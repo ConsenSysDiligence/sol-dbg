@@ -2,7 +2,6 @@ import { equalsBytes } from "ethereum-cryptography/utils";
 import * as sol from "solc-typed-ast";
 import { FrameKind, IArtifactManager, OPCODES, StepState } from "../debug";
 import { SolCallResult, SolVM, WorldInterface } from "../solvm";
-import { nyi } from "../solvm/exceptions";
 import { SolMessage } from "../solvm/state";
 import { SolTrace } from "../solvm/trace";
 import { stackTop, ZERO_ADDRESS } from "./misc";
@@ -113,8 +112,7 @@ export async function buildSolTrace(
     const world: WorldInterface = {
         call: (msg) => call(msg, OPCODES.CALL),
         delegatecall: (msg) => call(msg, OPCODES.DELEGATECALL),
-        staticcall: (msg) => call(msg, OPCODES.STATICCALL),
-        getStorage: () => nyi("WorldInterface.getStorage")
+        staticcall: (msg) => call(msg, OPCODES.STATICCALL)
     };
 
     const msg: SolMessage = {
@@ -128,12 +126,19 @@ export async function buildSolTrace(
 
     function getSegment(start: number, end: number): SolTraceSegment {
         const trace = vm.getTrace();
+        const traceSeg = trace.slice(solTraceLoc, trace.length);
+        // Alignment points consist of the start, end of each segment as well as any event emissions
+        // @todo align event emissions
+        const alignedPoints: Array<[number, number]> = [
+            [start, 0],
+            [end, traceSeg.length]
+        ];
+
         const res = {
             start,
             end,
-            // @todo align traces in [start, end] and [solTraceLoc, trace.length]
-            alignedPoints: [],
-            trace: trace.slice(solTraceLoc, trace.length)
+            alignedPoints,
+            trace: traceSeg
         };
         solTraceLoc = trace.length;
         return res;

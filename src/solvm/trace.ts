@@ -1,17 +1,33 @@
 import * as sol from "solc-typed-ast";
 import { SolValue } from "./state";
 
-export enum SolStepKind {
-    PushScope = "push_scope",
-    PopScope = "pop_scope",
-    Eval = "eval",
-    Exec = "exec",
-    Assign = "assign",
-    Copy = "copy"
+export class BaseSolStep {}
+export class PushScope extends BaseSolStep {
+    constructor(public readonly node: ScopeNode) {
+        super();
+    }
 }
-
-export interface BaseSolStep {
-    kind: SolStepKind;
+export class PopScope extends BaseSolStep {}
+export class EvalStep<T extends sol.Expression> extends BaseSolStep {
+    constructor(
+        public readonly expr: T,
+        public readonly value: SolValue
+    ) {
+        super();
+    }
+}
+export class ExecStep<T extends sol.Statement> extends BaseSolStep {
+    constructor(public readonly stmt: T) {
+        super();
+    }
+}
+export class ReturnStep extends ExecStep<sol.Return> {
+    constructor(
+        public readonly stmt: sol.Return,
+        public readonly values: SolValue[]
+    ) {
+        super(stmt);
+    }
 }
 
 export type ScopeNode =
@@ -24,34 +40,5 @@ export type ScopeNode =
     | sol.SourceUnit
     | sol.ContractDefinition;
 
-export interface PushStep extends BaseSolStep {
-    kind: SolStepKind.PushScope;
-    node: ScopeNode;
-}
-
-export interface PopStep extends BaseSolStep {
-    kind: SolStepKind.PopScope;
-}
-
-export interface EvalStep extends BaseSolStep {
-    kind: SolStepKind.Eval;
-    expr: sol.Expression;
-    value: SolValue;
-}
-
-export interface ExecStep extends BaseSolStep {
-    kind: SolStepKind.Exec;
-    stmt: sol.Statement;
-}
-
-export interface CopyStep extends BaseSolStep {
-    kind: SolStepKind.Copy;
-}
-
-export interface AssignStep extends BaseSolStep {
-    kind: SolStepKind.Assign;
-    to: sol.Expression;
-}
-
-export type SolTraceStep = PushStep | PopStep | EvalStep | ExecStep | CopyStep | AssignStep;
+export type SolTraceStep = BaseSolStep;
 export type SolTrace = SolTraceStep[];

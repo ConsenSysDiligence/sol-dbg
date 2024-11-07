@@ -1,4 +1,3 @@
-import { Address } from "@ethereumjs/util";
 import * as sol from "solc-typed-ast";
 import {
     buildMsgDataViews,
@@ -17,7 +16,7 @@ import {
 } from "./exceptions";
 import { BaseScope, BlockScope, ContractScope, FunScope, GlobalScope, Scope } from "./scope";
 import { LValue, noType, POISON, SolMessage, SolTuple, SolValue, VmDataView } from "./state";
-import { ScopeNode, SolStepKind, SolTrace } from "./trace";
+import { EvalStep, ExecStep, PopScope, PushScope, ReturnStep, ScopeNode, SolTrace } from "./trace";
 import { coerceToLValue } from "./utils";
 
 export interface SolCallResult {
@@ -29,7 +28,6 @@ export interface WorldInterface {
     call(msg: SolMessage): Promise<SolCallResult>;
     staticcall(msg: SolMessage): Promise<SolCallResult>;
     delegatecall(msg: SolMessage): Promise<SolCallResult>;
-    getStorage(addr: Address): Storage;
 }
 
 enum ControlFlow {
@@ -135,12 +133,12 @@ export class SolVM {
 
     private pushScope(scope: Scope, node: ScopeNode): void {
         this.scopes.push(scope);
-        this.trace.push({ kind: SolStepKind.PushScope, node });
+        this.trace.push(new PushScope(node));
     }
 
     private popScope(): void {
         this.scopes.pop();
-        this.trace.push({ kind: SolStepKind.PopScope });
+        this.trace.push(new PopScope());
     }
 
     private topScopeByType<T extends ScopeNode>(
@@ -258,7 +256,10 @@ export class SolVM {
             nyi(`Stmt ${stmt.constructor.name}`);
         }
 
-        this.trace.push({ kind: SolStepKind.Exec, stmt });
+        if (!(stmt instanceof sol.Return)) {
+            this.trace.push(new ExecStep(stmt));
+        }
+
         return res;
     }
 
@@ -459,13 +460,15 @@ export class SolVM {
             funScope.assign(i, retVals[i]);
         }
 
+        this.trace.push(new ReturnStep(stmt, retVals));
+
         return ControlFlow.Return;
     }
 
     private execRevertStatement(stmt: sol.RevertStatement): ControlFlow {
         const args = stmt.errorCall.vArguments.map(this.evalExpression);
         // Push to the trace before we throw
-        this.trace.push({ kind: SolStepKind.Exec, stmt });
+        this.trace.push(new ExecStep(stmt));
 
         const errDef = stmt.errorCall.vReferencedDeclaration;
         sol.assert(
@@ -479,7 +482,7 @@ export class SolVM {
 
     private execThrow(stmt: sol.Throw): ControlFlow {
         // Push to the trace before we throw
-        this.trace.push({ kind: SolStepKind.Exec, stmt });
+        this.trace.push(new ExecStep(stmt));
         throw new SolRawException(new Uint8Array());
     }
 
@@ -556,7 +559,7 @@ export class SolVM {
             nyi(`evalLValue(${expr.constructor.name})`);
         }
 
-        this.trace.push({ kind: SolStepKind.Eval, expr, value: res });
+        this.trace.push(new EvalStep(expr, res));
 
         return res;
     }
@@ -631,7 +634,7 @@ export class SolVM {
             nyi(`evalExpression(${expr.constructor.name})`);
         }
 
-        this.trace.push({ kind: SolStepKind.Eval, expr, value: res });
+        this.trace.push(new EvalStep(expr, res));
 
         return res;
     }
