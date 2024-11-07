@@ -3,6 +3,7 @@ export * from "./map";
 export * from "./misc";
 export * from "./pp";
 export * from "./set";
+export * from "./sol_tx_runner";
 export * from "./srcmap";
-export * from "./test_runner";
 export * from "./trace";
+export * from "./tx_runner";

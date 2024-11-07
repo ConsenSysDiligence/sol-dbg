@@ -30,6 +30,8 @@ import {
     mem_decodeValue
 } from "..";
 import { MAX_ARR_DECODE_LIMIT, bigEndianBufToBigint, bigIntToBuf, fits, uint256 } from "../..";
+import { nyi } from "../../solvm/exceptions";
+import { checkOOB } from "../../solvm/utils";
 
 /**
  * Helper to fetch the word residing at key `key` from `storage`.  Note that
@@ -634,4 +636,75 @@ export function stor_decodeValue(
     }
 
     throw new Error(`NYI storage decode for type ${typ.pp()}`);
+}
+
+/**
+ * Given a location `loc` with expected type `typ` return the location of the
+ * index element in `loc`
+ */
+export function stor_decodeIndexLoc(
+    typ: PointerType,
+    loc: StorageLocation,
+    idx: bigint,
+    storage: Storage,
+    infer: InferType
+): StorageLocation | undefined {
+    assert(
+        typ.to instanceof ArrayType || typ.to instanceof BytesType || typ.to instanceof MappingType,
+        `Indexing in storage can only happen in arrays, bytes and maps`
+    );
+
+    if (typ.to instanceof ArrayType) {
+        return stor_decodeIndexLoc_array(typ.to, loc, idx, storage, infer);
+    } else if (typ.to instanceof BytesType) {
+        nyi("stor_decodeIndexLoc_bytes(typ.to, loc, idx, storage, infer);");
+    } else {
+        nyi("stor_decodeIndexLoc(mapping)");
+    }
+}
+
+/**
+ * Given an array of type `typ` starting at location `loc` in storage, compute the location of storage of the elmeent at
+ * index `idx` in the array
+ */
+function stor_decodeIndexLoc_array(
+    typ: ArrayType,
+    loc: StorageLocation,
+    idx: bigint,
+    storage: Storage,
+    infer: InferType
+): StorageLocation | undefined {
+    let contentsLoc: StorageLocation;
+    let len: bigint;
+
+    if (typ.size === undefined) {
+        [len] = stor_decodeInt(uint256, loc, storage);
+        //console.error(`stor_decodeArray: Decoded len ${len} at loc ${ppLoc(loc)}`);
+        contentsLoc = {
+            kind: loc.kind,
+            address: keccakOfAddr(loc.address),
+            endOffsetInWord: 32
+        };
+    } else {
+        len = typ.size;
+        contentsLoc = loc;
+    }
+
+    // Check idx OoB
+    if (checkOOB(idx, 0n, len) === undefined) {
+        return undefined;
+    }
+
+    const elSize = typeStaticStorSize(typ.elementT, infer);
+    assert(0 < elSize && elSize <= 32, ``);
+    const elsPerWord = BigInt(Math.floor(32 / elSize));
+    const wordIdx = idx / elsPerWord;
+    const remainingEls = Number(idx - wordIdx * elsPerWord);
+    const remainingSize = remainingEls * elSize;
+
+    return {
+        kind: loc.kind,
+        address: contentsLoc.address + wordIdx,
+        endOffsetInWord: remainingSize
+    };
 }

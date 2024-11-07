@@ -26,7 +26,7 @@ export interface ReturnInfo {
 }
 
 /**
- * Adds return info for steps in the caller context, right after a return.
+ * Adds return info for steps in the calle context, right before a return.
  */
 export async function addReturnInfo<T extends object & BasicStepInfo & ExternalFrameInfo>(
     vm: VM,
@@ -35,26 +35,16 @@ export async function addReturnInfo<T extends object & BasicStepInfo & ExternalF
     trace: Array<T & ReturnInfo>,
     artifactManager: IArtifactManager
 ): Promise<T & ReturnInfo> {
-    if (trace.length === 0) {
+    if (state.op.opcode !== OPCODES.RETURN && state.op.opcode !== OPCODES.STOP) {
         return state;
     }
 
-    const lastStep = trace[trace.length - 1];
-
-    if (lastStep.op.opcode !== OPCODES.RETURN && lastStep.op.opcode !== OPCODES.STOP) {
-        return state;
-    }
-
-    const lastFrame = topExtFrame(lastStep);
+    const lastFrame = topExtFrame(state);
     const callStartStep = lastFrame.startStep;
 
     const rawReturnData =
-        lastStep.op.opcode === OPCODES.RETURN
-            ? mustReadMem(
-                  stackTop(lastStep.evmStack),
-                  stackInd(lastStep.evmStack, 1),
-                  lastStep.memory
-              )
+        state.op.opcode === OPCODES.RETURN
+            ? mustReadMem(stackTop(state.evmStack), stackInd(state.evmStack, 1), state.memory)
             : new Uint8Array(0);
 
     // Special case: For creation frames we know that the consturctor doesn't "return anything" at the Solidity level

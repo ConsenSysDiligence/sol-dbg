@@ -2,9 +2,12 @@ import {
     ArrayType,
     assert,
     InferType,
+    MappingType,
+    PackedArrayType,
     PointerType,
     DataLocation as SolDataLocation,
-    TypeNode
+    TypeNode,
+    types
 } from "solc-typed-ast";
 import { ABIEncoderVersion } from "solc-typed-ast/dist/types/abi";
 import {
@@ -19,9 +22,9 @@ import {
 import { MAX_ARR_DECODE_LIMIT, uint256 } from "../..";
 import { MapKeys, topExtFrame } from "../tracers/transformers";
 import { cd_decodeArrayContents, cd_decodeValue } from "./calldata";
-import { mem_decodeValue } from "./memory";
+import { mem_decodeIndexLoc, mem_decodeValue } from "./memory";
 import { st_decodeInt, st_decodeValue } from "./stack";
-import { stor_decodeValue } from "./storage";
+import { stor_decodeIndexLoc, stor_decodeValue } from "./storage";
 
 function solLocToDataKind(loc: SolDataLocation): MemoryLocationKind {
     if (loc === SolDataLocation.Default) {
@@ -176,4 +179,43 @@ export function decodeValue(
     //console.error(`decodeValue: res ${res}`);
 
     return res;
+}
+
+/**
+ * Return the location of an index into a data structure. Handles Storage and
+ * Memory locations, and arrays and maps.
+ */
+export function decodeIndexLoc(
+    view: DataView,
+    idx: bigint | Uint8Array,
+    state: StepState,
+    infer: InferType
+): DataView | undefined {
+    const { type, loc } = view;
+    assert(typeof idx === "bigint", `Idx keys in memory should be numbers.`);
+    assert(type instanceof PointerType, ``);
+
+    let elT: TypeNode;
+
+    if (type.to instanceof ArrayType) {
+        elT = type.to.elementT;
+    } else if (type.to instanceof PackedArrayType) {
+        elT = types.uint8;
+    } else if (type.to instanceof MappingType) {
+        elT = type.to.valueType;
+    } else {
+        assert(false, `Unexpected indexable type {0}`, type);
+    }
+
+    let idxLoc: DataLocation | undefined;
+
+    if (loc.kind === DataLocationKind.Memory) {
+        idxLoc = mem_decodeIndexLoc(type, loc, idx, state.memory);
+    } else if (loc.kind === DataLocationKind.Storage) {
+        idxLoc = stor_decodeIndexLoc(type, loc, idx, state.storage, infer);
+    } else {
+        assert(false, `Unsupported location in decodeIndexLoc {0}`, loc.kind);
+    }
+
+    return idxLoc === undefined ? undefined : { type: elT, loc: idxLoc };
 }

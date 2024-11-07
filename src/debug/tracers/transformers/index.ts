@@ -11,6 +11,7 @@ export type TransformerF<T extends object, T1 extends T> = (
 export * from "./basic_info";
 export * from "./contract_lifetime";
 export * from "./events";
+export * from "./exc_info";
 export * from "./ext_stack";
 export * from "./int_stack";
 export * from "./keccak256_invert";

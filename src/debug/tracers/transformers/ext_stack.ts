@@ -104,9 +104,9 @@ function makeCallFrame(
 
     return {
         kind: FrameKind.Call,
-        sender, // TODO: This should be Address
+        sender,
         msgData: data,
-        receiver: receiver, // TODO: This should be Address
+        receiver: receiver,
         code: receiverCode,
         info: contractInfo,
         callee,

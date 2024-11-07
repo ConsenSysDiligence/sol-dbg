@@ -8,6 +8,7 @@ import {
     ContractDefinition,
     EventDefinition,
     FunctionDefinition,
+    FunctionKind,
     FunctionVisibility,
     InferType,
     SourceUnit,
@@ -38,6 +39,11 @@ import { HexString } from "../../artifacts";
 import { OpcodeInfo } from "../opcodes";
 import { BytecodeTemplate, makeTemplate, matchesTemplate } from "./bytecode_templates";
 
+export interface InitSequence {
+    inlineInitializers: VariableDeclaration[];
+    constructors: FunctionDefinition[];
+}
+
 export interface IArtifactManager {
     getContractFromDeployedBytecode(code: Uint8Array): ContractInfo | undefined;
     getContractFromCreationBytecode(code: Uint8Array): ContractInfo | undefined;
@@ -50,6 +56,10 @@ export interface IArtifactManager {
     findMethod(
         selector: HexString | Uint8Array
     ): [ContractInfo, FunctionDefinition | VariableDeclaration] | undefined;
+    findEntryPoint(
+        data: HexString | Uint8Array,
+        contract: ContractInfo
+    ): FunctionDefinition | VariableDeclaration | undefined;
     getEventDefInfo(topic: bigint | Uint8Array | EventDesc): EventDefInfo | undefined;
 }
 
@@ -436,13 +446,14 @@ export class ArtifactManager implements IArtifactManager {
     }
 
     findMethod(
-        selector: HexString | Uint8Array
+        selector: HexString | Uint8Array,
+        info?: ContractInfo
     ): [ContractInfo, FunctionDefinition | VariableDeclaration] | undefined {
         if (selector instanceof Uint8Array) {
             selector = bytesToHex(selector);
         }
 
-        for (const contract of this._contracts) {
+        for (const contract of info ? [info] : this._contracts) {
             if (!contract.ast) {
                 continue;
             }
@@ -487,5 +498,96 @@ export class ArtifactManager implements IArtifactManager {
         }
 
         return this._topicToEventInfo.get(topic);
+    }
+
+    /**
+     * Returns the receive function for a contract (if any). Note that it may be defined on a base class
+     */
+    private findReceiveFun(contract: ContractDefinition): FunctionDefinition | undefined {
+        for (const base of contract.vLinearizedBaseContracts) {
+            for (const fun of base.vFunctions) {
+                if (fun.kind === FunctionKind.Receive) {
+                    return fun;
+                }
+            }
+        }
+
+        return undefined;
+    }
+
+    /**
+     * Returns the fallback function for a contract (if any). Note that it may be defined on a base class
+     */
+    private findFallbackFun(contract: ContractDefinition): FunctionDefinition | undefined {
+        for (const base of contract.vLinearizedBaseContracts) {
+            for (const fun of base.vFunctions) {
+                if (fun.kind === FunctionKind.Fallback) {
+                    return fun;
+                }
+            }
+        }
+
+        return undefined;
+    }
+
+    /**
+     * Given a contract, compute the sequence of state variables with inline
+     * initializers and constructors that need to run in order for the contract
+     * to be initialized.
+     */
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    getInitSequence(contract: ContractDefinition): InitSequence {
+        throw new Error("NYI");
+    }
+
+    /**
+     * Given a msg.data and a target contract, compute the intended AST entry point. If any.
+     * This handles the following cases:
+     *      - receive functions
+     *      - fallback functions
+     *      - normal function match
+     */
+    findEntryPoint(
+        data: HexString | Uint8Array,
+        info: ContractInfo
+    ): FunctionDefinition | VariableDeclaration | undefined {
+        const contract = info.ast;
+
+        if (!contract) {
+            return undefined;
+        }
+
+        // No data
+        if (data.length === 0) {
+            // First check if receive function is specified
+            const recvF = this.findReceiveFun(contract);
+
+            if (recvF) {
+                return recvF;
+            }
+
+            // Otherwise we fall back to the fallback fun
+            return this.findFallbackFun(contract);
+        }
+
+        // Not enough data for a signature
+        if (data.length < 4) {
+            // First check if receive function is specified
+            const recvF = this.findReceiveFun(contract);
+
+            if (recvF) {
+                return recvF;
+            }
+
+            // Otherwise we fall back to the fallback fun
+            return this.findFallbackFun(contract);
+        }
+
+        const selector = data.slice(0, 4);
+
+        const funMatch = this.findMethod(selector, info);
+
+        // Return either the fun match, or fallback fun if there is one
+        return funMatch ? funMatch[1] : this.findFallbackFun(contract);
     }
 }

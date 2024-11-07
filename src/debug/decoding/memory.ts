@@ -387,3 +387,112 @@ export function mem_decodeValue(
 
     throw new Error(`NYI decoding ${typ.pp()}`);
 }
+
+/**
+ * Return the static size in bytes of a data type.
+ * For reference types (arrays, structs) this is just the size of a pointer.
+ */
+export function mem_staticSizeOf(typ: TypeNode): number {
+    //console.error(`mem_decodeValue(${typ.pp()}, ${ppLoc(loc)})`);
+    if (
+        typ instanceof IntType ||
+        typ instanceof AddressType ||
+        typ instanceof FixedBytesType ||
+        typ instanceof BoolType ||
+        typ instanceof PointerType
+    ) {
+        return 32;
+    }
+
+    if (
+        typ instanceof UserDefinedType &&
+        (typ.definition instanceof EnumDefinition ||
+            typ.definition instanceof ContractDefinition ||
+            typ.definition instanceof UserDefinedValueTypeDefinition)
+    ) {
+        return 32;
+    }
+
+    throw new Error(`NYI decoding ${typ.pp()}`);
+}
+
+/**
+ * Given a location `loc` with expected type `typ` return the location of the
+ * index element in `loc`
+ */
+export function mem_decodeIndexLoc(
+    typ: PointerType,
+    loc: LinearMemoryLocation,
+    idx: bigint,
+    memory: Memory
+): LinearMemoryLocation | undefined {
+    // Indexing in memory can happen only in arrays.
+    assert(
+        typ.to instanceof ArrayType || typ.to instanceof BytesType,
+        `Indexing in memory can only happen in arrays and bytes`
+    );
+    const offRes = mem_decodeInt(uint256, loc, memory);
+
+    if (offRes === undefined) {
+        return undefined;
+    }
+
+    let arrOffset = offRes[0];
+
+    let numLen: number;
+
+    if (typ.to instanceof ArrayType) {
+        if (typ.to.size === undefined) {
+            const len = mem_decodeInt(
+                uint256,
+                { kind: DataLocationKind.Memory, address: arrOffset },
+                memory
+            );
+
+            if (len == undefined) {
+                return undefined;
+            }
+
+            if (len[0] >= MAX_ARR_DECODE_LIMIT) {
+                return undefined;
+            }
+
+            numLen = Number(len[0]);
+            arrOffset += BigInt(len[1]);
+        } else {
+            if (typ.to.size >= MAX_ARR_DECODE_LIMIT) {
+                return undefined;
+            }
+
+            numLen = Number(typ.to.size);
+        }
+
+        /// OoB
+        if (idx < 0 || idx >= numLen) {
+            return undefined;
+        }
+
+        return {
+            kind: DataLocationKind.Memory,
+            address: arrOffset + idx * BigInt(mem_staticSizeOf(typ.to.elementT) * 8)
+        };
+    }
+
+    const lenRes = mem_decodeInt(uint256, loc, memory);
+
+    if (lenRes == undefined) {
+        return undefined;
+    }
+
+    if (lenRes[0] >= MAX_ARR_DECODE_LIMIT) {
+        return undefined;
+    }
+
+    numLen = Number(lenRes[0]);
+    arrOffset += BigInt(lenRes[1]);
+
+    return {
+        kind: DataLocationKind.Memory,
+        address: arrOffset + idx
+    };
+}

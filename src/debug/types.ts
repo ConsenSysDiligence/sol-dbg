@@ -215,6 +215,9 @@ export interface StepState extends StepVMState {
         // Decoded returned data (if ast info is available)
         decodedReturnData?: any[];
     };
+    excInfo?: {
+        data: Uint8Array;
+    };
     intStack: InternalCallFrame[];
     src: sol.DecodedBytecodeSourceMapEntry | undefined;
     astNode: sol.ASTNode | undefined;
