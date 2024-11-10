@@ -7,6 +7,10 @@ export function nyi(msg: string): never {
     throw new NYI(`NYI: ${msg}`);
 }
 
+export function fail(msg: string): never {
+    sol.assert(false, msg);
+}
+
 export abstract class SolBaseException {}
 
 export abstract class SolInternalException extends SolBaseException {}

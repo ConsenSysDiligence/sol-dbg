@@ -7,7 +7,42 @@ export function zeroValue(typ: sol.TypeNode): SolValue {
         return 0n;
     }
 
+    if (typ instanceof sol.BoolType) {
+        return false;
+    }
+
     nyi(`NYI zeroValue`);
+}
+
+export function isExternal(call: sol.FunctionCall, infer: sol.InferType): boolean {
+    const callee = call.vCallee;
+
+    if (!(callee instanceof sol.MemberAccess)) {
+        return false;
+    }
+
+    const baseT = infer.typeOf(callee.vExpression);
+
+    return (
+        baseT instanceof sol.UserDefinedType && baseT.definition instanceof sol.ContractDefinition
+    );
+}
+
+export function getFunCallTarget(
+    call: sol.FunctionCall,
+    infer: sol.InferType
+): sol.FunctionDefinition {
+    const decl = call.vReferencedDeclaration;
+
+    sol.assert(decl instanceof sol.FunctionDefinition, `NYI fun def {0}`, decl);
+
+    const contractScope = call.getClosestParentByType(sol.ContractDefinition);
+
+    const callee = contractScope ? sol.resolveCallable(contractScope, decl, infer) : decl;
+
+    sol.assert(callee instanceof sol.FunctionDefinition, `NYI callee {0}`, callee);
+
+    return callee;
 }
 
 export function coerceToLValue(val: SolValue): LValue {

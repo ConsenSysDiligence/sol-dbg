@@ -1,6 +1,6 @@
 import { equalsBytes } from "ethereum-cryptography/utils";
 import * as sol from "solc-typed-ast";
-import { FrameKind, IArtifactManager, OPCODES, StepState } from "../debug";
+import { FrameKind, IArtifactManager, OPCODES, StepState, Storage } from "../debug";
 import { SolCallResult, SolVM, WorldInterface } from "../solvm";
 import { SolMessage } from "../solvm/state";
 import { SolTrace } from "../solvm/trace";
@@ -11,6 +11,9 @@ export interface SolTraceSegment {
     end: number;
     alignedPoints: Array<[number, number]>;
     trace: SolTrace;
+    finalState: {
+        storage: Storage;
+    };
 }
 
 export function findIndexAfter<T>(
@@ -54,7 +57,7 @@ function getSolCalResult(step: StepState): SolCallResult {
         };
     }
 
-    sol.assert(false, `Unexpected getSolCalResult(${step.op.mnemonic})`);
+    fail(`Unexpected getSolCalResult(${step.op.mnemonic})`);
 }
 
 /**
@@ -108,11 +111,16 @@ export async function buildSolTrace(
         }
     }
 
+    function getStorage(): Storage {
+        return evmTrace[idx].storage;
+    }
+
     // Instantiate the SolVm and try executing
     const world: WorldInterface = {
         call: (msg) => call(msg, OPCODES.CALL),
         delegatecall: (msg) => call(msg, OPCODES.DELEGATECALL),
-        staticcall: (msg) => call(msg, OPCODES.STATICCALL)
+        staticcall: (msg) => call(msg, OPCODES.STATICCALL),
+        getStorage
     };
 
     const msg: SolMessage = {
@@ -138,7 +146,10 @@ export async function buildSolTrace(
             start,
             end,
             alignedPoints,
-            trace: traceSeg
+            trace: traceSeg,
+            finalState: {
+                storage: vm.getStorage()
+            }
         };
         solTraceLoc = trace.length;
         return res;
@@ -170,7 +181,7 @@ export async function buildSolTrace(
         return ctxRes;
     }
 
-    const vm = new SolVM(world, artifactManager, frame.info, msg, evmTrace[idx].storage);
+    const vm = new SolVM(world, artifactManager, frame.info, msg);
 
     await vm.run();
 

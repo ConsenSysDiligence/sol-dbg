@@ -6,8 +6,6 @@ import { SolValue, VmDataView } from "./state";
 import { ScopeNode } from "./trace";
 import { zeroValue } from "./utils";
 
-export type Scope = GlobalScope | ContractScope | FunScope | BlockScope;
-
 export interface ScopeI {
     lookup(name: string): VmDataView | undefined;
 }
@@ -30,25 +28,16 @@ export class FunScope extends BaseScope {
         return this.rets;
     }
 
-    lookupVal(name: string | number): SolValue {
-        if (typeof name === "number") {
-            sol.assert(this.rets.length > name, `Return oob ${name}`);
-            return this.rets[name];
+    deref(view: VmDataView): SolValue | undefined {
+        if (!(view.kind === "local" && view.scope === this)) {
+            return undefined;
         }
 
-        if (this.nameToIdx.has(name)) {
-            sol.assert(
-                this.rets.length > (this.nameToIdx.get(name) as number),
-                `Return oob ${name}`
-            );
-            return this.rets[this.nameToIdx.get(name) as number];
+        if (typeof view.name === "string") {
+            return this.args.get(view.name);
         }
 
-        const res = this.args.get(name);
-
-        sol.assert(res !== undefined, `Unknown local ${name}`);
-
-        return res;
+        return this.rets[view.name];
     }
 
     constructor(
@@ -122,6 +111,14 @@ export class BlockScope extends BaseScope {
     assign(name: string, v: SolValue): void {
         this.locals.set(name, v);
     }
+
+    deref(view: VmDataView): SolValue | undefined {
+        if (!(view.kind === "local" && view.scope === this && typeof view.name === "string")) {
+            return undefined;
+        }
+
+        return this.locals.get(view.name);
+    }
 }
 
 export class ContractScope extends BaseScope {
@@ -159,5 +156,10 @@ export class GlobalScope extends BaseScope {
             // @todo require isolating the evaulator for constant evaulation
             nyi(`evaluating global constants`);
         }
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    deref(view: VmDataView): SolValue | undefined {
+        nyi(`deref global constants`);
     }
 }

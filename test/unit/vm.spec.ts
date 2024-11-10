@@ -1,19 +1,25 @@
 import { TypedTransaction } from "@ethereumjs/tx";
+import { AbiCoder } from "@ethersproject/abi";
+import { bytesToHex } from "ethereum-cryptography/utils";
 import expect from "expect";
 import fse from "fs-extra";
+import { ABIEncoderVersion, ContractDefinition, InferType } from "solc-typed-ast";
 import {
     ArtifactManager,
     buildSolTrace,
+    ContractInfo,
     PartialSolcOutput,
     pp,
     Scenario,
     SolTxDebugger,
+    stackTop,
     StepState,
     TxRunner
 } from "../../src";
+import { ReturnStep } from "../../src/solvm/trace";
 
-function makeTest(artifact: PartialSolcOutput): Scenario {
-    const bytecode = artifact.contracts["sample.sol"]["Test"].evm.bytecode.object;
+function makeTest(artifact: PartialSolcOutput, fileName: string): Scenario {
+    const bytecode = artifact.contracts[fileName]["__IRTest__"].evm.bytecode.object;
     return {
         initialState: { accounts: {} },
         steps: [
@@ -48,7 +54,8 @@ function makeTest(artifact: PartialSolcOutput): Scenario {
 }
 
 describe("Local tests", () => {
-    for (const sample of fse.readdirSync("test/samples/solvm")) {
+    const coder = new AbiCoder();
+    for (const sample of ["cfg"] /*fse.readdirSync("test/samples/solvm")*/) {
         describe(`Sample ${sample}`, () => {
             let artifact: PartialSolcOutput;
             let artifactManager: ArtifactManager;
@@ -61,7 +68,7 @@ describe("Local tests", () => {
                 artifactManager = new ArtifactManager([artifact]);
                 txRunner = new TxRunner(artifactManager);
 
-                const test = makeTest(artifact);
+                const test = makeTest(artifact, `${sample}.sol`);
 
                 await txRunner.runScenario(test);
 
@@ -80,6 +87,29 @@ describe("Local tests", () => {
 
                 for (const seg of segments) {
                     console.error(`${seg.start}-${seg.end}: \n${pp(seg.trace)}`);
+                    const evmStep = trace[seg.end];
+                    const solStep = seg.trace[seg.trace.length - 1];
+
+                    const info = stackTop(evmStep.stack).info as ContractInfo;
+                    expect(info).toBeDefined();
+                    const ast = (info as ContractInfo).ast as ContractDefinition;
+                    expect(ast).toBeDefined();
+                    const mainFun = ast.vFunctions.filter((f) => f.name === "main")[0];
+                    const infer = new InferType(info.artifact.compilerVersion);
+                    const mainT = infer.funDefToType(mainFun);
+                    const abiRets = mainT.returns.map((t) =>
+                        infer.toABIEncodedType(t, ABIEncoderVersion.V2).pp()
+                    );
+
+                    if (solStep instanceof ReturnStep) {
+                        const encodedSolidityRet = coder.encode(abiRets, solStep.values);
+                        expect(evmStep.retInfo).toBeDefined();
+                        expect(
+                            "0x" + bytesToHex(evmStep.retInfo?.rawReturnData as Uint8Array)
+                        ).toEqual(encodedSolidityRet);
+                    } else {
+                        throw new Error(`NYI alignment point ${pp(solStep)}`);
+                    }
                 }
                 expect(finalIdx).toEqual(trace.length);
             });

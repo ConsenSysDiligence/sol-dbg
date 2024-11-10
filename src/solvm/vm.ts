@@ -1,23 +1,28 @@
 import * as sol from "solc-typed-ast";
+import { isExternal } from "util/types";
 import {
     buildMsgDataViews,
     ContractInfo,
     DataLocationKind,
     IArtifactManager,
+    mem_decodeValue,
+    Memory,
+    stor_decodeValue,
     Storage
 } from "../debug";
 import { stackTop, ZERO_ADDRESS } from "../utils";
 import {
+    fail,
     nyi,
     SolBaseException,
     SolNoMethod,
     SolRawException,
     SolStructuredException
 } from "./exceptions";
-import { BaseScope, BlockScope, ContractScope, FunScope, GlobalScope, Scope } from "./scope";
+import { BaseScope, BlockScope, ContractScope, FunScope, GlobalScope } from "./scope";
 import { LValue, noType, POISON, SolMessage, SolTuple, SolValue, VmDataView } from "./state";
-import { EvalStep, ExecStep, PopScope, PushScope, ReturnStep, ScopeNode, SolTrace } from "./trace";
-import { coerceToLValue } from "./utils";
+import { EvalStep, ExecStep, ReturnStep, ScopeNode, SolTrace } from "./trace";
+import { coerceToLValue, getFunCallTarget } from "./utils";
 
 export interface SolCallResult {
     reverted: boolean;
@@ -28,6 +33,7 @@ export interface WorldInterface {
     call(msg: SolMessage): Promise<SolCallResult>;
     staticcall(msg: SolMessage): Promise<SolCallResult>;
     delegatecall(msg: SolMessage): Promise<SolCallResult>;
+    getStorage(): Storage;
 }
 
 enum ControlFlow {
@@ -39,20 +45,23 @@ enum ControlFlow {
 
 export class SolVM {
     protected infer: sol.InferType;
-    protected scopes: Scope[] = [];
+    protected scopes: BaseScope[] = [];
     protected temps = new Map<sol.Expression, SolValue>();
     protected compilerVersion: string;
     protected encoderVersion: sol.ABIEncoderVersion;
     protected contract: sol.ContractDefinition;
     protected trace: SolTrace = [];
+    protected storage: Storage;
+    protected memory: Memory;
 
     constructor(
         protected env: WorldInterface,
         protected artifactManager: IArtifactManager,
         protected info: ContractInfo,
-        protected msg: SolMessage,
-        protected storage: Storage
+        protected msg: SolMessage
     ) {
+        this.memory = new Uint8Array();
+        this.storage = env.getStorage();
         this.compilerVersion = info.artifact.compilerVersion;
         this.encoderVersion = info.artifact.abiEncoderVersion;
         this.infer = artifactManager.infer(this.compilerVersion);
@@ -89,6 +98,10 @@ export class SolVM {
 
     getTrace(): SolTrace {
         return this.trace;
+    }
+
+    getStorage(): Storage {
+        return this.storage;
     }
 
     /**
@@ -131,14 +144,15 @@ export class SolVM {
         );
     }
 
-    private pushScope(scope: Scope, node: ScopeNode): void {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    private pushScope(scope: BaseScope, node: ScopeNode): void {
         this.scopes.push(scope);
-        this.trace.push(new PushScope(node));
+        //this.trace.push(new PushScope(node));
     }
 
     private popScope(): void {
         this.scopes.pop();
-        this.trace.push(new PopScope());
+        //this.trace.push(new PopScope());
     }
 
     private topScopeByType<T extends ScopeNode>(
@@ -162,7 +176,31 @@ export class SolVM {
             }
         }
 
-        sol.assert(false, `Undeclared identifier ${name}`);
+        fail(`Undeclared identifier ${name}`);
+    }
+
+    private getValue(view: VmDataView, typ: sol.TypeNode): SolValue {
+        let res: SolValue | undefined;
+
+        if (view.kind === "local") {
+            const scope = view.scope;
+            if (
+                scope instanceof GlobalScope ||
+                scope instanceof BlockScope ||
+                scope instanceof FunScope
+            ) {
+                res = scope.deref(view);
+            }
+        } else if (view.kind === "storage") {
+            res = stor_decodeValue(typ, view, this.storage, this.infer);
+        } else if (view.kind === "memory") {
+            res = mem_decodeValue(typ, view, this.memory, this.infer);
+        } else {
+            fail(`Unexpected view ${view.kind}`);
+        }
+
+        sol.assert(res !== undefined, ``);
+        return res;
     }
 
     private execModifier(mod: sol.ModifierInvocation): void {
@@ -177,7 +215,7 @@ export class SolVM {
     }
 
     /**
-     * Execute a "callable". This includes FunctionDefinition, ModifierInvocation and VariableDeclaration (getters).
+     * Execute a FunctionDefinition.
      * Sets up the callable scope, and figure out what to execute next:
      *  - for functions with modifiers, the first modifier
      *  - otherwise (fun with no modifier or a modifier) execute the body next
@@ -185,7 +223,18 @@ export class SolVM {
      * @todo Handle getters
      */
     private execFun(fun: sol.FunctionDefinition, args: SolValue[]): SolValue[] {
+        // If we are being called from another function, then we remember its scopes here. We restore them at the end
+        const savedScopes = this.scopes;
+
         const scope = new FunScope(fun, args, this.infer);
+        this.scopes = [this.scopes[0]];
+
+        // If this is a contract method add the contract scope. Otherwise this is a global function in the global scope
+        if (fun.vScope instanceof sol.ContractDefinition) {
+            this.pushScope(new ContractScope(fun.vScope, this.infer), fun.vScope);
+        }
+
+        // Add function scope
         this.pushScope(scope, fun);
 
         // First check if this is a function with modifiers. If so we start execution at the first modifier
@@ -209,7 +258,7 @@ export class SolVM {
             this.execBlock(body);
         }
 
-        this.popScope();
+        this.scopes = savedScopes;
 
         return scope.returns();
     }
@@ -445,10 +494,10 @@ export class SolVM {
 
         if (stmt.vExpression === undefined) {
             retVals = [];
-        } else if (stmt.vExpression instanceof sol.TupleExpression) {
-            retVals = this.evalExpression(stmt.vExpression) as SolValue[];
         } else {
-            retVals = [this.evalExpression(stmt.vExpression)];
+            const retVal = this.evalExpression(stmt.vExpression);
+
+            retVals = retVal instanceof SolTuple ? retVal.components : [retVal];
         }
 
         sol.assert(
@@ -518,6 +567,7 @@ export class SolVM {
 
         return ControlFlow.Fallthrough;
     }
+
     private execWhileStatement(stmt: sol.WhileStatement): ControlFlow {
         let flow: ControlFlow = ControlFlow.Fallthrough;
 
@@ -599,6 +649,21 @@ export class SolVM {
         return res;
     }
 
+    // Helper to eval an expression as bigint or fail
+    private evalBigint(expr: sol.Expression): bigint {
+        const res = this.evalExpression(expr);
+
+        sol.assert(
+            typeof res === "bigint",
+            `Expected a boolean when evaluating {0} not {1} of type {2}`,
+            expr,
+            res as any,
+            typeof res
+        );
+
+        return res;
+    }
+
     private evalExpression(expr: sol.Expression): SolValue {
         let res: SolValue;
 
@@ -635,28 +700,241 @@ export class SolVM {
         }
 
         this.trace.push(new EvalStep(expr, res));
+        //console.error(`eval(${sol.pp(expr)}) -> ${res}`);
 
         return res;
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     private assign(lhs: LValue, rhs: SolValue): void {
-        nyi("assign");
+        // Tuple assignment
+        if (lhs instanceof Array) {
+            sol.assert(
+                rhs instanceof SolTuple && lhs.length === rhs.components.length,
+                `Mismatch in tuple assignment`
+            );
+
+            for (let i = 0; i < lhs.length; i++) {
+                const lhsC = lhs[i];
+
+                if (lhsC !== null) {
+                    this.assign(lhsC, rhs.components[i]);
+                }
+            }
+
+            return;
+        }
+
+        if (lhs.kind === "local") {
+            lhs.scope.assign(lhs.name as any, rhs);
+        } else if (lhs.kind === "storage") {
+            nyi("Storage assignments");
+        } else if (lhs.kind === "memory") {
+            nyi("Memory assignments");
+        } else {
+            nyi(`Assignment location ${lhs.kind}`);
+        }
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     private evalAssignment(expr: sol.Assignment): SolValue {
-        const rhs = this.evalExpression(expr.vRightHandSide);
+        let rhs = this.evalExpression(expr.vRightHandSide);
         const lhs = this.evalLValue(expr.vLeftHandSide);
+
+        const op = expr.operator;
+
+        if (op.length > 1) {
+            sol.assert(!(lhs instanceof Array), `No operator assignments on tuples.`);
+
+            const lhsV = this.evalExpression(expr.vLeftHandSide);
+            const type = this.infer.typeOfAssignment(expr);
+            rhs = this.evalBinaryOperationImpl(
+                lhsV,
+                op[0],
+                rhs,
+                type,
+                this.getBinaryUserFunction(op[0], type, expr),
+                this.isUnchecked(expr)
+            );
+        }
 
         this.assign(lhs, rhs);
 
         return rhs;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    isUnchecked(expr: sol.Expression): boolean {
+        // @todo add semver
+        // @todo check if this.info.artifact.compilerVersion < 0.8.0
+
+        return expr.getClosestParentByType(sol.UncheckedBlock) !== undefined;
+    }
+
+    private getBinaryUserFunction(
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        op: string,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        exprT: sol.TypeNode,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        ctx: sol.ASTNode
+    ): sol.FunctionDefinition | undefined {
+        // @todo - need to detect that a given (operator, type) has an associated user function attached
+        return undefined;
+    }
+
+    private evalBinaryOperationImpl(
+        left: SolValue,
+        operator: string,
+        right: SolValue,
+        type: sol.TypeNode,
+        userFunction: sol.FunctionDefinition | undefined,
+        unchecked: boolean
+    ): SolValue {
+        // @todo - need to detect
+        if (userFunction) {
+            nyi("User-defined operators");
+        }
+
+        if (sol.BINARY_OPERATOR_GROUPS.Logical.includes(operator)) {
+            if (!(typeof left === "boolean" && typeof right === "boolean")) {
+                fail(`${operator} expects booleans not ${left} and ${right}`);
+            }
+
+            if (operator === "&&") {
+                return left && right;
+            }
+
+            if (operator === "||") {
+                return left || right;
+            }
+
+            fail(`Unknown logical operator ${operator}`);
+        }
+
+        if (sol.BINARY_OPERATOR_GROUPS.Equality.includes(operator)) {
+            let isEqual: boolean;
+
+            if (typeof left === "boolean" && typeof right === "boolean") {
+                isEqual = left === right;
+            } else if (typeof left === "bigint" && typeof right === "bigint") {
+                isEqual = left === right;
+            } else {
+                nyi(`${left} ${operator} ${right}`);
+            }
+
+            if (operator === "==") {
+                return isEqual;
+            }
+
+            if (operator === "!=") {
+                return !isEqual;
+            }
+
+            fail(`Unknown equality operator ${operator}`);
+        }
+
+        if (sol.BINARY_OPERATOR_GROUPS.Comparison.includes(operator)) {
+            if (!(typeof left === "bigint" && typeof right === "bigint")) {
+                nyi(`${left} ${operator} ${right}`);
+            }
+
+            if (operator === "<") {
+                return left < right;
+            }
+
+            if (operator === "<=") {
+                return left <= right;
+            }
+
+            if (operator === ">") {
+                return left > right;
+            }
+
+            if (operator === ">=") {
+                return left >= right;
+            }
+
+            throw new EvalError(`Unknown comparison operator ${operator}`);
+        }
+
+        if (sol.BINARY_OPERATOR_GROUPS.Arithmetic.includes(operator)) {
+            if (!(typeof left === "bigint" && typeof right === "bigint")) {
+                nyi(`${left} ${operator} ${right}`);
+            }
+
+            let res: bigint;
+
+            if (operator === "+") {
+                res = left + right;
+            } else if (operator === "-") {
+                res = left - right;
+            } else if (operator === "*") {
+                res = left * right;
+            } else if (operator === "/") {
+                res = left / right;
+            } else if (operator === "%") {
+                res = left % right;
+            } else if (operator === "**") {
+                res = left ** right;
+            } else {
+                throw new EvalError(`Unknown arithmetic operator ${operator}`);
+            }
+
+            const clampedRes = this.clampIntToType(res, type);
+            const overflow = clampedRes !== res;
+
+            if (overflow && !unchecked) {
+                nyi(`Exception on overflow`);
+            }
+
+            return res;
+        }
+
+        if (sol.BINARY_OPERATOR_GROUPS.Bitwise.includes(operator)) {
+            if (!(typeof left === "bigint" && typeof right === "bigint")) {
+                nyi(`${operator} between ${left} and ${right}`);
+            }
+
+            if (operator === "<<") {
+                return left << right;
+            }
+
+            if (operator === ">>") {
+                return left >> right;
+            }
+
+            if (operator === "|") {
+                return left | right;
+            }
+
+            if (operator === "&") {
+                return left & right;
+            }
+
+            if (operator === "^") {
+                return left ^ right;
+            }
+
+            nyi(`Unknown bitwise operator ${operator}`);
+        }
+
+        nyi(`${left} ${operator} ${right}`);
+    }
+
     private evalBinaryOperation(expr: sol.BinaryOperation): SolValue {
-        nyi("BinaryOperation");
+        const left = this.evalExpression(expr.vLeftExpression);
+        const right = this.evalExpression(expr.vRightExpression);
+        const operator = expr.operator;
+        const type = this.infer.typeOf(expr);
+
+        return this.evalBinaryOperationImpl(
+            left,
+            operator,
+            right,
+            type,
+            expr.vUserFunction,
+            this.isUnchecked(expr)
+        );
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -675,13 +953,74 @@ export class SolVM {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    private evalFunctionCall(expr: sol.FunctionCall): SolValue {
-        nyi("FunctionCall");
+    private evalBuiltinFunctionCall(expr: sol.FunctionCall): SolValue {
+        nyi("evalBuiltinFunctionCall");
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    private evalInternalFunctionCall(expr: sol.FunctionCall): SolValue {
+        const args = expr.vArguments.map((arg) => this.evalExpression(arg));
+        const callee = getFunCallTarget(expr, this.infer);
+        const retVals = this.execFun(callee, args);
+
+        return retVals.length === 0
+            ? POISON
+            : retVals.length === 1
+              ? retVals[0]
+              : new SolTuple(retVals);
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    private evalExternalFunctionCall(expr: sol.FunctionCall): SolValue {
+        nyi("evalExternalFunctionCall");
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    private evalTypeConversion(expr: sol.FunctionCall): SolValue {
+        const exprT = this.infer.typeOf(expr.vExpression);
+        sol.assert(expr.vArguments.length === 1 && exprT instanceof sol.TypeNameType, ``);
+
+        const innerV = this.evalExpression(expr.vArguments[0]);
+        const toT = exprT.type;
+
+        if (toT instanceof sol.IntType && typeof innerV === "bigint") {
+            return sol.clampIntToType(innerV, toT);
+        }
+
+        nyi(`evalTypeConversion ${innerV} -> ${toT.pp()}`);
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    private evalStructConstructorCall(expr: sol.FunctionCall): SolValue {
+        nyi("evalStructConstructorCall");
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    private evalFunctionCall(expr: sol.FunctionCall): SolValue {
+        const decl = expr.vReferencedDeclaration;
+
+        if (expr.kind === sol.FunctionCallKind.TypeConversion) {
+            return this.evalTypeConversion(expr);
+        } else if (expr.kind === sol.FunctionCallKind.StructConstructorCall) {
+            return this.evalStructConstructorCall(expr);
+        } else {
+            if (decl === undefined) {
+                return this.evalBuiltinFunctionCall(expr);
+            }
+
+            if (isExternal(expr)) {
+                return this.evalExternalFunctionCall(expr);
+            }
+
+            return this.evalInternalFunctionCall(expr);
+        }
+    }
+
     private evalIdentifier(expr: sol.Identifier): SolValue {
-        nyi("Identifier");
+        const view = this.lookup(expr.name);
+        const typ = this.infer.typeOf(expr);
+
+        return this.getValue(view, typ);
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -698,6 +1037,10 @@ export class SolVM {
     private evalLiteral(expr: sol.Literal): SolValue {
         if (expr.kind === sol.LiteralKind.Number) {
             return BigInt(expr.value);
+        }
+
+        if (expr.kind === sol.LiteralKind.Bool) {
+            return expr.value === "true";
         }
 
         nyi("Literal");
@@ -723,8 +1066,71 @@ export class SolVM {
         );
     }
 
+    clampIntToType(val: bigint, type: sol.TypeNode): bigint {
+        sol.assert(
+            type instanceof sol.IntType || type instanceof sol.IntLiteralType,
+            `Unexpected int type {0}`,
+            type
+        );
+
+        if (type instanceof sol.IntLiteralType) {
+            return val;
+        }
+
+        return sol.clampIntToType(val, type);
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     private evalUnaryOperation(expr: sol.UnaryOperation): SolValue {
-        nyi("UnaryOperation");
+        const op = expr.operator;
+
+        if (expr.vUserFunction) {
+            nyi(`User-defined functions`);
+        }
+
+        if (op === "!") {
+            return !this.evalBool(expr.vSubExpression);
+        }
+
+        if (op === "-") {
+            const rawRes = -this.evalBigint(expr.vSubExpression);
+            const type = this.infer.typeOf(expr);
+            const clampedRes = this.clampIntToType(rawRes, type);
+
+            if (rawRes !== clampedRes && !this.isUnchecked(expr)) {
+                nyi(`Exception on overflow`);
+            }
+
+            return clampedRes;
+        }
+
+        if (op === "~") {
+            nyi(`Unary bitwise not`);
+        }
+
+        if (op === "delete") {
+            nyi("delete");
+        }
+
+        if (op === "++" || op === "--") {
+            const type = this.infer.typeOf(expr) as sol.IntType;
+            const inner = this.evalBigint(expr.vSubExpression);
+            const lv = this.evalLValue(expr.vSubExpression);
+
+            const newVal = this.evalBinaryOperationImpl(
+                inner,
+                op[0],
+                1n,
+                type,
+                this.getBinaryUserFunction(op[0], type, expr),
+                this.isUnchecked(expr)
+            );
+
+            this.assign(lv, newVal);
+
+            return expr.prefix ? newVal : inner;
+        }
+
+        nyi(`Unknown unary op ${expr.operator}`);
     }
 }
