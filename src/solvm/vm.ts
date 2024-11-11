@@ -1,5 +1,7 @@
+import { Address } from "@ethereumjs/util";
+import { concatBytes, hexToBytes } from "ethereum-cryptography/utils";
+import { lt } from "semver";
 import * as sol from "solc-typed-ast";
-import { isExternal } from "util/types";
 import {
     buildMsgDataViews,
     ContractInfo,
@@ -7,22 +9,42 @@ import {
     IArtifactManager,
     mem_decodeValue,
     Memory,
+    OPCODES,
     stor_decodeValue,
     Storage
 } from "../debug";
 import { stackTop, ZERO_ADDRESS } from "../utils";
+import { PanicCodes } from "./constants";
 import {
     fail,
     nyi,
     SolBaseException,
+    SolInvalid,
     SolNoMethod,
-    SolRawException,
-    SolStructuredException
+    SolPanic,
+    SolRevert
 } from "./exceptions";
 import { BaseScope, BlockScope, ContractScope, FunScope, GlobalScope } from "./scope";
 import { LValue, noType, POISON, SolMessage, SolTuple, SolValue, VmDataView } from "./state";
-import { EvalStep, ExecStep, ReturnStep, ScopeNode, SolTrace } from "./trace";
-import { coerceToLValue, getFunCallTarget } from "./utils";
+import {
+    DefaultConstructorStep,
+    EvalStep,
+    ExceptionStep,
+    ExecStep,
+    ExternalCallStep,
+    InternalReturnStep,
+    ScopeNode,
+    SolTrace
+} from "./trace";
+import {
+    asyncMap,
+    coerceToLValue,
+    decodeReturns,
+    encodeCall,
+    findConstructor,
+    getFunCallTarget,
+    grabInheritanceArgs
+} from "./utils";
 
 export interface SolCallResult {
     reverted: boolean;
@@ -30,6 +52,7 @@ export interface SolCallResult {
 }
 
 export interface WorldInterface {
+    create(msg: SolMessage): Promise<SolCallResult>;
     call(msg: SolMessage): Promise<SolCallResult>;
     staticcall(msg: SolMessage): Promise<SolCallResult>;
     delegatecall(msg: SolMessage): Promise<SolCallResult>;
@@ -77,16 +100,16 @@ export class SolVM {
     /**
      * Entry point for running the VM
      */
-    run(): SolValue[] | SolBaseException {
+    async run(): Promise<SolValue[] | SolBaseException> {
         this.trace = [];
 
         try {
             if (this.msg.to === null || this.msg.to.equals(ZERO_ADDRESS)) {
-                this._create();
+                await this._create();
                 return [];
             }
 
-            return this._call();
+            return await this._call();
         } catch (e) {
             if (e instanceof SolBaseException) {
                 return e;
@@ -105,23 +128,89 @@ export class SolVM {
     }
 
     /**
-     * Helper to handle contract creation
+     * Helper to handle contract creation. Handles constructor evaluation.
+     * Called at most once per object lifetime.
      */
-    private _create(): void {
-        nyi("contract creation");
+    private async _create(): Promise<void> {
+        const info = this.artifactManager.getContractFromCreationBytecode(this.msg.data);
+        sol.assert(info !== undefined, ``);
+        const contract = info.ast;
+        sol.assert(contract !== undefined, ``);
+        const [argExprMap, parentScopeMap] = grabInheritanceArgs(contract);
+
+        const argMap = new Map<sol.ContractDefinition, SolValue[]>();
+        const firstConstructor = findConstructor(contract);
+
+        if (firstConstructor) {
+            const calldataViews = buildMsgDataViews(
+                firstConstructor,
+                this.msg.data,
+                DataLocationKind.CallData,
+                this.infer,
+                this.encoderVersion
+            );
+
+            const calldataArgs = calldataViews.map((v) =>
+                v[1] === undefined ? { val: POISON, type: noType } : { val: v[1], type: v[1].type }
+            );
+
+            argMap.set(firstConstructor.vScope as sol.ContractDefinition, calldataArgs);
+        }
+
+        for (const base of contract.vLinearizedBaseContracts) {
+            // @todo add inline state var initializers
+
+            if (!base.vConstructor) {
+                this.trace.push(new DefaultConstructorStep(base));
+                continue;
+            }
+
+            const args = argMap.get(base);
+            sol.assert(args !== undefined, `Missing args for base ${base.name}`);
+
+            // Evaluate any parent-contract args in the scope of this constructor
+            for (const [subContract, baseContract] of parentScopeMap) {
+                if (baseContract === base) {
+                    const argExprs = argExprMap.get(subContract);
+                    sol.assert(argExprs !== undefined, ``);
+
+                    const savedScopes = this.scopes;
+                    this.scopes = [
+                        ...this.scopes.slice(0, 2),
+                        new FunScope(base.vConstructor, args, this.infer)
+                    ];
+
+                    argMap.set(
+                        subContract,
+                        await asyncMap(argExprs, (e) => this.evalExpression(e))
+                    );
+
+                    this.scopes = savedScopes;
+                }
+            }
+
+            // Execute this constructor (and any of its concrete modifiers)
+            await this.execFun(base.vConstructor, args);
+        }
+    }
+
+    private solException(e: SolBaseException): never {
+        this.trace.push(new ExceptionStep(e));
+        throw e;
     }
 
     /**
      * Helper to implement the logic of contract dispatch. Handles:
      *  - disaptching receive() and fallback()
      *  - dispatching a normal method
+     * Called at most once per object lifetime.
      *  @todo: Throw exception on non-payable fallback with money
      */
-    private _call(): SolValue[] {
+    private async _call(): Promise<SolValue[]> {
         const entry = this.artifactManager.findEntryPoint(this.msg.data, this.info);
 
         if (!entry) {
-            throw new SolNoMethod(this.msg.data);
+            this.solException(new SolNoMethod(this.msg.data));
         }
 
         if (entry instanceof sol.VariableDeclaration) {
@@ -136,7 +225,7 @@ export class SolVM {
             this.encoderVersion
         );
 
-        return this.execFun(
+        return await this.execFun(
             entry,
             views.map((v) =>
                 v[1] === undefined ? { val: POISON, type: noType } : { val: v[1], type: v[1].type }
@@ -203,15 +292,17 @@ export class SolVM {
         return res;
     }
 
-    private execModifier(mod: sol.ModifierInvocation): void {
-        const modArgs = mod.vArguments.map((arg) => this.evalExpression(arg));
+    private async execModifier(mod: sol.ModifierInvocation): Promise<ControlFlow> {
+        const modArgs = await asyncMap(mod.vArguments, (arg) => this.evalExpression(arg));
         this.pushScope(new FunScope(mod, modArgs, this.infer), mod);
 
         const body = (mod.vModifier as sol.ModifierDefinition).vBody;
         sol.assert(body !== undefined, `NYI abstract modifiers`);
 
-        this.execBlock(body);
+        const res = await this.execBlock(body);
         this.popScope();
+
+        return res;
     }
 
     /**
@@ -222,7 +313,7 @@ export class SolVM {
      *
      * @todo Handle getters
      */
-    private execFun(fun: sol.FunctionDefinition, args: SolValue[]): SolValue[] {
+    private async execFun(fun: sol.FunctionDefinition, args: SolValue[]): Promise<SolValue[]> {
         // If we are being called from another function, then we remember its scopes here. We restore them at the end
         const savedScopes = this.scopes;
 
@@ -250,64 +341,64 @@ export class SolVM {
 
         // Execute either the first modifier (if any) or the function body
         if (firstMod) {
-            this.execModifier(firstMod);
+            await this.execModifier(firstMod);
         } else {
             const body = fun.vBody;
             sol.assert(body !== undefined, `Expected a body`);
 
-            this.execBlock(body);
+            await this.execBlock(body);
         }
 
         this.scopes = savedScopes;
+        const rets = scope.returns();
 
-        return scope.returns();
+        this.trace.push(new InternalReturnStep(rets));
+        return rets;
     }
 
     /// ------------------------------------ Statements ----------------------------------------------------
-    private execStatement(stmt: sol.Statement): ControlFlow {
+    private async execStatement(stmt: sol.Statement): Promise<ControlFlow> {
         let res: ControlFlow;
 
         if (stmt instanceof sol.Block || stmt instanceof sol.UncheckedBlock) {
-            res = this.execBlock(stmt);
+            res = await this.execBlock(stmt);
         } else if (stmt instanceof sol.Break) {
-            res = this.execBreak(stmt);
+            res = await this.execBreak(stmt);
         } else if (stmt instanceof sol.Continue) {
-            res = this.execContinue(stmt);
+            res = await this.execContinue(stmt);
         } else if (stmt instanceof sol.DoWhileStatement) {
-            res = this.execDoWhileStatement(stmt);
+            res = await this.execDoWhileStatement(stmt);
         } else if (stmt instanceof sol.EmitStatement) {
-            res = this.execEmitStatement(stmt);
+            res = await this.execEmitStatement(stmt);
         } else if (stmt instanceof sol.ExpressionStatement) {
-            res = this.execExpressionStatement(stmt);
+            res = await this.execExpressionStatement(stmt);
         } else if (stmt instanceof sol.ForStatement) {
-            res = this.execForStatement(stmt);
+            res = await this.execForStatement(stmt);
         } else if (stmt instanceof sol.IfStatement) {
-            res = this.execIfStatement(stmt);
+            res = await this.execIfStatement(stmt);
         } else if (stmt instanceof sol.InlineAssembly) {
-            res = this.execInlineAssembly(stmt);
+            res = await this.execInlineAssembly(stmt);
         } else if (stmt instanceof sol.PlaceholderStatement) {
-            res = this.execPlaceholderStatement(stmt);
+            res = await this.execPlaceholderStatement(stmt);
         } else if (stmt instanceof sol.Return) {
-            res = this.execReturn(stmt);
+            res = await this.execReturn(stmt);
         } else if (stmt instanceof sol.RevertStatement) {
-            res = this.execRevertStatement(stmt);
+            res = await this.execRevertStatement(stmt);
         } else if (stmt instanceof sol.Throw) {
-            res = this.execThrow(stmt);
+            res = await this.execThrow(stmt);
         } else if (stmt instanceof sol.TryCatchClause) {
-            res = this.execTryCatchClause(stmt);
+            res = await this.execTryCatchClause(stmt);
         } else if (stmt instanceof sol.TryStatement) {
-            res = this.execTryStatement(stmt);
+            res = await this.execTryStatement(stmt);
         } else if (stmt instanceof sol.VariableDeclarationStatement) {
-            res = this.execVariableDeclarationStatement(stmt);
+            res = await this.execVariableDeclarationStatement(stmt);
         } else if (stmt instanceof sol.WhileStatement) {
-            res = this.execWhileStatement(stmt);
+            res = await this.execWhileStatement(stmt);
         } else {
             nyi(`Stmt ${stmt.constructor.name}`);
         }
 
-        if (!(stmt instanceof sol.Return)) {
-            this.trace.push(new ExecStep(stmt));
-        }
+        this.trace.push(new ExecStep(stmt));
 
         return res;
     }
@@ -316,13 +407,13 @@ export class SolVM {
      * Execute a block. Pushes a block scope, and executes the statements of the block in order.
      * Checks the control flow after each statement to determine if we need to go out
      */
-    private execBlock(block: sol.Block | sol.UncheckedBlock): ControlFlow {
+    private async execBlock(block: sol.Block | sol.UncheckedBlock): Promise<ControlFlow> {
         let flow: ControlFlow = ControlFlow.Fallthrough;
 
         this.pushScope(new BlockScope(block, this.infer), block);
 
         for (const stmt of block.vStatements) {
-            flow = this.execStatement(stmt);
+            flow = await this.execStatement(stmt);
 
             if (flow !== ControlFlow.Fallthrough) {
                 return flow;
@@ -344,55 +435,55 @@ export class SolVM {
         return ControlFlow.Continue;
     }
 
-    private execDoWhileStatement(stmt: sol.DoWhileStatement): ControlFlow {
+    private async execDoWhileStatement(stmt: sol.DoWhileStatement): Promise<ControlFlow> {
         let cond: boolean;
         let flow: ControlFlow;
 
         do {
-            flow = this.execStatement(stmt.vBody);
+            flow = await this.execStatement(stmt.vBody);
 
             if (!(flow === ControlFlow.Fallthrough || flow === ControlFlow.Continue)) {
                 break;
             }
 
-            cond = this.evalBool(stmt.vCondition);
+            cond = await this.evalBool(stmt.vCondition);
         } while (cond);
 
         return flow === ControlFlow.Return ? ControlFlow.Return : ControlFlow.Fallthrough;
     }
 
-    private execEmitStatement(stmt: sol.EmitStatement): ControlFlow {
-        stmt.vEventCall.vArguments.map((arg) => this.evalExpression(arg));
+    private async execEmitStatement(stmt: sol.EmitStatement): Promise<ControlFlow> {
+        await asyncMap(stmt.vEventCall.vArguments, (arg) => this.evalExpression(arg));
         return ControlFlow.Fallthrough;
     }
 
-    private execExpressionStatement(stmt: sol.ExpressionStatement): ControlFlow {
-        this.evalExpression(stmt.vExpression);
+    private async execExpressionStatement(stmt: sol.ExpressionStatement): Promise<ControlFlow> {
+        await this.evalExpression(stmt.vExpression);
         return ControlFlow.Fallthrough;
     }
 
-    private execForStatement(stmt: sol.ForStatement): ControlFlow {
+    private async execForStatement(stmt: sol.ForStatement): Promise<ControlFlow> {
         let cond: boolean;
         let flow: ControlFlow;
 
         this.pushScope(new BlockScope(stmt, this.infer), stmt);
 
         if (stmt.vInitializationExpression) {
-            flow = this.execStatement(stmt.vInitializationExpression);
+            flow = await this.execStatement(stmt.vInitializationExpression);
             if (flow !== ControlFlow.Fallthrough) {
                 return flow;
             }
         }
 
         while (true) {
-            cond = stmt.vCondition ? this.evalBool(stmt.vCondition) : true;
+            cond = stmt.vCondition ? await this.evalBool(stmt.vCondition) : true;
 
             if (!cond) {
                 flow = ControlFlow.Fallthrough;
                 break;
             }
 
-            flow = this.execStatement(stmt.vBody);
+            flow = await this.execStatement(stmt.vBody);
 
             if (!(flow === ControlFlow.Continue || flow === ControlFlow.Fallthrough)) {
                 break;
@@ -404,18 +495,18 @@ export class SolVM {
         return flow;
     }
 
-    private execIfStatement(stmt: sol.IfStatement): ControlFlow {
-        const cond: boolean = this.evalBool(stmt.vCondition);
+    private async execIfStatement(stmt: sol.IfStatement): Promise<ControlFlow> {
+        const cond: boolean = await this.evalBool(stmt.vCondition);
 
         if (cond) {
-            return this.execStatement(stmt.vTrueBody);
+            return await this.execStatement(stmt.vTrueBody);
         }
 
         if (!stmt.vFalseBody) {
             return ControlFlow.Fallthrough;
         }
 
-        return this.execStatement(stmt.vFalseBody);
+        return await this.execStatement(stmt.vFalseBody);
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -424,7 +515,7 @@ export class SolVM {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    private execPlaceholderStatement(stmt: sol.PlaceholderStatement): ControlFlow {
+    private async execPlaceholderStatement(stmt: sol.PlaceholderStatement): Promise<ControlFlow> {
         // Find the top modifier scope, and the function scope it belongs to
         const topModScope = this.topScopeByType(sol.ModifierInvocation);
 
@@ -472,11 +563,13 @@ export class SolVM {
         this.scopes = this.scopes.slice(0, this.scopes.indexOf(funScope) + 1);
 
         if (nextExecutable instanceof sol.ModifierInvocation) {
-            this.execModifier(nextExecutable);
+            const flow = await this.execModifier(nextExecutable);
+
+            sol.assert(flow === ControlFlow.Fallthrough, `NYI: Returning in a modifier`);
         } else {
             const body = fun.vBody;
             sol.assert(body !== undefined, `Missing fun body`);
-            this.execBlock(body);
+            await this.execBlock(body);
         }
 
         this.scopes = savedScopes;
@@ -484,7 +577,7 @@ export class SolVM {
         return ControlFlow.Fallthrough;
     }
 
-    private execReturn(stmt: sol.Return): ControlFlow {
+    private async execReturn(stmt: sol.Return): Promise<ControlFlow> {
         const funScope = this.topScopeByType(sol.FunctionDefinition);
         sol.assert(funScope !== undefined && funScope instanceof FunScope, `Missing fun scope`);
 
@@ -495,27 +588,29 @@ export class SolVM {
         if (stmt.vExpression === undefined) {
             retVals = [];
         } else {
-            const retVal = this.evalExpression(stmt.vExpression);
+            const retVal = await this.evalExpression(stmt.vExpression);
 
             retVals = retVal instanceof SolTuple ? retVal.components : [retVal];
         }
 
         sol.assert(
-            retVals.length === fun.vReturnParameters.vParameters.length,
+            retVals.length === fun.vReturnParameters.vParameters.length || retVals.length === 0,
             `Mismatch in number of ret vals and formal returns`
         );
+
+        if (retVals.length === 0) {
+            return ControlFlow.Return;
+        }
 
         for (let i = 0; i < retVals.length; i++) {
             funScope.assign(i, retVals[i]);
         }
 
-        this.trace.push(new ReturnStep(stmt, retVals));
-
         return ControlFlow.Return;
     }
 
-    private execRevertStatement(stmt: sol.RevertStatement): ControlFlow {
-        const args = stmt.errorCall.vArguments.map(this.evalExpression);
+    private async execRevertStatement(stmt: sol.RevertStatement): Promise<ControlFlow> {
+        const args = await asyncMap(stmt.errorCall.vArguments, (arg) => this.evalExpression(arg));
         // Push to the trace before we throw
         this.trace.push(new ExecStep(stmt));
 
@@ -526,13 +621,14 @@ export class SolVM {
             errDef
         );
 
-        throw new SolStructuredException(errDef, args);
+        const payload = encodeCall(errDef, args, this.infer, this.encoderVersion);
+        this.solException(new SolRevert(payload));
     }
 
     private execThrow(stmt: sol.Throw): ControlFlow {
         // Push to the trace before we throw
         this.trace.push(new ExecStep(stmt));
-        throw new SolRawException(new Uint8Array());
+        this.solException(new SolRevert(new Uint8Array()));
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -545,13 +641,15 @@ export class SolVM {
         nyi("TryStatement");
     }
 
-    private execVariableDeclarationStatement(stmt: sol.VariableDeclarationStatement): ControlFlow {
+    private async execVariableDeclarationStatement(
+        stmt: sol.VariableDeclarationStatement
+    ): Promise<ControlFlow> {
         const curScope = stackTop(this.scopes) as BlockScope;
         if (!stmt.vInitialValue) {
             return ControlFlow.Fallthrough;
         }
 
-        const rhs = this.evalExpression(stmt.vInitialValue);
+        const rhs = await this.evalExpression(stmt.vInitialValue);
         const rhsVs = rhs instanceof SolTuple ? rhs.components : [rhs];
 
         for (let i = 0, declIdx = 0; i < rhsVs.length; i++) {
@@ -568,11 +666,11 @@ export class SolVM {
         return ControlFlow.Fallthrough;
     }
 
-    private execWhileStatement(stmt: sol.WhileStatement): ControlFlow {
+    private async execWhileStatement(stmt: sol.WhileStatement): Promise<ControlFlow> {
         let flow: ControlFlow = ControlFlow.Fallthrough;
 
-        while (this.evalBool(stmt.vCondition)) {
-            flow = this.execStatement(stmt.vBody);
+        while (await this.evalBool(stmt.vCondition)) {
+            flow = await this.execStatement(stmt.vBody);
 
             if (!(flow === ControlFlow.Fallthrough || flow === ControlFlow.Continue)) {
                 break;
@@ -586,25 +684,30 @@ export class SolVM {
     /**
      * LValues are a special case of expression evaluations meant for evaluating the LHS of assignments.
      */
-    private evalLValue(expr: sol.Expression): LValue {
+    private async evalLValue(expr: sol.Expression): Promise<LValue> {
         let res: LValue;
 
         if (expr instanceof sol.Conditional) {
             nyi(`evalLVConditional(${expr.constructor.name})`);
         } else if (expr instanceof sol.FunctionCall) {
-            res = coerceToLValue(this.evalFunctionCall(expr));
+            res = coerceToLValue(await this.evalFunctionCall(expr));
         } else if (expr instanceof sol.Identifier) {
-            res = this.evalLVIdentifier(expr);
+            res = await this.evalLVIdentifier(expr);
         } else if (expr instanceof sol.IndexAccess) {
-            res = this.evalLVIndexAccess(expr);
+            res = await this.evalLVIndexAccess(expr);
         } else if (expr instanceof sol.MemberAccess) {
             nyi(`evalLVMemberAccess(${expr.constructor.name})`);
         } else if (expr instanceof sol.TupleExpression) {
             if (expr.vOriginalComponents.length === 1) {
-                return this.evalLValue(expr.vOriginalComponents[0] as sol.Expression);
+                return await this.evalLValue(expr.vOriginalComponents[0] as sol.Expression);
             }
 
-            return expr.vOriginalComponents.map((c) => (c === null ? null : this.evalLValue(c)));
+            const res: Array<LValue | null> = [];
+            for (const c of expr.vOriginalComponents) {
+                res.push(c === null ? null : await this.evalLValue(c));
+            }
+
+            return res;
         } else {
             nyi(`evalLValue(${expr.constructor.name})`);
         }
@@ -614,11 +717,11 @@ export class SolVM {
         return res;
     }
 
-    private evalLVIdentifier(expr: sol.Identifier): LValue {
+    private async evalLVIdentifier(expr: sol.Identifier): Promise<LValue> {
         return this.lookup(expr.name);
     }
 
-    private evalLVIndexAccess(expr: sol.IndexAccess): LValue {
+    private async evalLVIndexAccess(expr: sol.IndexAccess): Promise<LValue> {
         sol.assert(expr.vIndexExpression !== undefined, `Missing index expr`);
 
         const baseT = this.infer.typeOf(expr.vBaseExpression);
@@ -635,8 +738,8 @@ export class SolVM {
     /// ------------------------------------ Expressions ----------------------------------------------------
 
     // Helper to eval an expression as bool or fail
-    private evalBool(expr: sol.Expression): boolean {
-        const res = this.evalExpression(expr);
+    private async evalBool(expr: sol.Expression): Promise<boolean> {
+        const res = await this.evalExpression(expr);
 
         sol.assert(
             typeof res === "boolean",
@@ -650,8 +753,8 @@ export class SolVM {
     }
 
     // Helper to eval an expression as bigint or fail
-    private evalBigint(expr: sol.Expression): bigint {
-        const res = this.evalExpression(expr);
+    private async evalBigint(expr: sol.Expression): Promise<bigint> {
+        const res = await this.evalExpression(expr);
 
         sol.assert(
             typeof res === "bigint",
@@ -664,37 +767,63 @@ export class SolVM {
         return res;
     }
 
-    private evalExpression(expr: sol.Expression): SolValue {
+    // Helper to eval an expression as bytes
+    private async evalBytes(expr: sol.Expression): Promise<Uint8Array> {
+        const res = await this.evalExpression(expr);
+
+        sol.assert(
+            res instanceof Uint8Array,
+            `Expected a boolean when evaluating {0} not {1} of type {2}`,
+            expr,
+            res as any,
+            typeof res
+        );
+
+        return res;
+    }
+
+    // Helper to eval an expression as Address or fail
+    private async evalAddress(expr: sol.Expression): Promise<Address> {
+        const res = await this.evalExpression(expr);
+
+        sol.assert(
+            res instanceof Address,
+            `Expected a boolean when evaluating {0} not {1} of type {2}`,
+            expr,
+            res as any,
+            typeof res
+        );
+
+        return res;
+    }
+
+    private async evalExpression(expr: sol.Expression): Promise<SolValue> {
         let res: SolValue;
 
         if (expr instanceof sol.Assignment) {
-            res = this.evalAssignment(expr);
+            res = await this.evalAssignment(expr);
         } else if (expr instanceof sol.BinaryOperation) {
-            res = this.evalBinaryOperation(expr);
+            res = await this.evalBinaryOperation(expr);
         } else if (expr instanceof sol.Conditional) {
-            res = this.evalConditional(expr);
+            res = await this.evalConditional(expr);
         } else if (expr instanceof sol.ElementaryTypeNameExpression) {
-            res = this.evalElementaryTypeNameExpression(expr);
-        } else if (expr instanceof sol.FunctionCallOptions) {
-            res = this.evalFunctionCallOptions(expr);
+            res = await this.evalElementaryTypeNameExpression(expr);
         } else if (expr instanceof sol.FunctionCall) {
-            res = this.evalFunctionCall(expr);
+            res = await this.evalFunctionCall(expr);
         } else if (expr instanceof sol.Identifier) {
-            res = this.evalIdentifier(expr);
+            res = await this.evalIdentifier(expr);
         } else if (expr instanceof sol.IndexAccess) {
-            res = this.evalIndexAccess(expr);
+            res = await this.evalIndexAccess(expr);
         } else if (expr instanceof sol.IndexRangeAccess) {
-            res = this.evalIndexRangeAccess(expr);
+            res = await this.evalIndexRangeAccess(expr);
         } else if (expr instanceof sol.Literal) {
-            res = this.evalLiteral(expr);
+            res = await this.evalLiteral(expr);
         } else if (expr instanceof sol.MemberAccess) {
-            res = this.evalMemberAccess(expr);
-        } else if (expr instanceof sol.NewExpression) {
-            res = this.evalNewExpression(expr);
+            res = await this.evalMemberAccess(expr);
         } else if (expr instanceof sol.TupleExpression) {
-            res = this.evalTupleExpression(expr);
+            res = await this.evalTupleExpression(expr);
         } else if (expr instanceof sol.UnaryOperation) {
-            res = this.evalUnaryOperation(expr);
+            res = await this.evalUnaryOperation(expr);
         } else {
             nyi(`evalExpression(${expr.constructor.name})`);
         }
@@ -737,18 +866,18 @@ export class SolVM {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    private evalAssignment(expr: sol.Assignment): SolValue {
-        let rhs = this.evalExpression(expr.vRightHandSide);
-        const lhs = this.evalLValue(expr.vLeftHandSide);
+    private async evalAssignment(expr: sol.Assignment): Promise<SolValue> {
+        let rhs = await this.evalExpression(expr.vRightHandSide);
+        const lhs = await this.evalLValue(expr.vLeftHandSide);
 
         const op = expr.operator;
 
         if (op.length > 1) {
             sol.assert(!(lhs instanceof Array), `No operator assignments on tuples.`);
 
-            const lhsV = this.evalExpression(expr.vLeftHandSide);
+            const lhsV = await this.evalExpression(expr.vLeftHandSide);
             const type = this.infer.typeOfAssignment(expr);
-            rhs = this.evalBinaryOperationImpl(
+            rhs = await this.evalBinaryOperationImpl(
                 lhsV,
                 op[0],
                 rhs,
@@ -766,7 +895,6 @@ export class SolVM {
     isUnchecked(expr: sol.Expression): boolean {
         // @todo add semver
         // @todo check if this.info.artifact.compilerVersion < 0.8.0
-
         return expr.getClosestParentByType(sol.UncheckedBlock) !== undefined;
     }
 
@@ -782,14 +910,14 @@ export class SolVM {
         return undefined;
     }
 
-    private evalBinaryOperationImpl(
+    private async evalBinaryOperationImpl(
         left: SolValue,
         operator: string,
         right: SolValue,
         type: sol.TypeNode,
         userFunction: sol.FunctionDefinition | undefined,
         unchecked: boolean
-    ): SolValue {
+    ): Promise<SolValue> {
         // @todo - need to detect
         if (userFunction) {
             nyi("User-defined operators");
@@ -854,7 +982,7 @@ export class SolVM {
                 return left >= right;
             }
 
-            throw new EvalError(`Unknown comparison operator ${operator}`);
+            nyi(`Unknown comparison operator ${operator}`);
         }
 
         if (sol.BINARY_OPERATOR_GROUPS.Arithmetic.includes(operator)) {
@@ -877,7 +1005,7 @@ export class SolVM {
             } else if (operator === "**") {
                 res = left ** right;
             } else {
-                throw new EvalError(`Unknown arithmetic operator ${operator}`);
+                nyi(`Unknown arithmetic operator ${operator}`);
             }
 
             const clampedRes = this.clampIntToType(res, type);
@@ -921,13 +1049,13 @@ export class SolVM {
         nyi(`${left} ${operator} ${right}`);
     }
 
-    private evalBinaryOperation(expr: sol.BinaryOperation): SolValue {
-        const left = this.evalExpression(expr.vLeftExpression);
-        const right = this.evalExpression(expr.vRightExpression);
+    private async evalBinaryOperation(expr: sol.BinaryOperation): Promise<SolValue> {
+        const left = await this.evalExpression(expr.vLeftExpression);
+        const right = await this.evalExpression(expr.vRightExpression);
         const operator = expr.operator;
         const type = this.infer.typeOf(expr);
 
-        return this.evalBinaryOperationImpl(
+        return await this.evalBinaryOperationImpl(
             left,
             operator,
             right,
@@ -947,21 +1075,39 @@ export class SolVM {
         nyi("ElementaryTypeNameExpression");
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    private evalFunctionCallOptions(expr: sol.FunctionCallOptions): SolValue {
-        nyi("FunctionCallOptions");
+    private async evalAssert(expr: sol.FunctionCall): Promise<SolValue> {
+        const cond = await this.evalBool(expr.vArguments[0]);
+
+        if (cond) {
+            return POISON;
+        }
+
+        if (lt(this.compilerVersion, "0.8.0")) {
+            this.solException(new SolInvalid());
+        }
+
+        this.solException(new SolPanic(PanicCodes.AssertFail));
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    private evalBuiltinFunctionCall(expr: sol.FunctionCall): SolValue {
-        nyi("evalBuiltinFunctionCall");
+    private async evalBuiltinFunctionCall(expr: sol.FunctionCall): Promise<SolValue> {
+        const callee = expr.vExpression;
+        if (callee instanceof sol.Identifier) {
+            if (callee.name === "assert") {
+                return this.evalAssert(expr);
+            }
+
+            nyi(`evalBuiltinFunctionCall ${callee.name}`);
+        }
+
+        nyi(`evalBuiltinFunctionCall ${callee.constructor.name}`);
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    private evalInternalFunctionCall(expr: sol.FunctionCall): SolValue {
-        const args = expr.vArguments.map((arg) => this.evalExpression(arg));
+    private async evalInternalFunctionCall(expr: sol.FunctionCall): Promise<SolValue> {
+        const args = await asyncMap(expr.vArguments, (arg) => this.evalExpression(arg));
         const callee = getFunCallTarget(expr, this.infer);
-        const retVals = this.execFun(callee, args);
+        const retVals = await this.execFun(callee, args);
 
         return retVals.length === 0
             ? POISON
@@ -971,16 +1117,74 @@ export class SolVM {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    private evalExternalFunctionCall(expr: sol.FunctionCall): SolValue {
-        nyi("evalExternalFunctionCall");
+    private async evalExternalFunctionCall(
+        expr: sol.FunctionCall,
+        propagateRevert = true
+    ): Promise<SolValue> {
+        const [callee, value, gas, salt] = await this.decodeCallee(expr.vExpression);
+        const args = await asyncMap(expr.vArguments, (e) => this.evalExpression(e));
+
+        sol.assert(callee instanceof sol.MemberAccess, `Unexpected external callee {0}`, callee);
+
+        const calleeDef = callee.vReferencedDeclaration;
+        sol.assert(
+            calleeDef instanceof sol.FunctionDefinition,
+            `Unexpected external callee ${callee.constructor.name}`
+        );
+        const addr = await this.evalAddress(callee.vExpression);
+
+        const data = encodeCall(calleeDef, args, this.infer, this.encoderVersion);
+
+        const msg: SolMessage = {
+            to: addr,
+            data: data,
+            value: value || 0n,
+            gas: gas || 0n,
+            salt
+        };
+
+        let res: SolCallResult;
+
+        let opcode: OPCODES;
+        if (calleeDef.stateMutability === sol.FunctionStateMutability.View) {
+            opcode = OPCODES.STATICCALL;
+        } else if (
+            calleeDef.vScope instanceof sol.ContractDefinition &&
+            calleeDef.vScope.kind === sol.ContractKind.Library
+        ) {
+            opcode = OPCODES.DELEGATECALL;
+        } else {
+            opcode = OPCODES.CALL;
+        }
+
+        this.trace.push(new ExternalCallStep(msg, opcode));
+
+        if (calleeDef.stateMutability === sol.FunctionStateMutability.View) {
+            res = await this.env.staticcall(msg);
+        } else if (
+            calleeDef.vScope instanceof sol.ContractDefinition &&
+            calleeDef.vScope.kind === sol.ContractKind.Library
+        ) {
+            res = await this.env.delegatecall(msg);
+        } else {
+            res = await this.env.call(msg);
+        }
+
+        if (res.reverted && propagateRevert) {
+            throw new SolRevert(res.data);
+        }
+
+        // @todo what happens when the callee encoder version is different from the caller?
+        // 2 cases - older and newer. Need separate tests!!!
+        return decodeReturns(calleeDef, res.data, this.infer, this.encoderVersion);
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    private evalTypeConversion(expr: sol.FunctionCall): SolValue {
+    private async evalTypeConversion(expr: sol.FunctionCall): Promise<SolValue> {
         const exprT = this.infer.typeOf(expr.vExpression);
         sol.assert(expr.vArguments.length === 1 && exprT instanceof sol.TypeNameType, ``);
 
-        const innerV = this.evalExpression(expr.vArguments[0]);
+        const innerV = await this.evalExpression(expr.vArguments[0]);
         const toT = exprT.type;
 
         if (toT instanceof sol.IntType && typeof innerV === "bigint") {
@@ -991,28 +1195,130 @@ export class SolVM {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    private evalStructConstructorCall(expr: sol.FunctionCall): SolValue {
+    private async evalStructConstructorCall(expr: sol.FunctionCall): Promise<SolValue> {
         nyi("evalStructConstructorCall");
     }
 
+    /**
+     * Helper to decode a function callee for an external call. Returns a tuple:
+     * [actual callee, value passed, gas passed]
+     */
+    private async decodeCallee(
+        expr: sol.Expression
+    ): Promise<[sol.Expression, bigint | undefined, bigint | undefined, Uint8Array | undefined]> {
+        let callee: sol.Expression;
+        let value: bigint | undefined;
+        let gas: bigint | undefined;
+        let salt: Uint8Array | undefined;
+
+        while (true) {
+            if (expr instanceof sol.FunctionCallOptions) {
+                for (const [name, optExpr] of expr.vOptionsMap) {
+                    if (name === "value") {
+                        value = await this.evalBigint(optExpr);
+                    } else if (name === "gas") {
+                        gas = await this.evalBigint(optExpr);
+                    } else if (name === "salt") {
+                        salt = await this.evalBytes(optExpr);
+                    } else {
+                        fail(`Unexpected call option ${name}`);
+                    }
+                }
+
+                expr = expr.vExpression;
+                continue;
+            } else if (expr instanceof sol.FunctionCall) {
+                if (expr.vFunctionName === "value") {
+                    value = await this.evalBigint(expr.vArguments[0]);
+                } else if (expr.vFunctionName === "gas") {
+                    gas = await this.evalBigint(expr.vArguments[0]);
+                } else if (expr.vFunctionName === "salt") {
+                    salt = await this.evalBytes(expr.vArguments[0]);
+                } else {
+                    fail(`Unexpected call option ${expr.vFunctionName}`);
+                }
+                expr = expr.vExpression;
+                continue;
+            }
+
+            callee = expr;
+            break;
+        }
+
+        return [callee, value, gas, salt];
+    }
+
+    private async evalNewCall(expr: sol.FunctionCall, propagateRevert = true): Promise<SolValue> {
+        const [callee, value, gas, salt] = await this.decodeCallee(expr.vCallee);
+
+        sol.assert(callee instanceof sol.NewExpression, ``);
+
+        const newT = this.infer.typeNameToTypeNode(callee.vTypeName);
+        const args = await asyncMap(expr.vArguments, (arg) => this.evalExpression(arg));
+
+        if (
+            newT instanceof sol.UserDefinedType &&
+            newT.definition instanceof sol.ContractDefinition
+        ) {
+            const constr = findConstructor(newT.definition);
+            const constrArgs =
+                constr === undefined
+                    ? new Uint8Array()
+                    : encodeCall(constr, args, this.infer, this.encoderVersion);
+
+            const info = this.artifactManager.getContractInfo(newT.definition);
+
+            sol.assert(info !== undefined, `Missing info for ${newT.definition.name}`);
+
+            const data = concatBytes(
+                hexToBytes(info.contractArtifact.evm.bytecode.object),
+                constrArgs
+            );
+
+            const msg = {
+                to: ZERO_ADDRESS,
+                data,
+                value: value || 0n,
+                gas: gas || 0n,
+                salt
+            };
+
+            this.trace.push(new ExternalCallStep(msg, msg.salt ? OPCODES.CREATE2 : OPCODES.CREATE));
+            const res = await this.env.create(msg);
+
+            if (res.reverted && propagateRevert) {
+                throw new SolRevert(res.data);
+            }
+
+            sol.assert(res.data.length === 20, `Expected an address`);
+            return new Address(res.data);
+        }
+
+        nyi(`new(${newT.pp()})`);
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    private evalFunctionCall(expr: sol.FunctionCall): SolValue {
-        const decl = expr.vReferencedDeclaration;
-
+    private async evalFunctionCall(expr: sol.FunctionCall): Promise<SolValue> {
         if (expr.kind === sol.FunctionCallKind.TypeConversion) {
-            return this.evalTypeConversion(expr);
+            return await this.evalTypeConversion(expr);
         } else if (expr.kind === sol.FunctionCallKind.StructConstructorCall) {
-            return this.evalStructConstructorCall(expr);
+            return await this.evalStructConstructorCall(expr);
         } else {
-            if (decl === undefined) {
-                return this.evalBuiltinFunctionCall(expr);
+            if (expr.vFunctionCallType === sol.ExternalReferenceType.Builtin) {
+                const callee = expr.vCallee;
+
+                if (callee instanceof sol.NewExpression) {
+                    return await this.evalNewCall(expr);
+                }
+
+                return await this.evalBuiltinFunctionCall(expr);
             }
 
-            if (isExternal(expr)) {
-                return this.evalExternalFunctionCall(expr);
+            if (this.infer.isFunctionCallExternal(expr)) {
+                return await this.evalExternalFunctionCall(expr);
             }
 
-            return this.evalInternalFunctionCall(expr);
+            return await this.evalInternalFunctionCall(expr);
         }
     }
 
@@ -1052,18 +1358,12 @@ export class SolVM {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    private evalNewExpression(expr: sol.NewExpression): SolValue {
-        nyi("NewExpression");
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    private evalTupleExpression(expr: sol.TupleExpression): SolValue {
-        return new SolTuple(
-            expr.vOriginalComponents.map((c) => {
-                sol.assert(c !== null, `Unexpected eval of null tuple component`);
-                return this.evalExpression(c);
-            })
-        );
+    private async evalTupleExpression(expr: sol.TupleExpression): Promise<SolValue> {
+        const components = await asyncMap(expr.vOriginalComponents, (c) => {
+            sol.assert(c !== null, `Unexpected eval of null tuple component`);
+            return this.evalExpression(c);
+        });
+        return components.length === 1 ? components[0] : new SolTuple(components);
     }
 
     clampIntToType(val: bigint, type: sol.TypeNode): bigint {
@@ -1081,7 +1381,7 @@ export class SolVM {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    private evalUnaryOperation(expr: sol.UnaryOperation): SolValue {
+    private async evalUnaryOperation(expr: sol.UnaryOperation): Promise<SolValue> {
         const op = expr.operator;
 
         if (expr.vUserFunction) {
@@ -1089,11 +1389,11 @@ export class SolVM {
         }
 
         if (op === "!") {
-            return !this.evalBool(expr.vSubExpression);
+            return !(await this.evalBool(expr.vSubExpression));
         }
 
         if (op === "-") {
-            const rawRes = -this.evalBigint(expr.vSubExpression);
+            const rawRes = -(await this.evalBigint(expr.vSubExpression));
             const type = this.infer.typeOf(expr);
             const clampedRes = this.clampIntToType(rawRes, type);
 
@@ -1114,10 +1414,10 @@ export class SolVM {
 
         if (op === "++" || op === "--") {
             const type = this.infer.typeOf(expr) as sol.IntType;
-            const inner = this.evalBigint(expr.vSubExpression);
-            const lv = this.evalLValue(expr.vSubExpression);
+            const inner = await this.evalBigint(expr.vSubExpression);
+            const lv = await this.evalLValue(expr.vSubExpression);
 
-            const newVal = this.evalBinaryOperationImpl(
+            const newVal = await this.evalBinaryOperationImpl(
                 inner,
                 op[0],
                 1n,

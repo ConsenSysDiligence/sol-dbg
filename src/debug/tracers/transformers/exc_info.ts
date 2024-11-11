@@ -1,6 +1,8 @@
 import { InterpreterStep } from "@ethereumjs/evm";
+import { bytesToBigInt } from "@ethereumjs/util";
 import { VM } from "@ethereumjs/vm";
 import { nyi } from "../../../solvm/exceptions";
+import { mustReadMem, stackInd, stackTop } from "../../../utils";
 import { IArtifactManager } from "../../artifact_manager";
 import { OPCODES } from "../../opcodes";
 import { BasicStepInfo } from "./basic_info";
@@ -37,6 +39,16 @@ export async function addExceptionInfo<T extends object & BasicStepInfo & Extern
 
     // REVERT
     if (state.op.opcode === OPCODES.REVERT) {
+        const off = bytesToBigInt(stackTop(state.evmStack));
+        const len = bytesToBigInt(stackInd(state.evmStack, 1));
+
+        return {
+            ...state,
+            excInfo: {
+                data: mustReadMem(off, len, state.memory)
+            }
+        };
+
         nyi("REVERT exception state");
 
         // @todo try and decode revert

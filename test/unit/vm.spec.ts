@@ -1,13 +1,19 @@
 import { TypedTransaction } from "@ethereumjs/tx";
-import { AbiCoder } from "@ethersproject/abi";
 import { bytesToHex } from "ethereum-cryptography/utils";
 import expect from "expect";
 import fse from "fs-extra";
-import { ABIEncoderVersion, ContractDefinition, InferType } from "solc-typed-ast";
+import {
+    ABIEncoderVersion,
+    assert,
+    ContractDefinition,
+    FunctionDefinition,
+    InferType
+} from "solc-typed-ast";
 import {
     ArtifactManager,
     buildSolTrace,
     ContractInfo,
+    OPCODES,
     PartialSolcOutput,
     pp,
     Scenario,
@@ -16,7 +22,12 @@ import {
     StepState,
     TxRunner
 } from "../../src";
-import { ReturnStep } from "../../src/solvm/trace";
+import {
+    DefaultConstructorStep,
+    ExternalCallStep,
+    InternalReturnStep
+} from "../../src/solvm/trace";
+import { encodeReturns } from "../../src/solvm/utils";
 
 function makeTest(artifact: PartialSolcOutput, fileName: string): Scenario {
     const bytecode = artifact.contracts[fileName]["__IRTest__"].evm.bytecode.object;
@@ -54,8 +65,7 @@ function makeTest(artifact: PartialSolcOutput, fileName: string): Scenario {
 }
 
 describe("Local tests", () => {
-    const coder = new AbiCoder();
-    for (const sample of ["cfg"] /*fse.readdirSync("test/samples/solvm")*/) {
+    for (const sample of ["WhileV04"] /*fse.readdirSync("test/samples/solvm")*/) {
         describe(`Sample ${sample}`, () => {
             let artifact: PartialSolcOutput;
             let artifactManager: ArtifactManager;
@@ -77,7 +87,7 @@ describe("Local tests", () => {
                 const block = txRunner.getBlock(tx);
                 const stateBefore = txRunner.getStateBeforeTx(tx);
 
-                const dbg = new SolTxDebugger(artifactManager);
+                const dbg = new SolTxDebugger(artifactManager, { strict: false });
 
                 [trace] = await dbg.debugTx(tx, block, stateBefore);
             });
@@ -90,25 +100,41 @@ describe("Local tests", () => {
                     const evmStep = trace[seg.end];
                     const solStep = seg.trace[seg.trace.length - 1];
 
-                    const info = stackTop(evmStep.stack).info as ContractInfo;
+                    const frame = stackTop(evmStep.stack);
+                    const info = frame.info as ContractInfo;
                     expect(info).toBeDefined();
                     const ast = (info as ContractInfo).ast as ContractDefinition;
                     expect(ast).toBeDefined();
-                    const mainFun = ast.vFunctions.filter((f) => f.name === "main")[0];
                     const infer = new InferType(info.artifact.compilerVersion);
-                    const mainT = infer.funDefToType(mainFun);
-                    const abiRets = mainT.returns.map((t) =>
-                        infer.toABIEncodedType(t, ABIEncoderVersion.V2).pp()
-                    );
 
-                    if (solStep instanceof ReturnStep) {
-                        const encodedSolidityRet = coder.encode(abiRets, solStep.values);
+                    if (solStep instanceof InternalReturnStep) {
+                        assert(
+                            frame.callee instanceof FunctionDefinition,
+                            `NYI callee {0}`,
+                            frame.callee
+                        );
+
+                        const encodedSolidityRet = encodeReturns(
+                            frame.callee,
+                            solStep.values,
+                            infer,
+                            ABIEncoderVersion.V2
+                        );
                         expect(evmStep.retInfo).toBeDefined();
-                        expect(
-                            "0x" + bytesToHex(evmStep.retInfo?.rawReturnData as Uint8Array)
-                        ).toEqual(encodedSolidityRet);
+                        expect(bytesToHex(evmStep.retInfo?.rawReturnData as Uint8Array)).toEqual(
+                            bytesToHex(encodedSolidityRet)
+                        );
+                    } else if (solStep instanceof ExternalCallStep) {
+                        expect(solStep.opcode === evmStep.op.opcode);
+                        expect(seg.end + 1 < trace.length);
+                        const newFrame = stackTop(trace[seg.end + 1].stack);
+
+                        expect(newFrame.address.toString()).toEqual(solStep.msg.to.toString());
+                        expect(bytesToHex(newFrame.msgData)).toEqual(bytesToHex(solStep.msg.data));
+                    } else if (solStep instanceof DefaultConstructorStep) {
+                        expect(evmStep.op.opcode === OPCODES.RETURN);
                     } else {
-                        throw new Error(`NYI alignment point ${pp(solStep)}`);
+                        throw new Error(`NYI alignment point ${solStep.constructor.name}`);
                     }
                 }
                 expect(finalIdx).toEqual(trace.length);

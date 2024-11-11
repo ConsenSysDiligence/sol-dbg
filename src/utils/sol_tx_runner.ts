@@ -1,7 +1,7 @@
 import { equalsBytes } from "ethereum-cryptography/utils";
 import * as sol from "solc-typed-ast";
 import { FrameKind, IArtifactManager, OPCODES, StepState, Storage } from "../debug";
-import { SolCallResult, SolVM, WorldInterface } from "../solvm";
+import { fail, SolCallResult, SolVM, WorldInterface } from "../solvm";
 import { SolMessage } from "../solvm/state";
 import { SolTrace } from "../solvm/trace";
 import { stackTop, ZERO_ADDRESS } from "./misc";
@@ -34,12 +34,12 @@ function noCtxChangeAt(trace: StepState[], idx: number): boolean {
     return trace[idx].stack.length === trace[idx + 1].stack.length;
 }
 
-function callsAt(trace: StepState[], idx: number): boolean {
-    return idx === 0 || trace[idx].stack.length < trace[idx + 1].stack.length;
+function callStartAt(trace: StepState[], idx: number): boolean {
+    return idx === 0 || trace[idx].stack.length > trace[idx - 1].stack.length;
 }
 
 function returnOrExceptionAt(trace: StepState[], idx: number): boolean {
-    return idx === trace.length || trace[idx].stack.length > trace[idx + 1].stack.length;
+    return idx === trace.length - 1 || trace[idx].stack.length > trace[idx + 1].stack.length;
 }
 
 function getSolCalResult(step: StepState): SolCallResult {
@@ -79,7 +79,7 @@ export async function buildSolTrace(
     }
 
     // Step must be the start of a new execution context
-    sol.assert(callsAt(evmTrace, idx), ``);
+    sol.assert(callStartAt(evmTrace, idx), ``);
 
     const startHeight = evmTrace[idx].stack.length;
     const frame = stackTop(evmTrace[idx].stack);
@@ -117,9 +117,10 @@ export async function buildSolTrace(
 
     // Instantiate the SolVm and try executing
     const world: WorldInterface = {
-        call: (msg) => call(msg, OPCODES.CALL),
-        delegatecall: (msg) => call(msg, OPCODES.DELEGATECALL),
-        staticcall: (msg) => call(msg, OPCODES.STATICCALL),
+        create: (msg) => create(msg),
+        call: (msg) => _execMsg(msg, OPCODES.CALL),
+        delegatecall: (msg) => _execMsg(msg, OPCODES.DELEGATECALL),
+        staticcall: (msg) => _execMsg(msg, OPCODES.STATICCALL),
         getStorage
     };
 
@@ -127,7 +128,8 @@ export async function buildSolTrace(
         to: frame.kind === FrameKind.Call ? frame.receiver : ZERO_ADDRESS,
         data: frame.msgData,
         gas: evmTrace[idx].gas, // @todo Not sure this is correct
-        value: 0n // @todo implement value!!
+        value: 0n, // @todo implement value!!
+        salt: undefined
     };
 
     let solTraceLoc = 0;
@@ -155,7 +157,20 @@ export async function buildSolTrace(
         return res;
     }
 
-    async function call(msg: SolMessage, callOp: OPCODES): Promise<SolCallResult> {
+    async function create(msg: SolMessage): Promise<SolCallResult> {
+        const callRes = await _execMsg(msg, msg.salt ? OPCODES.CREATE2 : OPCODES.CREATE);
+
+        if (callRes.reverted) {
+            return callRes;
+        }
+
+        return {
+            reverted: false,
+            data: stackTop(evmTrace[idx].evmStack).slice(12)
+        };
+    }
+
+    async function _execMsg(msg: SolMessage, callOp: OPCODES): Promise<SolCallResult> {
         const callStepIdx = findIndexAfter(
             evmTrace,
             (step, i) =>

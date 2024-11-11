@@ -1,13 +1,14 @@
 import * as sol from "solc-typed-ast";
-import { SolValue } from "./state";
+import { OPCODES } from "../debug";
+import { SolBaseException } from "./exceptions";
+import { SolMessage, SolValue } from "./state";
 
-export class BaseSolStep {}
-export class PushScope extends BaseSolStep {
-    constructor(public readonly node: ScopeNode) {
-        super();
-    }
-}
-export class PopScope extends BaseSolStep {}
+export abstract class BaseSolStep {}
+/**
+ * Mark steps that may be hidden as "internal". (e.g. compiler-generated constructor calls, etc)
+ */
+export abstract class InternalSolStep extends BaseSolStep {}
+
 export class EvalStep<T extends sol.Expression> extends BaseSolStep {
     constructor(
         public readonly expr: T,
@@ -16,17 +17,51 @@ export class EvalStep<T extends sol.Expression> extends BaseSolStep {
         super();
     }
 }
+
 export class ExecStep<T extends sol.Statement> extends BaseSolStep {
     constructor(public readonly stmt: T) {
         super();
     }
 }
-export class ReturnStep extends ExecStep<sol.Return> {
+
+/**
+ * This is a bit counter-intuitive, but due to modifiers we can execute multiple
+ * 'Return' statements in the lifetime of a single internal function. However
+ * there is only one real return, marked by `InternalReturnStep`
+ */
+export class InternalReturnStep extends InternalSolStep {
+    constructor(public readonly values: SolValue[]) {
+        super();
+    }
+}
+
+/**
+ * Marks an external call. Applies to both calls and contract deployments
+ */
+export class ExternalCallStep extends InternalSolStep {
     constructor(
-        public readonly stmt: sol.Return,
-        public readonly values: SolValue[]
+        public readonly msg: SolMessage,
+        public readonly opcode: OPCODES
     ) {
-        super(stmt);
+        super();
+    }
+}
+
+/**
+ * Marks a solidity exception
+ */
+export class ExceptionStep extends InternalSolStep {
+    constructor(public readonly exc: SolBaseException) {
+        super();
+    }
+}
+
+/**
+ * Marks the execution of a default (compiler-generated) constructor for contracts that don't have a real one
+ */
+export class DefaultConstructorStep extends InternalSolStep {
+    constructor(public readonly contract: sol.ContractDefinition) {
+        super();
     }
 }
 

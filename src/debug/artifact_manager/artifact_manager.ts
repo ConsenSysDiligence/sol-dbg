@@ -61,6 +61,7 @@ export interface IArtifactManager {
         contract: ContractInfo
     ): FunctionDefinition | VariableDeclaration | undefined;
     getEventDefInfo(topic: bigint | Uint8Array | EventDesc): EventDefInfo | undefined;
+    getContractInfo(contract: ContractDefinition): ContractInfo | undefined;
 }
 
 export interface BytecodeInfo {
@@ -361,6 +362,16 @@ export class ArtifactManager implements IArtifactManager {
         return this._artifacts;
     }
 
+    getContractInfo(contract: ContractDefinition): ContractInfo | undefined {
+        for (const info of this._contracts) {
+            if (info.ast === contract) {
+                return info;
+            }
+        }
+
+        return undefined;
+    }
+
     getContractFromMDHash(hash: HexString): ContractInfo | undefined {
         return this._mdHashToContractInfo.get(hash);
     }
@@ -375,7 +386,7 @@ export class ArtifactManager implements IArtifactManager {
         for (let i = 0; i < this._deployedBytecodeTemplates.length; i++) {
             const templ = this._deployedBytecodeTemplates[i];
 
-            if (matchesTemplate(bytecode, templ)) {
+            if (matchesTemplate(bytecode, templ, false)) {
                 return this._contracts[i];
             }
         }
@@ -393,7 +404,7 @@ export class ArtifactManager implements IArtifactManager {
         for (let i = 0; i < this._creationBytecodeTemplates.length; i++) {
             const templ = this._creationBytecodeTemplates[i];
 
-            if (matchesTemplate(creationBytecode, templ)) {
+            if (matchesTemplate(creationBytecode, templ, true)) {
                 return this._contracts[i];
             }
         }

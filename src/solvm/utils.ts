@@ -1,6 +1,103 @@
+import { AbiCoder } from "@ethersproject/abi";
+import { concatBytes, hexToBytes } from "ethereum-cryptography/utils";
 import * as sol from "solc-typed-ast";
+import { ZERO_ADDRESS } from "../utils";
 import { nyi } from "./exceptions";
 import { LValue, SolValue } from "./state";
+
+export const coder = new AbiCoder();
+
+export async function asyncMap<T1, T2>(
+    arr: T1[],
+    fun: (arg: T1, idx: number) => Promise<T2>
+): Promise<T2[]> {
+    const res: T2[] = [];
+
+    for (let i = 0; i < arr.length; i++) {
+        res.push(await fun(arr[i], i));
+    }
+
+    return res;
+}
+
+export function encodeCall(
+    target: sol.FunctionDefinition | sol.ErrorDefinition,
+    args: SolValue[],
+    infer: sol.InferType,
+    abiVersion: sol.ABIEncoderVersion
+): Uint8Array {
+    const selector =
+        target instanceof sol.FunctionDefinition && target.isConstructor
+            ? new Uint8Array()
+            : hexToBytes(infer.signatureHash(target));
+    sol.assert(selector.length === 4 || selector.length === 0, ``);
+
+    const abiArgTs = target.vParameters.vParameters.map((p) =>
+        infer.toABIEncodedType(infer.variableDeclarationToTypeNode(p), abiVersion)
+    );
+
+    return concatBytes(
+        selector,
+        hexToBytes(
+            coder.encode(
+                abiArgTs.map((t) => t.pp()),
+                args
+            )
+        )
+    );
+}
+
+export function encodeReturns(
+    target: sol.FunctionDefinition,
+    rets: SolValue[],
+    infer: sol.InferType,
+    abiVersion: sol.ABIEncoderVersion
+): Uint8Array {
+    const abiRetTs = target.vReturnParameters.vParameters.map((p) =>
+        infer.toABIEncodedType(infer.variableDeclarationToTypeNode(p), abiVersion)
+    );
+
+    return hexToBytes(
+        coder.encode(
+            abiRetTs.map((t) => t.pp()),
+            rets
+        )
+    );
+}
+
+function abiCoderValToSolVal(v: any, typ: sol.TypeNode): SolValue {
+    if (typ instanceof sol.IntType) {
+        const res = BigInt(v.toString());
+        const clamped = sol.clampIntToType(res, typ);
+        sol.assert(res === clamped, `Decoded return {0} outside of range for type {1}`, res, typ);
+
+        return res;
+    }
+
+    nyi(`Decoding ${v} of type ${typ.pp()}`);
+}
+
+export function decodeReturns(
+    target: sol.FunctionDefinition,
+    data: Uint8Array,
+    infer: sol.InferType,
+    abiVersion: sol.ABIEncoderVersion
+): SolValue[] {
+    if (target.vReturnParameters.vParameters.length === 0) {
+        return [];
+    }
+
+    const abiRetTs = target.vReturnParameters.vParameters.map((p) =>
+        infer.toABIEncodedType(infer.variableDeclarationToTypeNode(p), abiVersion)
+    );
+
+    return coder
+        .decode(
+            abiRetTs.map((t) => t.pp()),
+            data
+        )
+        .map((v, i) => abiCoderValToSolVal(v, abiRetTs[i]));
+}
 
 export function zeroValue(typ: sol.TypeNode): SolValue {
     if (typ instanceof sol.IntType) {
@@ -11,10 +108,42 @@ export function zeroValue(typ: sol.TypeNode): SolValue {
         return false;
     }
 
-    nyi(`NYI zeroValue`);
+    if (typ instanceof sol.AddressType) {
+        return ZERO_ADDRESS;
+    }
+
+    if (typ instanceof sol.UserDefinedType && typ.definition instanceof sol.ContractDefinition) {
+        return ZERO_ADDRESS;
+    }
+
+    nyi(`NYI zeroValue(${typ.pp()})`);
 }
 
-export function isExternal(call: sol.FunctionCall, infer: sol.InferType): boolean {
+export function findConstructor(
+    contract: sol.ContractDefinition
+): sol.FunctionDefinition | undefined {
+    for (const base of contract.vLinearizedBaseContracts) {
+        if (base.vConstructor) {
+            return base.vConstructor;
+        }
+    }
+
+    return undefined;
+}
+
+export function getConstructorABITypes(
+    contract: sol.ContractDefinition,
+    infer: sol.InferType
+): sol.TypeNode[] {
+    const constrDef = findConstructor(contract);
+    return constrDef
+        ? constrDef.vParameters.vParameters.map((param) =>
+              infer.variableDeclarationToTypeNode(param)
+          )
+        : [];
+}
+
+export function isCallExternal(call: sol.FunctionCall, infer: sol.InferType): boolean {
     const callee = call.vCallee;
 
     if (!(callee instanceof sol.MemberAccess)) {
@@ -105,4 +234,66 @@ export function checkOOB(
     }
 
     return v;
+}
+
+type ArgExprMap = Map<sol.ContractDefinition, sol.Expression[]>;
+type ParentScopeMap = Map<sol.ContractDefinition, sol.ContractDefinition>;
+/**
+ * Detect inheritance specifier-style and modifier-style invocation arguments
+ * of contract definition and creates corresponding entries in map.
+ * Recursively descends for detection in base contract definitions too.
+ *
+ * @param contract  contract definition to detect args.
+ * @param argsMap   mapping to collect corresponding arguments to call base constructors.
+ */
+export function grabInheritanceArgs(
+    contract: sol.ContractDefinition,
+    argsMap: ArgExprMap = new Map(),
+    parentScopeMap: ParentScopeMap = new Map()
+): [ArgExprMap, ParentScopeMap] {
+    for (const inheritanceSpecifier of contract.vInheritanceSpecifiers) {
+        const base = inheritanceSpecifier.vBaseType
+            .vReferencedDeclaration as sol.ContractDefinition;
+
+        grabInheritanceArgs(base, argsMap, parentScopeMap);
+
+        if (inheritanceSpecifier.vArguments.length) {
+            /**
+             * Overwrite here is just fine as Solc 0.4+ does the same (with warning).
+             * Solc 0.5+ will not compile at all.
+             */
+            argsMap.set(base, inheritanceSpecifier.vArguments);
+            parentScopeMap.set(base, contract);
+        }
+    }
+
+    if (contract.vConstructor) {
+        for (const invocation of contract.vConstructor.vModifiers) {
+            const base = invocation.vModifier;
+
+            /**
+             * Prior to Solidity 0.6.0, it was allowed to specify current contract
+             * as modifier to it's own constructor. Compiler ignores the call in such case.
+             *
+             * Since Solidity 0.6.0 such use is forbidden.
+             */
+            if (base instanceof sol.ContractDefinition && base !== contract) {
+                grabInheritanceArgs(base, argsMap, parentScopeMap);
+
+                /**
+                 * Modifier-style invocations are taking precedence over
+                 * inheritance specifier-style calls for Solc 0.4.21 and lower.
+                 *
+                 * Solc 0.4.22 and further will not compile at all.
+                 *
+                 * @see https://solidity.readthedocs.io/en/v0.4.21/contracts.html#arguments-for-base-constructors
+                 * @see https://solidity.readthedocs.io/en/v0.4.22/contracts.html#arguments-for-base-constructors
+                 */
+                argsMap.set(base, invocation.vArguments);
+                parentScopeMap.set(base, contract);
+            }
+        }
+    }
+
+    return [argsMap, parentScopeMap];
 }

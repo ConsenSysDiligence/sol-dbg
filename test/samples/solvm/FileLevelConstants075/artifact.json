@@ -1,0 +1,157 @@
+{
+    "errors": [
+        {
+            "component": "general",
+            "errorCode": "1878",
+            "formattedMessage": "FileLevelConstants075_lib.sol: Warning: SPDX license identifier not provided in source file. Before publishing, consider adding a comment containing \"SPDX-License-Identifier: <SPDX-License>\" to each source file. Use \"SPDX-License-Identifier: UNLICENSED\" for non-open-source code. Please see https://spdx.org for more information.\n",
+            "message": "SPDX license identifier not provided in source file. Before publishing, consider adding a comment containing \"SPDX-License-Identifier: <SPDX-License>\" to each source file. Use \"SPDX-License-Identifier: UNLICENSED\" for non-open-source code. Please see https://spdx.org for more information.",
+            "severity": "warning",
+            "sourceLocation": {
+                "end": -1,
+                "file": "FileLevelConstants075_lib.sol",
+                "start": -1
+            },
+            "type": "Warning"
+        }
+    ],
+    "sources": {
+        "FileLevelConstants075_lib.sol": {
+            "ast": {
+                "absolutePath": "FileLevelConstants075_lib.sol",
+                "exportedSymbols": {
+                    "ANOTHER_CONST": [
+                        4
+                    ]
+                },
+                "id": 5,
+                "nodeType": "SourceUnit",
+                "nodes": [
+                    {
+                        "id": 1,
+                        "literals": [
+                            "solidity",
+                            "^",
+                            "0.7",
+                            ".5"
+                        ],
+                        "nodeType": "PragmaDirective",
+                        "src": "0:23:0"
+                    },
+                    {
+                        "constant": true,
+                        "id": 4,
+                        "mutability": "constant",
+                        "name": "ANOTHER_CONST",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 5,
+                        "src": "25:32:0",
+                        "stateVariable": false,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                            "typeIdentifier": "t_uint256",
+                            "typeString": "uint256"
+                        },
+                        "typeName": {
+                            "id": 2,
+                            "name": "uint",
+                            "nodeType": "ElementaryTypeName",
+                            "src": "25:4:0",
+                            "typeDescriptions": {
+                                "typeIdentifier": "t_uint256",
+                                "typeString": "uint256"
+                            }
+                        },
+                        "value": {
+                            "hexValue": "3432",
+                            "id": 3,
+                            "isConstant": false,
+                            "isLValue": false,
+                            "isPure": true,
+                            "kind": "number",
+                            "lValueRequested": false,
+                            "nodeType": "Literal",
+                            "src": "55:2:0",
+                            "typeDescriptions": {
+                                "typeIdentifier": "t_rational_42_by_1",
+                                "typeString": "int_const 42"
+                            },
+                            "value": "42"
+                        },
+                        "visibility": "internal"
+                    }
+                ],
+                "src": "0:59:0"
+            },
+            "id": 0,
+            "legacyAST": {
+                "attributes": {
+                    "absolutePath": "FileLevelConstants075_lib.sol",
+                    "exportedSymbols": {
+                        "ANOTHER_CONST": [
+                            4
+                        ]
+                    }
+                },
+                "children": [
+                    {
+                        "attributes": {
+                            "literals": [
+                                "solidity",
+                                "^",
+                                "0.7",
+                                ".5"
+                            ]
+                        },
+                        "id": 1,
+                        "name": "PragmaDirective",
+                        "src": "0:23:0"
+                    },
+                    {
+                        "attributes": {
+                            "constant": true,
+                            "mutability": "constant",
+                            "name": "ANOTHER_CONST",
+                            "scope": 5,
+                            "stateVariable": false,
+                            "storageLocation": "default",
+                            "type": "uint256",
+                            "visibility": "internal"
+                        },
+                        "children": [
+                            {
+                                "attributes": {
+                                    "name": "uint",
+                                    "type": "uint256"
+                                },
+                                "id": 2,
+                                "name": "ElementaryTypeName",
+                                "src": "25:4:0"
+                            },
+                            {
+                                "attributes": {
+                                    "hexvalue": "3432",
+                                    "isConstant": false,
+                                    "isLValue": false,
+                                    "isPure": true,
+                                    "lValueRequested": false,
+                                    "token": "number",
+                                    "type": "int_const 42",
+                                    "value": "42"
+                                },
+                                "id": 3,
+                                "name": "Literal",
+                                "src": "55:2:0"
+                            }
+                        ],
+                        "id": 4,
+                        "name": "VariableDeclaration",
+                        "src": "25:32:0"
+                    }
+                ],
+                "id": 5,
+                "name": "SourceUnit",
+                "src": "0:59:0"
+            }
+        }
+    }
+}

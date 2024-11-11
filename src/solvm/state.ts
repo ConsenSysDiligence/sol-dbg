@@ -43,8 +43,9 @@ export interface SolNamedTypedValue extends SolTypedValue {
 }
 
 export interface SolMessage {
-    to: Address | null;
+    to: Address;
     data: Uint8Array;
     gas: bigint;
     value: bigint;
+    salt: Uint8Array | undefined;
 }

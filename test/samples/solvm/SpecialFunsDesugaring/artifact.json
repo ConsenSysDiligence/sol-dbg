@@ -1,0 +1,1526 @@
+{
+    "contracts": {
+        "SpecialFunsDesugaring.config.sol": {
+            "Test": {
+                "abi": [
+                    {
+                        "inputs": [],
+                        "stateMutability": "nonpayable",
+                        "type": "constructor"
+                    },
+                    {
+                        "stateMutability": "nonpayable",
+                        "type": "fallback"
+                    },
+                    {
+                        "inputs": [],
+                        "name": "fallback",
+                        "outputs": [],
+                        "stateMutability": "nonpayable",
+                        "type": "function"
+                    },
+                    {
+                        "inputs": [],
+                        "name": "receive",
+                        "outputs": [],
+                        "stateMutability": "payable",
+                        "type": "function"
+                    },
+                    {
+                        "stateMutability": "payable",
+                        "type": "receive"
+                    }
+                ],
+                "devdoc": {
+                    "kind": "dev",
+                    "methods": {},
+                    "version": 1
+                },
+                "evm": {
+                    "assembly": "    /* \"SpecialFunsDesugaring.config.sol\":24:206  contract Test {... */\n  mstore(0x40, 0x80)\n    /* \"SpecialFunsDesugaring.config.sol\":107:123  constructor() {} */\n  callvalue\n  dup1\n  iszero\n  tag_1\n  jumpi\n  0x00\n  dup1\n  revert\ntag_1:\n  pop\n    /* \"SpecialFunsDesugaring.config.sol\":24:206  contract Test {... */\n  dataSize(sub_0)\n  dup1\n  dataOffset(sub_0)\n  0x00\n  codecopy\n  0x00\n  return\nstop\n\nsub_0: assembly {\n        /* \"SpecialFunsDesugaring.config.sol\":24:206  contract Test {... */\n      mstore(0x40, 0x80)\n      jumpi(tag_1, lt(calldatasize, 0x04))\n      shr(0xe0, calldataload(0x00))\n      dup1\n      0x552079dc\n      eq\n      tag_3\n      jumpi\n      dup1\n      0xa3e76c0f\n      eq\n      tag_4\n      jumpi\n      jump(tag_2)\n    tag_1:\n      jumpi(tag_2, calldatasize)\n      stop\n    tag_2:\n      callvalue\n      dup1\n      iszero\n      tag_7\n      jumpi\n      0x00\n      dup1\n      revert\n    tag_7:\n      pop\n      stop\n        /* \"SpecialFunsDesugaring.config.sol\":173:204  function fallback() external {} */\n    tag_3:\n      callvalue\n      dup1\n      iszero\n      tag_10\n      jumpi\n      0x00\n      dup1\n      revert\n    tag_10:\n      pop\n      tag_11\n      tag_12\n      jump\t// in\n    tag_11:\n      stop\n        /* \"SpecialFunsDesugaring.config.sol\":129:167  function receive() external payable {} */\n    tag_4:\n      tag_13\n      tag_14\n      jump\t// in\n    tag_13:\n      stop\n        /* \"SpecialFunsDesugaring.config.sol\":173:204  function fallback() external {} */\n    tag_12:\n      jump\t// out\n        /* \"SpecialFunsDesugaring.config.sol\":129:167  function receive() external payable {} */\n    tag_14:\n      jump\t// out\n\n    auxdata: 0xa2646970667358221220e84568ae0cf89f803163e0ed478ae45dd3d0ad9c4c532053f25b31eb5247815f64736f6c63430008040033\n}\n",
+                    "bytecode": {
+                        "generatedSources": [],
+                        "linkReferences": {},
+                        "object": "6080604052348015600f57600080fd5b5060938061001e6000396000f3fe60806040526004361060295760003560e01c8063552079dc14603d578063a3e76c0f14605157602f565b36602f57005b348015603a57600080fd5b50005b348015604857600080fd5b50604f6059565b005b6057605b565b005b565b56fea2646970667358221220e84568ae0cf89f803163e0ed478ae45dd3d0ad9c4c532053f25b31eb5247815f64736f6c63430008040033",
+                        "opcodes": "PUSH1 0x80 PUSH1 0x40 MSTORE CALLVALUE DUP1 ISZERO PUSH1 0xF JUMPI PUSH1 0x0 DUP1 REVERT JUMPDEST POP PUSH1 0x93 DUP1 PUSH2 0x1E PUSH1 0x0 CODECOPY PUSH1 0x0 RETURN INVALID PUSH1 0x80 PUSH1 0x40 MSTORE PUSH1 0x4 CALLDATASIZE LT PUSH1 0x29 JUMPI PUSH1 0x0 CALLDATALOAD PUSH1 0xE0 SHR DUP1 PUSH4 0x552079DC EQ PUSH1 0x3D JUMPI DUP1 PUSH4 0xA3E76C0F EQ PUSH1 0x51 JUMPI PUSH1 0x2F JUMP JUMPDEST CALLDATASIZE PUSH1 0x2F JUMPI STOP JUMPDEST CALLVALUE DUP1 ISZERO PUSH1 0x3A JUMPI PUSH1 0x0 DUP1 REVERT JUMPDEST POP STOP JUMPDEST CALLVALUE DUP1 ISZERO PUSH1 0x48 JUMPI PUSH1 0x0 DUP1 REVERT JUMPDEST POP PUSH1 0x4F PUSH1 0x59 JUMP JUMPDEST STOP JUMPDEST PUSH1 0x57 PUSH1 0x5B JUMP JUMPDEST STOP JUMPDEST JUMP JUMPDEST JUMP INVALID LOG2 PUSH5 0x6970667358 0x22 SLT KECCAK256 0xE8 GASLIMIT PUSH9 0xAE0CF89F803163E0ED SELFBALANCE DUP11 0xE4 0x5D 0xD3 0xD0 0xAD SWAP13 0x4C MSTORE8 KECCAK256 MSTORE8 CALLCODE JUMPDEST BALANCE 0xEB MSTORE SELFBALANCE DUP2 0x5F PUSH5 0x736F6C6343 STOP ADDMOD DIV STOP CALLER ",
+                        "sourceMap": "24:182:0:-:0;;;107:16;;;;;;;;;;24:182;;;;;;"
+                    },
+                    "deployedBytecode": {
+                        "generatedSources": [],
+                        "immutableReferences": {},
+                        "linkReferences": {},
+                        "object": "60806040526004361060295760003560e01c8063552079dc14603d578063a3e76c0f14605157602f565b36602f57005b348015603a57600080fd5b50005b348015604857600080fd5b50604f6059565b005b6057605b565b005b565b56fea2646970667358221220e84568ae0cf89f803163e0ed478ae45dd3d0ad9c4c532053f25b31eb5247815f64736f6c63430008040033",
+                        "opcodes": "PUSH1 0x80 PUSH1 0x40 MSTORE PUSH1 0x4 CALLDATASIZE LT PUSH1 0x29 JUMPI PUSH1 0x0 CALLDATALOAD PUSH1 0xE0 SHR DUP1 PUSH4 0x552079DC EQ PUSH1 0x3D JUMPI DUP1 PUSH4 0xA3E76C0F EQ PUSH1 0x51 JUMPI PUSH1 0x2F JUMP JUMPDEST CALLDATASIZE PUSH1 0x2F JUMPI STOP JUMPDEST CALLVALUE DUP1 ISZERO PUSH1 0x3A JUMPI PUSH1 0x0 DUP1 REVERT JUMPDEST POP STOP JUMPDEST CALLVALUE DUP1 ISZERO PUSH1 0x48 JUMPI PUSH1 0x0 DUP1 REVERT JUMPDEST POP PUSH1 0x4F PUSH1 0x59 JUMP JUMPDEST STOP JUMPDEST PUSH1 0x57 PUSH1 0x5B JUMP JUMPDEST STOP JUMPDEST JUMP JUMPDEST JUMP INVALID LOG2 PUSH5 0x6970667358 0x22 SLT KECCAK256 0xE8 GASLIMIT PUSH9 0xAE0CF89F803163E0ED SELFBALANCE DUP11 0xE4 0x5D 0xD3 0xD0 0xAD SWAP13 0x4C MSTORE8 KECCAK256 MSTORE8 CALLCODE JUMPDEST BALANCE 0xEB MSTORE SELFBALANCE DUP2 0x5F PUSH5 0x736F6C6343 STOP ADDMOD DIV STOP CALLER ",
+                        "sourceMap": "24:182:0:-:0;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;173:31;;;;;;;;;;;;;:::i;:::-;;129:38;;;:::i;:::-;;173:31;:::o;129:38::-;:::o"
+                    },
+                    "gasEstimates": {
+                        "creation": {
+                            "codeDepositCost": "29400",
+                            "executionCost": "81",
+                            "totalCost": "29481"
+                        },
+                        "external": {
+                            "": "134",
+                            "fallback()": "122",
+                            "receive()": "120"
+                        }
+                    },
+                    "legacyAssembly": {
+                        ".code": [
+                            {
+                                "begin": 24,
+                                "end": 206,
+                                "name": "PUSH",
+                                "source": 0,
+                                "value": "80"
+                            },
+                            {
+                                "begin": 24,
+                                "end": 206,
+                                "name": "PUSH",
+                                "source": 0,
+                                "value": "40"
+                            },
+                            {
+                                "begin": 24,
+                                "end": 206,
+                                "name": "MSTORE",
+                                "source": 0
+                            },
+                            {
+                                "begin": 107,
+                                "end": 123,
+                                "name": "CALLVALUE",
+                                "source": 0
+                            },
+                            {
+                                "begin": 107,
+                                "end": 123,
+                                "name": "DUP1",
+                                "source": 0
+                            },
+                            {
+                                "begin": 107,
+                                "end": 123,
+                                "name": "ISZERO",
+                                "source": 0
+                            },
+                            {
+                                "begin": 107,
+                                "end": 123,
+                                "name": "PUSH [tag]",
+                                "source": 0,
+                                "value": "1"
+                            },
+                            {
+                                "begin": 107,
+                                "end": 123,
+                                "name": "JUMPI",
+                                "source": 0
+                            },
+                            {
+                                "begin": 107,
+                                "end": 123,
+                                "name": "PUSH",
+                                "source": 0,
+                                "value": "0"
+                            },
+                            {
+                                "begin": 107,
+                                "end": 123,
+                                "name": "DUP1",
+                                "source": 0
+                            },
+                            {
+                                "begin": 107,
+                                "end": 123,
+                                "name": "REVERT",
+                                "source": 0
+                            },
+                            {
+                                "begin": 107,
+                                "end": 123,
+                                "name": "tag",
+                                "source": 0,
+                                "value": "1"
+                            },
+                            {
+                                "begin": 107,
+                                "end": 123,
+                                "name": "JUMPDEST",
+                                "source": 0
+                            },
+                            {
+                                "begin": 107,
+                                "end": 123,
+                                "name": "POP",
+                                "source": 0
+                            },
+                            {
+                                "begin": 24,
+                                "end": 206,
+                                "name": "PUSH #[$]",
+                                "source": 0,
+                                "value": "0000000000000000000000000000000000000000000000000000000000000000"
+                            },
+                            {
+                                "begin": 24,
+                                "end": 206,
+                                "name": "DUP1",
+                                "source": 0
+                            },
+                            {
+                                "begin": 24,
+                                "end": 206,
+                                "name": "PUSH [$]",
+                                "source": 0,
+                                "value": "0000000000000000000000000000000000000000000000000000000000000000"
+                            },
+                            {
+                                "begin": 24,
+                                "end": 206,
+                                "name": "PUSH",
+                                "source": 0,
+                                "value": "0"
+                            },
+                            {
+                                "begin": 24,
+                                "end": 206,
+                                "name": "CODECOPY",
+                                "source": 0
+                            },
+                            {
+                                "begin": 24,
+                                "end": 206,
+                                "name": "PUSH",
+                                "source": 0,
+                                "value": "0"
+                            },
+                            {
+                                "begin": 24,
+                                "end": 206,
+                                "name": "RETURN",
+                                "source": 0
+                            }
+                        ],
+                        ".data": {
+                            "0": {
+                                ".auxdata": "a2646970667358221220e84568ae0cf89f803163e0ed478ae45dd3d0ad9c4c532053f25b31eb5247815f64736f6c63430008040033",
+                                ".code": [
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "PUSH",
+                                        "source": 0,
+                                        "value": "80"
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "PUSH",
+                                        "source": 0,
+                                        "value": "40"
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "MSTORE",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "PUSH",
+                                        "source": 0,
+                                        "value": "4"
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "CALLDATASIZE",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "LT",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "PUSH [tag]",
+                                        "source": 0,
+                                        "value": "1"
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "JUMPI",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "PUSH",
+                                        "source": 0,
+                                        "value": "0"
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "CALLDATALOAD",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "PUSH",
+                                        "source": 0,
+                                        "value": "E0"
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "SHR",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "DUP1",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "PUSH",
+                                        "source": 0,
+                                        "value": "552079DC"
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "EQ",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "PUSH [tag]",
+                                        "source": 0,
+                                        "value": "3"
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "JUMPI",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "DUP1",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "PUSH",
+                                        "source": 0,
+                                        "value": "A3E76C0F"
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "EQ",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "PUSH [tag]",
+                                        "source": 0,
+                                        "value": "4"
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "JUMPI",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "PUSH [tag]",
+                                        "source": 0,
+                                        "value": "2"
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "JUMP",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "tag",
+                                        "source": 0,
+                                        "value": "1"
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "JUMPDEST",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "CALLDATASIZE",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "PUSH [tag]",
+                                        "source": 0,
+                                        "value": "2"
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "JUMPI",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "STOP",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "tag",
+                                        "source": 0,
+                                        "value": "2"
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "JUMPDEST",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "CALLVALUE",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "DUP1",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "ISZERO",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "PUSH [tag]",
+                                        "source": 0,
+                                        "value": "7"
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "JUMPI",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "PUSH",
+                                        "source": 0,
+                                        "value": "0"
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "DUP1",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "REVERT",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "tag",
+                                        "source": 0,
+                                        "value": "7"
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "JUMPDEST",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "POP",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 24,
+                                        "end": 206,
+                                        "name": "STOP",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 173,
+                                        "end": 204,
+                                        "name": "tag",
+                                        "source": 0,
+                                        "value": "3"
+                                    },
+                                    {
+                                        "begin": 173,
+                                        "end": 204,
+                                        "name": "JUMPDEST",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 173,
+                                        "end": 204,
+                                        "name": "CALLVALUE",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 173,
+                                        "end": 204,
+                                        "name": "DUP1",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 173,
+                                        "end": 204,
+                                        "name": "ISZERO",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 173,
+                                        "end": 204,
+                                        "name": "PUSH [tag]",
+                                        "source": 0,
+                                        "value": "10"
+                                    },
+                                    {
+                                        "begin": 173,
+                                        "end": 204,
+                                        "name": "JUMPI",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 173,
+                                        "end": 204,
+                                        "name": "PUSH",
+                                        "source": 0,
+                                        "value": "0"
+                                    },
+                                    {
+                                        "begin": 173,
+                                        "end": 204,
+                                        "name": "DUP1",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 173,
+                                        "end": 204,
+                                        "name": "REVERT",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 173,
+                                        "end": 204,
+                                        "name": "tag",
+                                        "source": 0,
+                                        "value": "10"
+                                    },
+                                    {
+                                        "begin": 173,
+                                        "end": 204,
+                                        "name": "JUMPDEST",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 173,
+                                        "end": 204,
+                                        "name": "POP",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 173,
+                                        "end": 204,
+                                        "name": "PUSH [tag]",
+                                        "source": 0,
+                                        "value": "11"
+                                    },
+                                    {
+                                        "begin": 173,
+                                        "end": 204,
+                                        "name": "PUSH [tag]",
+                                        "source": 0,
+                                        "value": "12"
+                                    },
+                                    {
+                                        "begin": 173,
+                                        "end": 204,
+                                        "name": "JUMP",
+                                        "source": 0,
+                                        "value": "[in]"
+                                    },
+                                    {
+                                        "begin": 173,
+                                        "end": 204,
+                                        "name": "tag",
+                                        "source": 0,
+                                        "value": "11"
+                                    },
+                                    {
+                                        "begin": 173,
+                                        "end": 204,
+                                        "name": "JUMPDEST",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 173,
+                                        "end": 204,
+                                        "name": "STOP",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 129,
+                                        "end": 167,
+                                        "name": "tag",
+                                        "source": 0,
+                                        "value": "4"
+                                    },
+                                    {
+                                        "begin": 129,
+                                        "end": 167,
+                                        "name": "JUMPDEST",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 129,
+                                        "end": 167,
+                                        "name": "PUSH [tag]",
+                                        "source": 0,
+                                        "value": "13"
+                                    },
+                                    {
+                                        "begin": 129,
+                                        "end": 167,
+                                        "name": "PUSH [tag]",
+                                        "source": 0,
+                                        "value": "14"
+                                    },
+                                    {
+                                        "begin": 129,
+                                        "end": 167,
+                                        "name": "JUMP",
+                                        "source": 0,
+                                        "value": "[in]"
+                                    },
+                                    {
+                                        "begin": 129,
+                                        "end": 167,
+                                        "name": "tag",
+                                        "source": 0,
+                                        "value": "13"
+                                    },
+                                    {
+                                        "begin": 129,
+                                        "end": 167,
+                                        "name": "JUMPDEST",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 129,
+                                        "end": 167,
+                                        "name": "STOP",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 173,
+                                        "end": 204,
+                                        "name": "tag",
+                                        "source": 0,
+                                        "value": "12"
+                                    },
+                                    {
+                                        "begin": 173,
+                                        "end": 204,
+                                        "name": "JUMPDEST",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 173,
+                                        "end": 204,
+                                        "name": "JUMP",
+                                        "source": 0,
+                                        "value": "[out]"
+                                    },
+                                    {
+                                        "begin": 129,
+                                        "end": 167,
+                                        "name": "tag",
+                                        "source": 0,
+                                        "value": "14"
+                                    },
+                                    {
+                                        "begin": 129,
+                                        "end": 167,
+                                        "name": "JUMPDEST",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 129,
+                                        "end": 167,
+                                        "name": "JUMP",
+                                        "source": 0,
+                                        "value": "[out]"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "methodIdentifiers": {
+                        "fallback()": "552079dc",
+                        "receive()": "a3e76c0f"
+                    }
+                },
+                "ewasm": {
+                    "wasm": ""
+                },
+                "metadata": "{\"compiler\":{\"version\":\"0.8.4+commit.c7e474f2\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"stateMutability\":\"nonpayable\",\"type\":\"fallback\"},{\"inputs\":[],\"name\":\"fallback\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"receive\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"stateMutability\":\"payable\",\"type\":\"receive\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"SpecialFunsDesugaring.config.sol\":\"Test\"},\"evmVersion\":\"istanbul\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":false,\"runs\":200},\"remappings\":[]},\"sources\":{\"SpecialFunsDesugaring.config.sol\":{\"keccak256\":\"0x34e446aecf8c917f551263290335a198a40816fb16fe2cbe4c8db1543340053d\",\"urls\":[\"bzz-raw://52eee876b9cad9931e83584b786db56ffbb30b5a2e06e6c14ea2d4935e3d139d\",\"dweb:/ipfs/QmTmfghTSZu5ybiep3Kb5CPjXLhQdxhyf6yC1Kv6fsnLHN\"]}},\"version\":1}",
+                "storageLayout": {
+                    "storage": [],
+                    "types": null
+                },
+                "userdoc": {
+                    "kind": "user",
+                    "methods": {},
+                    "version": 1
+                }
+            },
+            "__IRTest__": {
+                "abi": [
+                    {
+                        "inputs": [],
+                        "name": "main",
+                        "outputs": [],
+                        "stateMutability": "nonpayable",
+                        "type": "function"
+                    }
+                ],
+                "devdoc": {
+                    "kind": "dev",
+                    "methods": {},
+                    "version": 1
+                },
+                "evm": {
+                    "assembly": "    /* \"SpecialFunsDesugaring.config.sol\":208:261  contract __IRTest__ {... */\n  mstore(0x40, 0x80)\n  callvalue\n  dup1\n  iszero\n  tag_1\n  jumpi\n  0x00\n  dup1\n  revert\ntag_1:\n  pop\n  dataSize(sub_0)\n  dup1\n  dataOffset(sub_0)\n  0x00\n  codecopy\n  0x00\n  return\nstop\n\nsub_0: assembly {\n        /* \"SpecialFunsDesugaring.config.sol\":208:261  contract __IRTest__ {... */\n      mstore(0x40, 0x80)\n      callvalue\n      dup1\n      iszero\n      tag_1\n      jumpi\n      0x00\n      dup1\n      revert\n    tag_1:\n      pop\n      jumpi(tag_2, lt(calldatasize, 0x04))\n      shr(0xe0, calldataload(0x00))\n      dup1\n      0xdffeadd0\n      eq\n      tag_3\n      jumpi\n    tag_2:\n      0x00\n      dup1\n      revert\n        /* \"SpecialFunsDesugaring.config.sol\":234:259  function main() public {} */\n    tag_3:\n      tag_4\n      tag_5\n      jump\t// in\n    tag_4:\n      stop\n    tag_5:\n      jump\t// out\n\n    auxdata: 0xa264697066735822122039bae83cbed8be24ec9a3edf675882719337c0a5d854395436d6c5dc8d99c33d64736f6c63430008040033\n}\n",
+                    "bytecode": {
+                        "generatedSources": [],
+                        "linkReferences": {},
+                        "object": "6080604052348015600f57600080fd5b50606d80601d6000396000f3fe6080604052348015600f57600080fd5b506004361060285760003560e01c8063dffeadd014602d575b600080fd5b60336035565b005b56fea264697066735822122039bae83cbed8be24ec9a3edf675882719337c0a5d854395436d6c5dc8d99c33d64736f6c63430008040033",
+                        "opcodes": "PUSH1 0x80 PUSH1 0x40 MSTORE CALLVALUE DUP1 ISZERO PUSH1 0xF JUMPI PUSH1 0x0 DUP1 REVERT JUMPDEST POP PUSH1 0x6D DUP1 PUSH1 0x1D PUSH1 0x0 CODECOPY PUSH1 0x0 RETURN INVALID PUSH1 0x80 PUSH1 0x40 MSTORE CALLVALUE DUP1 ISZERO PUSH1 0xF JUMPI PUSH1 0x0 DUP1 REVERT JUMPDEST POP PUSH1 0x4 CALLDATASIZE LT PUSH1 0x28 JUMPI PUSH1 0x0 CALLDATALOAD PUSH1 0xE0 SHR DUP1 PUSH4 0xDFFEADD0 EQ PUSH1 0x2D JUMPI JUMPDEST PUSH1 0x0 DUP1 REVERT JUMPDEST PUSH1 0x33 PUSH1 0x35 JUMP JUMPDEST STOP JUMPDEST JUMP INVALID LOG2 PUSH5 0x6970667358 0x22 SLT KECCAK256 CODECOPY 0xBA 0xE8 EXTCODECOPY 0xBE 0xD8 0xBE 0x24 0xEC SWAP11 RETURNDATACOPY 0xDF PUSH8 0x5882719337C0A5D8 SLOAD CODECOPY SLOAD CALLDATASIZE 0xD6 0xC5 0xDC DUP14 SWAP10 0xC3 RETURNDATASIZE PUSH5 0x736F6C6343 STOP ADDMOD DIV STOP CALLER ",
+                        "sourceMap": "208:53:0:-:0;;;;;;;;;;;;;;;;;;;"
+                    },
+                    "deployedBytecode": {
+                        "generatedSources": [],
+                        "immutableReferences": {},
+                        "linkReferences": {},
+                        "object": "6080604052348015600f57600080fd5b506004361060285760003560e01c8063dffeadd014602d575b600080fd5b60336035565b005b56fea264697066735822122039bae83cbed8be24ec9a3edf675882719337c0a5d854395436d6c5dc8d99c33d64736f6c63430008040033",
+                        "opcodes": "PUSH1 0x80 PUSH1 0x40 MSTORE CALLVALUE DUP1 ISZERO PUSH1 0xF JUMPI PUSH1 0x0 DUP1 REVERT JUMPDEST POP PUSH1 0x4 CALLDATASIZE LT PUSH1 0x28 JUMPI PUSH1 0x0 CALLDATALOAD PUSH1 0xE0 SHR DUP1 PUSH4 0xDFFEADD0 EQ PUSH1 0x2D JUMPI JUMPDEST PUSH1 0x0 DUP1 REVERT JUMPDEST PUSH1 0x33 PUSH1 0x35 JUMP JUMPDEST STOP JUMPDEST JUMP INVALID LOG2 PUSH5 0x6970667358 0x22 SLT KECCAK256 CODECOPY 0xBA 0xE8 EXTCODECOPY 0xBE 0xD8 0xBE 0x24 0xEC SWAP11 RETURNDATACOPY 0xDF PUSH8 0x5882719337C0A5D8 SLOAD CODECOPY SLOAD CALLDATASIZE 0xD6 0xC5 0xDC DUP14 SWAP10 0xC3 RETURNDATASIZE PUSH5 0x736F6C6343 STOP ADDMOD DIV STOP CALLER ",
+                        "sourceMap": "208:53:0:-:0;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;234:25;;;:::i;:::-;;;:::o"
+                    },
+                    "gasEstimates": {
+                        "creation": {
+                            "codeDepositCost": "21800",
+                            "executionCost": "75",
+                            "totalCost": "21875"
+                        },
+                        "external": {
+                            "main()": "122"
+                        }
+                    },
+                    "legacyAssembly": {
+                        ".code": [
+                            {
+                                "begin": 208,
+                                "end": 261,
+                                "name": "PUSH",
+                                "source": 0,
+                                "value": "80"
+                            },
+                            {
+                                "begin": 208,
+                                "end": 261,
+                                "name": "PUSH",
+                                "source": 0,
+                                "value": "40"
+                            },
+                            {
+                                "begin": 208,
+                                "end": 261,
+                                "name": "MSTORE",
+                                "source": 0
+                            },
+                            {
+                                "begin": 208,
+                                "end": 261,
+                                "name": "CALLVALUE",
+                                "source": 0
+                            },
+                            {
+                                "begin": 208,
+                                "end": 261,
+                                "name": "DUP1",
+                                "source": 0
+                            },
+                            {
+                                "begin": 208,
+                                "end": 261,
+                                "name": "ISZERO",
+                                "source": 0
+                            },
+                            {
+                                "begin": 208,
+                                "end": 261,
+                                "name": "PUSH [tag]",
+                                "source": 0,
+                                "value": "1"
+                            },
+                            {
+                                "begin": 208,
+                                "end": 261,
+                                "name": "JUMPI",
+                                "source": 0
+                            },
+                            {
+                                "begin": 208,
+                                "end": 261,
+                                "name": "PUSH",
+                                "source": 0,
+                                "value": "0"
+                            },
+                            {
+                                "begin": 208,
+                                "end": 261,
+                                "name": "DUP1",
+                                "source": 0
+                            },
+                            {
+                                "begin": 208,
+                                "end": 261,
+                                "name": "REVERT",
+                                "source": 0
+                            },
+                            {
+                                "begin": 208,
+                                "end": 261,
+                                "name": "tag",
+                                "source": 0,
+                                "value": "1"
+                            },
+                            {
+                                "begin": 208,
+                                "end": 261,
+                                "name": "JUMPDEST",
+                                "source": 0
+                            },
+                            {
+                                "begin": 208,
+                                "end": 261,
+                                "name": "POP",
+                                "source": 0
+                            },
+                            {
+                                "begin": 208,
+                                "end": 261,
+                                "name": "PUSH #[$]",
+                                "source": 0,
+                                "value": "0000000000000000000000000000000000000000000000000000000000000000"
+                            },
+                            {
+                                "begin": 208,
+                                "end": 261,
+                                "name": "DUP1",
+                                "source": 0
+                            },
+                            {
+                                "begin": 208,
+                                "end": 261,
+                                "name": "PUSH [$]",
+                                "source": 0,
+                                "value": "0000000000000000000000000000000000000000000000000000000000000000"
+                            },
+                            {
+                                "begin": 208,
+                                "end": 261,
+                                "name": "PUSH",
+                                "source": 0,
+                                "value": "0"
+                            },
+                            {
+                                "begin": 208,
+                                "end": 261,
+                                "name": "CODECOPY",
+                                "source": 0
+                            },
+                            {
+                                "begin": 208,
+                                "end": 261,
+                                "name": "PUSH",
+                                "source": 0,
+                                "value": "0"
+                            },
+                            {
+                                "begin": 208,
+                                "end": 261,
+                                "name": "RETURN",
+                                "source": 0
+                            }
+                        ],
+                        ".data": {
+                            "0": {
+                                ".auxdata": "a264697066735822122039bae83cbed8be24ec9a3edf675882719337c0a5d854395436d6c5dc8d99c33d64736f6c63430008040033",
+                                ".code": [
+                                    {
+                                        "begin": 208,
+                                        "end": 261,
+                                        "name": "PUSH",
+                                        "source": 0,
+                                        "value": "80"
+                                    },
+                                    {
+                                        "begin": 208,
+                                        "end": 261,
+                                        "name": "PUSH",
+                                        "source": 0,
+                                        "value": "40"
+                                    },
+                                    {
+                                        "begin": 208,
+                                        "end": 261,
+                                        "name": "MSTORE",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 208,
+                                        "end": 261,
+                                        "name": "CALLVALUE",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 208,
+                                        "end": 261,
+                                        "name": "DUP1",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 208,
+                                        "end": 261,
+                                        "name": "ISZERO",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 208,
+                                        "end": 261,
+                                        "name": "PUSH [tag]",
+                                        "source": 0,
+                                        "value": "1"
+                                    },
+                                    {
+                                        "begin": 208,
+                                        "end": 261,
+                                        "name": "JUMPI",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 208,
+                                        "end": 261,
+                                        "name": "PUSH",
+                                        "source": 0,
+                                        "value": "0"
+                                    },
+                                    {
+                                        "begin": 208,
+                                        "end": 261,
+                                        "name": "DUP1",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 208,
+                                        "end": 261,
+                                        "name": "REVERT",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 208,
+                                        "end": 261,
+                                        "name": "tag",
+                                        "source": 0,
+                                        "value": "1"
+                                    },
+                                    {
+                                        "begin": 208,
+                                        "end": 261,
+                                        "name": "JUMPDEST",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 208,
+                                        "end": 261,
+                                        "name": "POP",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 208,
+                                        "end": 261,
+                                        "name": "PUSH",
+                                        "source": 0,
+                                        "value": "4"
+                                    },
+                                    {
+                                        "begin": 208,
+                                        "end": 261,
+                                        "name": "CALLDATASIZE",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 208,
+                                        "end": 261,
+                                        "name": "LT",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 208,
+                                        "end": 261,
+                                        "name": "PUSH [tag]",
+                                        "source": 0,
+                                        "value": "2"
+                                    },
+                                    {
+                                        "begin": 208,
+                                        "end": 261,
+                                        "name": "JUMPI",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 208,
+                                        "end": 261,
+                                        "name": "PUSH",
+                                        "source": 0,
+                                        "value": "0"
+                                    },
+                                    {
+                                        "begin": 208,
+                                        "end": 261,
+                                        "name": "CALLDATALOAD",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 208,
+                                        "end": 261,
+                                        "name": "PUSH",
+                                        "source": 0,
+                                        "value": "E0"
+                                    },
+                                    {
+                                        "begin": 208,
+                                        "end": 261,
+                                        "name": "SHR",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 208,
+                                        "end": 261,
+                                        "name": "DUP1",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 208,
+                                        "end": 261,
+                                        "name": "PUSH",
+                                        "source": 0,
+                                        "value": "DFFEADD0"
+                                    },
+                                    {
+                                        "begin": 208,
+                                        "end": 261,
+                                        "name": "EQ",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 208,
+                                        "end": 261,
+                                        "name": "PUSH [tag]",
+                                        "source": 0,
+                                        "value": "3"
+                                    },
+                                    {
+                                        "begin": 208,
+                                        "end": 261,
+                                        "name": "JUMPI",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 208,
+                                        "end": 261,
+                                        "name": "tag",
+                                        "source": 0,
+                                        "value": "2"
+                                    },
+                                    {
+                                        "begin": 208,
+                                        "end": 261,
+                                        "name": "JUMPDEST",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 208,
+                                        "end": 261,
+                                        "name": "PUSH",
+                                        "source": 0,
+                                        "value": "0"
+                                    },
+                                    {
+                                        "begin": 208,
+                                        "end": 261,
+                                        "name": "DUP1",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 208,
+                                        "end": 261,
+                                        "name": "REVERT",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 234,
+                                        "end": 259,
+                                        "name": "tag",
+                                        "source": 0,
+                                        "value": "3"
+                                    },
+                                    {
+                                        "begin": 234,
+                                        "end": 259,
+                                        "name": "JUMPDEST",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 234,
+                                        "end": 259,
+                                        "name": "PUSH [tag]",
+                                        "source": 0,
+                                        "value": "4"
+                                    },
+                                    {
+                                        "begin": 234,
+                                        "end": 259,
+                                        "name": "PUSH [tag]",
+                                        "source": 0,
+                                        "value": "5"
+                                    },
+                                    {
+                                        "begin": 234,
+                                        "end": 259,
+                                        "name": "JUMP",
+                                        "source": 0,
+                                        "value": "[in]"
+                                    },
+                                    {
+                                        "begin": 234,
+                                        "end": 259,
+                                        "name": "tag",
+                                        "source": 0,
+                                        "value": "4"
+                                    },
+                                    {
+                                        "begin": 234,
+                                        "end": 259,
+                                        "name": "JUMPDEST",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 234,
+                                        "end": 259,
+                                        "name": "STOP",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 234,
+                                        "end": 259,
+                                        "name": "tag",
+                                        "source": 0,
+                                        "value": "5"
+                                    },
+                                    {
+                                        "begin": 234,
+                                        "end": 259,
+                                        "name": "JUMPDEST",
+                                        "source": 0
+                                    },
+                                    {
+                                        "begin": 234,
+                                        "end": 259,
+                                        "name": "JUMP",
+                                        "source": 0,
+                                        "value": "[out]"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "methodIdentifiers": {
+                        "main()": "dffeadd0"
+                    }
+                },
+                "ewasm": {
+                    "wasm": ""
+                },
+                "metadata": "{\"compiler\":{\"version\":\"0.8.4+commit.c7e474f2\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[],\"name\":\"main\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"SpecialFunsDesugaring.config.sol\":\"__IRTest__\"},\"evmVersion\":\"istanbul\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":false,\"runs\":200},\"remappings\":[]},\"sources\":{\"SpecialFunsDesugaring.config.sol\":{\"keccak256\":\"0x34e446aecf8c917f551263290335a198a40816fb16fe2cbe4c8db1543340053d\",\"urls\":[\"bzz-raw://52eee876b9cad9931e83584b786db56ffbb30b5a2e06e6c14ea2d4935e3d139d\",\"dweb:/ipfs/QmTmfghTSZu5ybiep3Kb5CPjXLhQdxhyf6yC1Kv6fsnLHN\"]}},\"version\":1}",
+                "storageLayout": {
+                    "storage": [],
+                    "types": null
+                },
+                "userdoc": {
+                    "kind": "user",
+                    "methods": {},
+                    "version": 1
+                }
+            }
+        }
+    },
+    "errors": [
+        {
+            "component": "general",
+            "errorCode": "3445",
+            "formattedMessage": "Warning: This function is named \"receive\" but is not the receive function of the contract. If you intend this to be a receive function, use \"receive(...) { ... }\" without the \"function\" keyword to define it.\n  --> SpecialFunsDesugaring.config.sol:10:14:\n   |\n10 |     function receive() external payable {}\n   |              ^^^^^^^\n\n",
+            "message": "This function is named \"receive\" but is not the receive function of the contract. If you intend this to be a receive function, use \"receive(...) { ... }\" without the \"function\" keyword to define it.",
+            "severity": "warning",
+            "sourceLocation": {
+                "end": 145,
+                "file": "SpecialFunsDesugaring.config.sol",
+                "start": 138
+            },
+            "type": "Warning"
+        },
+        {
+            "component": "general",
+            "errorCode": "3445",
+            "formattedMessage": "Warning: This function is named \"fallback\" but is not the fallback function of the contract. If you intend this to be a fallback function, use \"fallback(...) { ... }\" without the \"function\" keyword to define it.\n  --> SpecialFunsDesugaring.config.sol:12:14:\n   |\n12 |     function fallback() external {}\n   |              ^^^^^^^^\n\n",
+            "message": "This function is named \"fallback\" but is not the fallback function of the contract. If you intend this to be a fallback function, use \"fallback(...) { ... }\" without the \"function\" keyword to define it.",
+            "severity": "warning",
+            "sourceLocation": {
+                "end": 190,
+                "file": "SpecialFunsDesugaring.config.sol",
+                "start": 182
+            },
+            "type": "Warning"
+        },
+        {
+            "component": "general",
+            "errorCode": "1878",
+            "formattedMessage": "Warning: SPDX license identifier not provided in source file. Before publishing, consider adding a comment containing \"SPDX-License-Identifier: <SPDX-License>\" to each source file. Use \"SPDX-License-Identifier: UNLICENSED\" for non-open-source code. Please see https://spdx.org for more information.\n--> SpecialFunsDesugaring.config.sol\n\n",
+            "message": "SPDX license identifier not provided in source file. Before publishing, consider adding a comment containing \"SPDX-License-Identifier: <SPDX-License>\" to each source file. Use \"SPDX-License-Identifier: UNLICENSED\" for non-open-source code. Please see https://spdx.org for more information.",
+            "severity": "warning",
+            "sourceLocation": {
+                "end": -1,
+                "file": "SpecialFunsDesugaring.config.sol",
+                "start": -1
+            },
+            "type": "Warning"
+        }
+    ],
+    "sources": {
+        "SpecialFunsDesugaring.config.sol": {
+            "ast": {
+                "absolutePath": "SpecialFunsDesugaring.config.sol",
+                "exportedSymbols": {
+                    "Test": [
+                        22
+                    ],
+                    "__IRTest__": [
+                        27
+                    ]
+                },
+                "id": 28,
+                "nodeType": "SourceUnit",
+                "nodes": [
+                    {
+                        "id": 1,
+                        "literals": [
+                            "solidity",
+                            "0.8",
+                            ".4"
+                        ],
+                        "nodeType": "PragmaDirective",
+                        "src": "0:22:0"
+                    },
+                    {
+                        "abstract": false,
+                        "baseContracts": [],
+                        "contractDependencies": [],
+                        "contractKind": "contract",
+                        "fullyImplemented": true,
+                        "id": 22,
+                        "linearizedBaseContracts": [
+                            22
+                        ],
+                        "name": "Test",
+                        "nameLocation": "33:4:0",
+                        "nodeType": "ContractDefinition",
+                        "nodes": [
+                            {
+                                "body": {
+                                    "id": 4,
+                                    "nodeType": "Block",
+                                    "src": "64:2:0",
+                                    "statements": []
+                                },
+                                "id": 5,
+                                "implemented": true,
+                                "kind": "fallback",
+                                "modifiers": [],
+                                "name": "",
+                                "nameLocation": "-1:-1:-1",
+                                "nodeType": "FunctionDefinition",
+                                "parameters": {
+                                    "id": 2,
+                                    "nodeType": "ParameterList",
+                                    "parameters": [],
+                                    "src": "52:2:0"
+                                },
+                                "returnParameters": {
+                                    "id": 3,
+                                    "nodeType": "ParameterList",
+                                    "parameters": [],
+                                    "src": "64:0:0"
+                                },
+                                "scope": 22,
+                                "src": "44:22:0",
+                                "stateMutability": "nonpayable",
+                                "virtual": false,
+                                "visibility": "external"
+                            },
+                            {
+                                "body": {
+                                    "id": 8,
+                                    "nodeType": "Block",
+                                    "src": "99:2:0",
+                                    "statements": []
+                                },
+                                "id": 9,
+                                "implemented": true,
+                                "kind": "receive",
+                                "modifiers": [],
+                                "name": "",
+                                "nameLocation": "-1:-1:-1",
+                                "nodeType": "FunctionDefinition",
+                                "parameters": {
+                                    "id": 6,
+                                    "nodeType": "ParameterList",
+                                    "parameters": [],
+                                    "src": "79:2:0"
+                                },
+                                "returnParameters": {
+                                    "id": 7,
+                                    "nodeType": "ParameterList",
+                                    "parameters": [],
+                                    "src": "99:0:0"
+                                },
+                                "scope": 22,
+                                "src": "72:29:0",
+                                "stateMutability": "payable",
+                                "virtual": false,
+                                "visibility": "external"
+                            },
+                            {
+                                "body": {
+                                    "id": 12,
+                                    "nodeType": "Block",
+                                    "src": "121:2:0",
+                                    "statements": []
+                                },
+                                "id": 13,
+                                "implemented": true,
+                                "kind": "constructor",
+                                "modifiers": [],
+                                "name": "",
+                                "nameLocation": "-1:-1:-1",
+                                "nodeType": "FunctionDefinition",
+                                "parameters": {
+                                    "id": 10,
+                                    "nodeType": "ParameterList",
+                                    "parameters": [],
+                                    "src": "118:2:0"
+                                },
+                                "returnParameters": {
+                                    "id": 11,
+                                    "nodeType": "ParameterList",
+                                    "parameters": [],
+                                    "src": "121:0:0"
+                                },
+                                "scope": 22,
+                                "src": "107:16:0",
+                                "stateMutability": "nonpayable",
+                                "virtual": false,
+                                "visibility": "public"
+                            },
+                            {
+                                "body": {
+                                    "id": 16,
+                                    "nodeType": "Block",
+                                    "src": "165:2:0",
+                                    "statements": []
+                                },
+                                "functionSelector": "a3e76c0f",
+                                "id": 17,
+                                "implemented": true,
+                                "kind": "function",
+                                "modifiers": [],
+                                "name": "receive",
+                                "nameLocation": "138:7:0",
+                                "nodeType": "FunctionDefinition",
+                                "parameters": {
+                                    "id": 14,
+                                    "nodeType": "ParameterList",
+                                    "parameters": [],
+                                    "src": "145:2:0"
+                                },
+                                "returnParameters": {
+                                    "id": 15,
+                                    "nodeType": "ParameterList",
+                                    "parameters": [],
+                                    "src": "165:0:0"
+                                },
+                                "scope": 22,
+                                "src": "129:38:0",
+                                "stateMutability": "payable",
+                                "virtual": false,
+                                "visibility": "external"
+                            },
+                            {
+                                "body": {
+                                    "id": 20,
+                                    "nodeType": "Block",
+                                    "src": "202:2:0",
+                                    "statements": []
+                                },
+                                "functionSelector": "552079dc",
+                                "id": 21,
+                                "implemented": true,
+                                "kind": "function",
+                                "modifiers": [],
+                                "name": "fallback",
+                                "nameLocation": "182:8:0",
+                                "nodeType": "FunctionDefinition",
+                                "parameters": {
+                                    "id": 18,
+                                    "nodeType": "ParameterList",
+                                    "parameters": [],
+                                    "src": "190:2:0"
+                                },
+                                "returnParameters": {
+                                    "id": 19,
+                                    "nodeType": "ParameterList",
+                                    "parameters": [],
+                                    "src": "202:0:0"
+                                },
+                                "scope": 22,
+                                "src": "173:31:0",
+                                "stateMutability": "nonpayable",
+                                "virtual": false,
+                                "visibility": "external"
+                            }
+                        ],
+                        "scope": 28,
+                        "src": "24:182:0",
+                        "usedErrors": []
+                    },
+                    {
+                        "abstract": false,
+                        "baseContracts": [],
+                        "contractDependencies": [],
+                        "contractKind": "contract",
+                        "fullyImplemented": true,
+                        "id": 27,
+                        "linearizedBaseContracts": [
+                            27
+                        ],
+                        "name": "__IRTest__",
+                        "nameLocation": "217:10:0",
+                        "nodeType": "ContractDefinition",
+                        "nodes": [
+                            {
+                                "body": {
+                                    "id": 25,
+                                    "nodeType": "Block",
+                                    "src": "257:2:0",
+                                    "statements": []
+                                },
+                                "functionSelector": "dffeadd0",
+                                "id": 26,
+                                "implemented": true,
+                                "kind": "function",
+                                "modifiers": [],
+                                "name": "main",
+                                "nameLocation": "243:4:0",
+                                "nodeType": "FunctionDefinition",
+                                "parameters": {
+                                    "id": 23,
+                                    "nodeType": "ParameterList",
+                                    "parameters": [],
+                                    "src": "247:2:0"
+                                },
+                                "returnParameters": {
+                                    "id": 24,
+                                    "nodeType": "ParameterList",
+                                    "parameters": [],
+                                    "src": "257:0:0"
+                                },
+                                "scope": 27,
+                                "src": "234:25:0",
+                                "stateMutability": "nonpayable",
+                                "virtual": false,
+                                "visibility": "public"
+                            }
+                        ],
+                        "scope": 28,
+                        "src": "208:53:0",
+                        "usedErrors": []
+                    }
+                ],
+                "src": "0:261:0"
+            },
+            "id": 0
+        }
+    }
+}

@@ -19,6 +19,7 @@
         "prepare": "npm run build"
     },
     "dependencies": {
+        "semver": "^7.6.3",
         "@ethereumjs/block": "5.2.0",
         "@ethereumjs/common": "4.3.0",
         "@ethereumjs/evm": "3.0.0",
@@ -31,7 +32,8 @@
         "ethereum-cryptography": "2.2.1",
         "solc-typed-ast": "^18.2.0",
         "src-location": "^1.1.0",
-        "web3-eth-abi": "^4.2.2"
+        "web3-eth-abi": "^4.2.2",
+        "@ethersproject/abi": "^5.7.0"
     },
     "devDependencies": {
         "@types/debug": "^4.1.12",
@@ -40,6 +42,7 @@
         "@types/jest": "^29.5.12",
         "@types/lru-cache": "^5.1.1",
         "@types/node": "^20.11.19",
+        "@types/semver": "^7.5.8",
         "@typescript-eslint/eslint-plugin": "^7.0.2",
         "@typescript-eslint/parser": "^7.0.2",
         "eslint": "^8.56.0",
@@ -50,8 +53,7 @@
         "prettier": "^3.2.5",
         "ts-jest": "^29.1.2",
         "ts-node": "^10.9.2",
-        "typescript": "^5.3.3",
-        "@ethersproject/abi": "^5.7.0"
+        "typescript": "^5.3.3"
     },
     "homepage": "https://github.com/ConsenSys/sol-dbg",
     "bugs": "https://github.com/ConsenSys/sol-dbg/issues",
