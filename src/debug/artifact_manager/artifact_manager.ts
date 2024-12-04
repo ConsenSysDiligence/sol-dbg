@@ -30,6 +30,8 @@ import {
     detectArtifactCompilerVersion,
     fastParseBytecodeSourceMapping,
     findContractDef,
+    findFallbackFun,
+    findReceiveFun,
     getCodeHash,
     getCreationCodeHash,
     zip3
@@ -50,7 +52,12 @@ export interface IArtifactManager {
     findMethod(
         selector: HexString | Uint8Array
     ): [ContractInfo, FunctionDefinition | VariableDeclaration] | undefined;
+    findEntryPoint(
+        data: HexString | Uint8Array,
+        contract: ContractInfo
+    ): FunctionDefinition | VariableDeclaration | undefined;
     getEventDefInfo(topic: bigint | Uint8Array | EventDesc): EventDefInfo | undefined;
+    getContractInfo(contract: ContractDefinition): ContractInfo | undefined;
 }
 
 export interface BytecodeInfo {
@@ -351,6 +358,16 @@ export class ArtifactManager implements IArtifactManager {
         return this._artifacts;
     }
 
+    getContractInfo(contract: ContractDefinition): ContractInfo | undefined {
+        for (const info of this._contracts) {
+            if (info.ast === contract) {
+                return info;
+            }
+        }
+
+        return undefined;
+    }
+
     getContractFromMDHash(hash: HexString): ContractInfo | undefined {
         return this._mdHashToContractInfo.get(hash);
     }
@@ -365,7 +382,7 @@ export class ArtifactManager implements IArtifactManager {
         for (let i = 0; i < this._deployedBytecodeTemplates.length; i++) {
             const templ = this._deployedBytecodeTemplates[i];
 
-            if (matchesTemplate(bytecode, templ)) {
+            if (matchesTemplate(bytecode, templ, false)) {
                 return this._contracts[i];
             }
         }
@@ -383,7 +400,7 @@ export class ArtifactManager implements IArtifactManager {
         for (let i = 0; i < this._creationBytecodeTemplates.length; i++) {
             const templ = this._creationBytecodeTemplates[i];
 
-            if (matchesTemplate(creationBytecode, templ)) {
+            if (matchesTemplate(creationBytecode, templ, true)) {
                 return this._contracts[i];
             }
         }
@@ -436,13 +453,14 @@ export class ArtifactManager implements IArtifactManager {
     }
 
     findMethod(
-        selector: HexString | Uint8Array
+        selector: HexString | Uint8Array,
+        info?: ContractInfo
     ): [ContractInfo, FunctionDefinition | VariableDeclaration] | undefined {
         if (selector instanceof Uint8Array) {
             selector = bytesToHex(selector);
         }
 
-        for (const contract of this._contracts) {
+        for (const contract of info ? [info] : this._contracts) {
             if (!contract.ast) {
                 continue;
             }
@@ -469,6 +487,57 @@ export class ArtifactManager implements IArtifactManager {
         }
 
         return undefined;
+    }
+
+    /**
+     * Given a msg.data and a target contract, compute the intended AST entry point. If any.
+     * This handles the following cases:
+     *      - receive functions
+     *      - fallback functions
+     *      - normal function match
+     */
+    findEntryPoint(
+        data: HexString | Uint8Array,
+        info: ContractInfo
+    ): FunctionDefinition | VariableDeclaration | undefined {
+        const contract = info.ast;
+
+        if (!contract) {
+            return undefined;
+        }
+
+        // No data
+        if (data.length === 0) {
+            // First check if receive function is specified
+            const recvF = findReceiveFun(contract);
+
+            if (recvF) {
+                return recvF;
+            }
+
+            // Otherwise we fall back to the fallback fun
+            return findFallbackFun(contract);
+        }
+
+        // Not enough data for a signature
+        if (data.length < 4) {
+            // First check if receive function is specified
+            const recvF = findReceiveFun(contract);
+
+            if (recvF) {
+                return recvF;
+            }
+
+            // Otherwise we fall back to the fallback fun
+            return findFallbackFun(contract);
+        }
+
+        const selector = data.slice(0, 4);
+
+        const funMatch = this.findMethod(selector, info);
+
+        // Return either the fun match, or fallback fun if there is one
+        return funMatch ? funMatch[1] : findFallbackFun(contract);
     }
 
     getEventDefInfo(arg: bigint | Uint8Array | EventDesc): EventDefInfo | undefined {

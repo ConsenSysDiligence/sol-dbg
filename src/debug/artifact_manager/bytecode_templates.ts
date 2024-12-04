@@ -35,8 +35,15 @@ export function makeTemplate(artifact: PartialBytecodeDescription): BytecodeTemp
     };
 }
 
-export function matchesTemplate(bytecode: Uint8Array, template: BytecodeTemplate): boolean {
-    if (bytecode.length !== template.object.length) {
+export function matchesTemplate(
+    bytecode: Uint8Array,
+    template: BytecodeTemplate,
+    isCreation: boolean
+): boolean {
+    if (
+        (isCreation && bytecode.length < template.object.length) ||
+        (!isCreation && bytecode.length !== template.object.length)
+    ) {
         return false;
     }
 

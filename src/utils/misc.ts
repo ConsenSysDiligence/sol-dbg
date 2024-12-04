@@ -2,14 +2,7 @@ import { Common } from "@ethereumjs/common";
 import { TransactionFactory, TypedTransaction, TypedTxData } from "@ethereumjs/tx";
 import { Address, setLengthLeft } from "@ethereumjs/util";
 import { bytesToHex, hexToBytes } from "ethereum-cryptography/utils";
-import {
-    ContractDefinition,
-    FunctionDefinition,
-    InferType,
-    IntType,
-    SourceUnit,
-    assert
-} from "solc-typed-ast";
+import { FunctionDefinition, InferType, IntType, assert } from "solc-typed-ast";
 import { HexString, UnprefixedHexString } from "..";
 import { DataLocation, DataLocationKind, DataView, Stack, Storage } from "../debug/types";
 
@@ -77,36 +70,6 @@ export function makeFakeTransaction(
     tx.isSigned = () => true;
 
     return tx;
-}
-
-export function findContractDef(
-    units: SourceUnit[],
-    fileName: string,
-    contractName: string
-): ContractDefinition | undefined {
-    for (const unit of units) {
-        if (unit.sourceEntryKey !== fileName) {
-            continue;
-        }
-
-        for (const contract of unit.vContracts) {
-            if (contract.name === contractName) {
-                return contract;
-            }
-        }
-    }
-
-    return undefined;
-}
-
-export function resolveConstructor(contract: ContractDefinition): FunctionDefinition | undefined {
-    for (const contr of contract.vLinearizedBaseContracts) {
-        if (contr.vConstructor) {
-            return contr.vConstructor;
-        }
-    }
-
-    return undefined;
 }
 
 /**
