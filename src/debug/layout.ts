@@ -7,8 +7,11 @@ import {
     MappingType,
     Mutability,
     PointerType,
-    TypeNode
+    TypeNode,
+    VariableDeclaration
 } from "solc-typed-ast";
+import { DataView } from "../debug";
+import { ImmMap } from "../utils";
 import { IArtifactManager } from "./artifact_manager";
 import { nextWord, roundLocToType, stor_decodeValue } from "./decoding";
 import { getMapKeys, getStorage, KeccakPreimageMap, MapKeys } from "./tracers";
@@ -147,6 +150,61 @@ export function decodeContractState(
 
             res[varDecl.name] = value;
             loc = nextLoc;
+        }
+    }
+
+    return res;
+}
+
+export type ContractLayout = Array<[VariableDeclaration, DataView]>;
+
+export function getContractLayout(
+    infer: InferType,
+    contract: ContractDefinition
+): ContractLayout | undefined {
+    const res: Array<[VariableDeclaration, DataView]> = [];
+
+    const emptyStorage = ImmMap.fromEntries<bigint, Uint8Array>([]);
+
+    let loc: StorageLocation = {
+        kind: DataLocationKind.Storage,
+        address: BigInt(0),
+        endOffsetInWord: 32
+    };
+
+    for (const base of [...contract.vLinearizedBaseContracts].reverse()) {
+        if (base === null || base === undefined) {
+            return undefined;
+        }
+
+        for (const varDecl of base.vStateVariables) {
+            // Not part of layout
+            if (
+                varDecl.mutability === Mutability.Constant ||
+                varDecl.mutability === Mutability.Immutable
+            ) {
+                continue;
+            }
+
+            let typeNode: TypeNode;
+
+            try {
+                typeNode = infer.variableDeclarationToTypeNode(varDecl);
+            } catch (e) {
+                return undefined;
+            }
+
+            loc = roundLocToType(loc, typeNode, infer);
+
+            res.push([varDecl, { type: typeNode, loc }]);
+
+            const arg = stor_decodeValue(typeNode, loc, emptyStorage, infer);
+
+            if (arg === undefined) {
+                return undefined;
+            }
+
+            loc = arg[1];
         }
     }
 
