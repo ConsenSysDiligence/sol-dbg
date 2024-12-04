@@ -185,16 +185,22 @@ export function buildMsgDataViews(
     encoderVersion: ABIEncoderVersion
 ): Array<[string, DataView | undefined]> {
     const res: Array<[string, DataView | undefined]> = [];
+    let staticOff: number;
 
-    const selector =
-        callee instanceof FunctionDefinition
-            ? getFunctionSelector(callee, infer)
-            : infer.signatureHash(callee);
+    if (callee instanceof FunctionDefinition && callee.isConstructor) {
+        staticOff = 0;
+    } else {
+        staticOff = 4;
+        const selector =
+            callee instanceof FunctionDefinition
+                ? getFunctionSelector(callee, infer)
+                : infer.signatureHash(callee);
 
-    assert(
-        selector === bytesToHex(data.slice(0, 4)),
-        `Expected selector ${selector} instead got ${data.slice(0, 4)}`
-    );
+        assert(
+            selector === bytesToHex(data.slice(0, 4)),
+            `Expected selector ${selector} instead got ${data.slice(0, 4)}`
+        );
+    }
 
     const formals: Array<[string, TypeNode]> =
         callee instanceof FunctionDefinition
@@ -207,8 +213,6 @@ export function buildMsgDataViews(
             : infer
                   .getterArgsAndReturn(callee)[0]
                   .map((typ: TypeNode, i: number) => [`ARG_${i}`, typ]);
-
-    let staticOff = 4;
 
     const len = data.length;
 
