@@ -27,7 +27,7 @@ export interface ReturnInfo {
 }
 
 /**
- * Adds return info for steps in the caller context, right after a return.
+ * Adds return info for steps in the callee context, right after a return.
  */
 export async function addReturnInfo<T extends object & BasicStepInfo & ExternalFrameInfo>(
     vm: VM,
@@ -36,30 +36,20 @@ export async function addReturnInfo<T extends object & BasicStepInfo & ExternalF
     trace: Array<T & ReturnInfo>,
     artifactManager: IArtifactManager
 ): Promise<T & ReturnInfo> {
-    if (trace.length === 0) {
+    if (state.op.opcode !== OPCODES.RETURN && state.op.opcode !== OPCODES.STOP) {
         return state;
     }
 
-    const lastStep = trace[trace.length - 1];
-
-    if (lastStep.op.opcode !== OPCODES.RETURN && lastStep.op.opcode !== OPCODES.STOP) {
-        return state;
-    }
-
-    const lastFrame = topExtFrame(lastStep);
-    const callStartStep = lastFrame.startStep;
+    const extFrame = topExtFrame(state);
+    const callStartStep = extFrame.startStep;
 
     const rawReturnData =
-        lastStep.op.opcode === OPCODES.RETURN
-            ? mustReadMem(
-                  stackTop(lastStep.evmStack),
-                  stackInd(lastStep.evmStack, 1),
-                  lastStep.memory
-              )
+        state.op.opcode === OPCODES.RETURN
+            ? mustReadMem(stackTop(state.evmStack), stackInd(state.evmStack, 1), state.memory)
             : new Uint8Array(0);
 
     // Special case: For creation frames we know that the consturctor doesn't "return anything" at the Solidity level
-    if (lastFrame.kind === FrameKind.Creation) {
+    if (extFrame.kind === FrameKind.Creation) {
         return {
             ...state,
             retInfo: {
@@ -72,11 +62,11 @@ export async function addReturnInfo<T extends object & BasicStepInfo & ExternalF
 
     if (
         !(
-            lastFrame.info &&
-            (lastFrame.callee instanceof FunctionDefinition ||
-                (lastFrame.callee instanceof VariableDeclaration &&
-                    lastFrame.callee.stateVariable &&
-                    lastFrame.callee.visibility === StateVariableVisibility.Public))
+            extFrame.info &&
+            (extFrame.callee instanceof FunctionDefinition ||
+                (extFrame.callee instanceof VariableDeclaration &&
+                    extFrame.callee.stateVariable &&
+                    extFrame.callee.visibility === StateVariableVisibility.Public))
         )
     ) {
         return {
@@ -88,14 +78,14 @@ export async function addReturnInfo<T extends object & BasicStepInfo & ExternalF
         };
     }
 
-    const infer = artifactManager.infer(lastFrame.info.artifact.compilerVersion);
+    const infer = artifactManager.infer(extFrame.info.artifact.compilerVersion);
     let type: FunctionType;
 
     try {
         type =
-            lastFrame.callee instanceof FunctionDefinition
-                ? infer.funDefToType(lastFrame.callee)
-                : infer.getterFunType(lastFrame.callee);
+            extFrame.callee instanceof FunctionDefinition
+                ? infer.funDefToType(extFrame.callee)
+                : infer.getterFunType(extFrame.callee);
     } catch {
         return {
             ...state,
@@ -118,7 +108,7 @@ export async function addReturnInfo<T extends object & BasicStepInfo & ExternalF
         };
     }
 
-    const encVer = lastFrame.info.artifact.abiEncoderVersion;
+    const encVer = extFrame.info.artifact.abiEncoderVersion;
     const origType = new TupleType(type.returns);
     let abiType: TupleType;
 
