@@ -16,6 +16,7 @@ import {
 import { getMapKeys, getStorage, topExtFrame } from "../../src/debug/tracers/transformers";
 import {
     findFirstCallToFail,
+    findLastNonInternalStepBeforeAssert,
     findLastNonInternalStepBeforeLastRevert,
     findLastNonInternalStepBeforeRevert,
     ppStackTrace,
@@ -69,31 +70,14 @@ function checkResult(result: FoundryTxResult, step: TestStep): boolean {
             return res && !foundryFailed;
         }
 
+        case ResultKind.LastRevert:
+        case ResultKind.Assert:
+        case ResultKind.FoundryFail:
         case ResultKind.Revert: {
             const failed = result.execResult.exceptionError !== undefined;
 
             if (!failed) {
-                console.error(`Expected a revert, but the tx step succeeded`);
-            }
-
-            return failed;
-        }
-
-        case ResultKind.LastRevert: {
-            const failed = result.execResult.exceptionError !== undefined;
-
-            if (!failed) {
-                console.error(`Expected a revert, but the tx step succeeded`);
-            }
-
-            return failed;
-        }
-
-        case ResultKind.FoundryFail: {
-            const failed = result.failCalled;
-
-            if (!failed) {
-                console.error(`Expected a foundry fail call, but the tx step succeeded`);
+                console.error(`Expected a failure, but the tx step succeeded`);
             }
 
             return failed;
@@ -135,6 +119,10 @@ export function stackTracesEq(actualST: string, expectedST: string[]): boolean {
 function getStepFailTraceStep(step: TestStep, trace: StepState[]): StepState | undefined {
     if (step.result.kind === "revert") {
         return findLastNonInternalStepBeforeRevert(trace);
+    }
+
+    if (step.result.kind === "assert") {
+        return findLastNonInternalStepBeforeAssert(trace);
     }
 
     if (step.result.kind === "last_revert") {
