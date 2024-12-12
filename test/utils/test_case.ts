@@ -5,7 +5,8 @@ export enum ResultKind {
     ValueReturned = "value_returned",
     Revert = "revert",
     LastRevert = "last_revert",
-    FoundryFail = "foundry_fail"
+    FoundryFail = "foundry_fail",
+    Assert = "assert"
 }
 
 interface ResultContractCreated {
@@ -26,6 +27,10 @@ interface ResultLastRevert {
     kind: ResultKind.LastRevert;
 }
 
+interface ResultAssert {
+    kind: ResultKind.Assert;
+}
+
 interface ResultFoundryFail {
     kind: ResultKind.FoundryFail;
 }
@@ -39,7 +44,8 @@ export interface TestStep extends TxDesc {
         | ResultValueReturned
         | ResultRevert
         | ResultLastRevert
-        | ResultFoundryFail;
+        | ResultFoundryFail
+        | ResultAssert;
     // Stack trace at the first error in the tx
     errorStack?: string[];
     // String in the original file in which the error location maps to

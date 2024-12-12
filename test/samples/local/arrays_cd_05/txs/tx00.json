@@ -1,0 +1,117 @@
+{
+    "initialState": {
+        "accounts": {
+            "0xAaaaAaAAaaaAAaAAaAaaaaAAAAAaAaaaAaAaaAA0": {
+                "nonce": 0,
+                "balance": "0x0000000000000000000000f000000000",
+                "code": "",
+                "storage": {}
+            },
+            "0xAaAaaAAAaAaaAaAaAaaAAaAaAAAAAaAAAaaAaAa2": {
+                "nonce": 0,
+                "balance": "0x0000000000000000000000f000000000",
+                "code": "",
+                "storage": {}
+            },
+            "0xafFEaFFEAFfeAfFEAffeaFfEAfFEaffeafFeAFfE": {
+                "nonce": 0,
+                "balance": "0x0000000000000000000000f000000000",
+                "code": "",
+                "storage": {}
+            }
+        }
+    },
+    "steps": [
+        {
+            "address": "0x0000000000000000000000000000000000000000",
+            "gasLimit": "0xff0000",
+            "gasPrice": "0x1",
+            "input": "0x608060405234801561001057600080fd5b5061021f806100206000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c80635ff6c63d1461003b578063bc84dd27146100b4575b600080fd5b6100b26004803603602081101561005157600080fd5b810190808035906020019064010000000081111561006e57600080fd5b82018360208201111561008057600080fd5b803590602001918460208302840111640100000000831117156100a257600080fd5b909192939192939050505061016c565b005b61016a600480360360208110156100ca57600080fd5b81019080803590602001906401000000008111156100e757600080fd5b8201836020820111156100f957600080fd5b8035906020019184602083028401116401000000008311171561011b57600080fd5b919080806020026020016040519081016040528093929190818152602001838360200280828437600081840152601f19601f8201169050808301925050505050505091929192905050506101ac565b005b60008090505b828290508110156101a757600083838381811061018b57fe5b90506020020135141561019a57fe5b8080600101915050610172565b505050565b60008090505b81518110156101e65760008282815181106101c957fe5b602002602001015114156101d957fe5b80806001019150506101b2565b505056fea265627a7a723158209613e734c35a77094ea6f331d3b4f507f1529251a42c9ea717b6c69f5314e6fe64736f6c63430005110032",
+            "origin": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+            "value": "0x0",
+            "blockCoinbase": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+            "blockDifficulty": "0xc",
+            "blockGasLimit": "0xff0000",
+            "blockNumber": "0x1",
+            "blockTime": "0x1",
+            "result": {
+                "kind": "contract_created",
+                "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c"
+            }
+        },
+        {
+            "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
+            "gasLimit": "0xff0000",
+            "gasPrice": "0x1",
+            "input": "0xbc84dd2700000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000003",
+            "origin": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+            "value": "0x0",
+            "blockCoinbase": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+            "blockDifficulty": "0xc",
+            "blockGasLimit": "0xff0000",
+            "blockNumber": "0x2",
+            "blockTime": "0x2",
+            "result": {
+                "kind": "value_returned",
+                "value": ""
+            }
+        },
+        {
+            "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
+            "gasLimit": "0xff0000",
+            "gasPrice": "0x1",
+            "input": "0xbc84dd2700000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000",
+            "origin": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+            "value": "0x0",
+            "blockCoinbase": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+            "blockDifficulty": "0xc",
+            "blockGasLimit": "0xff0000",
+            "blockNumber": "0x2",
+            "blockTime": "0x2",
+            "result": {
+                "kind": "assert"
+            },
+            "errorString": "assert(arr[i] != 0)",
+            "errorStack": [
+                "test/samples/local/arrays_cd_05/contracts/main.sol Arrays.allNonZero([1, 2, 0])"
+            ]
+        },
+        {
+            "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
+            "gasLimit": "0xff0000",
+            "gasPrice": "0x1",
+            "input": "0x5ff6c63d00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000500000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000007",
+            "origin": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+            "value": "0x0",
+            "blockCoinbase": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+            "blockDifficulty": "0xc",
+            "blockGasLimit": "0xff0000",
+            "blockNumber": "0x2",
+            "blockTime": "0x2",
+            "result": {
+                "kind": "value_returned",
+                "value": ""
+            }
+        },
+        {
+            "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
+            "gasLimit": "0xff0000",
+            "gasPrice": "0x1",
+            "input": "0x5ff6c63d00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007",
+            "origin": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+            "value": "0x0",
+            "blockCoinbase": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+            "blockDifficulty": "0xc",
+            "blockGasLimit": "0xff0000",
+            "blockNumber": "0x2",
+            "blockTime": "0x2",
+            "result": {
+                "kind": "assert"
+            },
+            "errorString": "assert(arr[i] != 0)",
+            "errorStack": [
+                "test/samples/local/arrays_cd_05/contracts/main.sol Arrays.allNonZeroExt([5, 0, 7])"
+            ]
+        }
+    ]
+}
