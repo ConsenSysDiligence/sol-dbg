@@ -13,10 +13,11 @@ import {
     DataView,
     MemoryLocation,
     MemoryLocationKind,
+    StackLocation,
     StepState,
     StorageLocation
 } from "..";
-import { MAX_ARR_DECODE_LIMIT, uint256 } from "../..";
+import { MAX_ARR_DECODE_LIMIT, nyi, uint256 } from "../..";
 import { MapKeys, topExtFrame } from "../tracers/transformers";
 import { cd_decodeArrayContents, cd_decodeValue } from "./calldata";
 import { mem_decodeValue } from "./memory";
@@ -73,13 +74,45 @@ function decodeValInt(
     return res === undefined ? res : res[0];
 }
 
-export function isCalldataType2Slots(typ: TypeNode): boolean {
+export function isCalldataArrayType(typ: TypeNode): boolean {
     return (
         typ instanceof PointerType &&
         typ.to instanceof ArrayType &&
         typ.location === SolDataLocation.CallData &&
         typ.to.size === undefined
     );
+}
+
+/**
+ * Array pointers to calldata in the stack are stored as 2 slots - offset and
+ * length. This is to support array slices. Return the offset and length of the
+ * array (slice).
+ */
+function getCDArrayInStackOffAndLen(
+    loc: StackLocation,
+    state: StepState
+): [bigint, number] | [undefined, undefined] {
+    const off = st_decodeInt(uint256, loc, state.evmStack);
+
+    if (off === undefined) {
+        return [undefined, undefined];
+    }
+
+    const len = st_decodeInt(
+        uint256,
+        { kind: loc.kind, offsetFromTop: loc.offsetFromTop - 1 },
+        state.evmStack
+    );
+
+    if (len === undefined) {
+        return [undefined, undefined];
+    }
+
+    if (len > MAX_ARR_DECODE_LIMIT) {
+        return [undefined, undefined];
+    }
+
+    return [off, Number(len)];
 }
 
 /**
@@ -101,17 +134,13 @@ export function decodeValue(
      * own memory region
      */
     if (typ instanceof PointerType && loc.kind === DataLocationKind.Stack) {
-        const off = st_decodeInt(uint256, loc, state.evmStack);
+        if (isCalldataArrayType(typ)) {
+            const [off, len] = getCDArrayInStackOffAndLen(loc, state);
 
-        if (off === undefined) {
-            return undefined;
-        }
+            if (off === undefined || len === undefined) {
+                return undefined;
+            }
 
-        const kind: MemoryLocationKind = solLocToDataKind(typ.location);
-
-        let pointedToLoc: MemoryLocation;
-
-        if (isCalldataType2Slots(typ)) {
             const lastExtFrame = topExtFrame(state);
 
             let abiType: TypeNode;
@@ -127,20 +156,6 @@ export function decodeValue(
                 `InternalError`
             );
 
-            const len = st_decodeInt(
-                uint256,
-                { kind: loc.kind, offsetFromTop: loc.offsetFromTop - 1 },
-                state.evmStack
-            );
-
-            if (len === undefined) {
-                return undefined;
-            }
-
-            if (len > MAX_ARR_DECODE_LIMIT) {
-                return undefined;
-            }
-
             const res = cd_decodeArrayContents(
                 abiType.to,
                 typ.to as ArrayType,
@@ -153,17 +168,29 @@ export function decodeValue(
             return res === undefined ? res : res[0];
         }
 
+        const off = st_decodeInt(uint256, loc, state.evmStack);
+
+        if (off === undefined) {
+            return undefined;
+        }
+
+        const kind: MemoryLocationKind = solLocToDataKind(typ.location);
+
+        let pointedToLoc: MemoryLocation;
+
         if (kind === DataLocationKind.Storage) {
             pointedToLoc = {
                 kind,
                 address: off,
                 endOffsetInWord: 32
             } as StorageLocation;
-        } else {
+        } else if (kind === DataLocationKind.Memory || kind === DataLocationKind.CallData) {
             pointedToLoc = {
                 kind,
                 address: off
             };
+        } else {
+            nyi(`NYI data location kind ${kind}`);
         }
 
         const res = decodeValInt(typ.to, pointedToLoc, state, infer, mapKeys);

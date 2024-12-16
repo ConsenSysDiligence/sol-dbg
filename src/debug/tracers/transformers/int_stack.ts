@@ -2,7 +2,7 @@ import { InterpreterStep } from "@ethereumjs/evm";
 import { VM } from "@ethereumjs/vm";
 import { assert, FunctionDefinition, TypeNode, VariableDeclaration } from "solc-typed-ast";
 import { ContractInfo, IArtifactManager } from "../../artifact_manager";
-import { isCalldataType2Slots } from "../../decoding";
+import { isCalldataArrayType } from "../../decoding";
 import { OPCODES } from "../../opcodes";
 import {
     DataLocationKind,
@@ -63,7 +63,7 @@ function buildFunArgViews(
 
     for (let i = formals.length - 1; i >= 0; i--) {
         const [name, typ] = formals[i];
-        const stackSize = isCalldataType2Slots(typ) ? 2 : 1;
+        const stackSize = isCalldataArrayType(typ) ? 2 : 1;
 
         offsetFromTop += stackSize;
 

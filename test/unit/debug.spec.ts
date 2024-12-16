@@ -72,12 +72,21 @@ function checkResult(result: FoundryTxResult, step: TestStep): boolean {
 
         case ResultKind.LastRevert:
         case ResultKind.Assert:
-        case ResultKind.FoundryFail:
         case ResultKind.Revert: {
             const failed = result.execResult.exceptionError !== undefined;
 
             if (!failed) {
                 console.error(`Expected a failure, but the tx step succeeded`);
+            }
+
+            return failed;
+        }
+
+        case ResultKind.FoundryFail: {
+            const failed = result.failCalled;
+
+            if (!failed) {
+                console.error(`Expected a foundry fail call, but the tx step succeeded`);
             }
 
             return failed;

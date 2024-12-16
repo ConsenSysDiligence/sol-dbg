@@ -22,29 +22,29 @@ import {
     DataLocationKind,
     changeToLocation,
     isABITypeStaticSized
-} from "..";
+} from "../..";
 import {
     MAX_ARR_DECODE_LIMIT,
     Memory,
     bigEndianBufToBigint,
-    checkAddrOoB,
     fits,
+    readMem,
     uint256
-} from "../..";
+} from "../../..";
 
-function cd_decodeInt(
+export function cd_decodeInt(
     typ: IntType,
     loc: CalldataLocation,
     calldata: Uint8Array
 ): undefined | [bigint, number] {
-    const numAddr = checkAddrOoB(loc.address, calldata);
+    const bytes = readMem(loc.address, 32n, calldata);
 
     // OoB access
-    if (numAddr === undefined) {
+    if (bytes === undefined) {
         return undefined;
     }
 
-    let res = bigEndianBufToBigint(calldata.slice(numAddr, numAddr + 32));
+    let res = bigEndianBufToBigint(bytes);
 
     // Convert signed negative 2's complement values
     if (typ.signed && (res & (BigInt(1) << BigInt(typ.nBits - 1))) !== BigInt(0)) {
@@ -62,13 +62,13 @@ function cd_decodeInt(
 }
 
 function cd_decodeAddress(loc: CalldataLocation, calldata: Memory): undefined | [Address, number] {
-    const numAddr = checkAddrOoB(loc.address, calldata);
+    const bytes = readMem(loc.address + 12n, 20n, calldata);
 
-    if (numAddr === undefined) {
+    if (bytes === undefined) {
         return undefined;
     }
 
-    const res = new Address(calldata.slice(numAddr + 12, numAddr + 32));
+    const res = new Address(bytes);
     return [res, 32];
 }
 
@@ -77,32 +77,23 @@ function cd_decodeFixedBytes(
     loc: CalldataLocation,
     calldata: Memory
 ): undefined | [Uint8Array, number] {
-    const numAddr = checkAddrOoB(loc.address, calldata);
-
-    if (numAddr === undefined) {
-        return undefined;
-    }
-
-    const res = calldata.slice(numAddr, numAddr + typ.size);
-
-    return [res, 32];
+    const res = readMem(loc.address, typ.size, calldata);
+    return res === undefined ? undefined : [res, 32]; // @todo is 32 correct here???
 }
 
 function cd_decodeBool(loc: CalldataLocation, calldata: Memory): undefined | [boolean, number] {
-    const numAddr = checkAddrOoB(loc.address, calldata);
+    const bytes = readMem(loc.address, 32, calldata); // @todo is 32 correct here?
 
-    if (numAddr === undefined) {
+    if (bytes === undefined) {
         return undefined;
     }
 
-    const res = bigEndianBufToBigint(calldata.slice(numAddr, numAddr + 32)) !== BigInt(0);
+    const res = bigEndianBufToBigint(bytes) !== BigInt(0);
 
     return [res, 32];
 }
 
 function cd_decodeBytes(loc: CalldataLocation, calldata: Memory): undefined | [Uint8Array, number] {
-    let res: Uint8Array | undefined = undefined;
-
     let bytesOffset = loc.address;
     let bytesSize = 0;
     const bytesLoc = loc.kind;
@@ -123,19 +114,9 @@ function cd_decodeBytes(loc: CalldataLocation, calldata: Memory): undefined | [U
     bytesSize += len[1];
     bytesSize += numLen + (numLen % 32 === 0 ? 0 : 1 - (numLen % 32));
 
-    const checkedArrDynOffset = checkAddrOoB(bytesOffset, calldata);
+    const res = readMem(bytesOffset, numLen, calldata);
 
-    if (checkedArrDynOffset === undefined) {
-        return undefined;
-    }
-
-    if (checkedArrDynOffset + numLen > calldata.length) {
-        return undefined;
-    }
-
-    res = calldata.slice(checkedArrDynOffset, checkedArrDynOffset + numLen);
-
-    return [res, bytesSize];
+    return res === undefined ? undefined : [res, bytesSize];
 }
 
 function cd_decodeString(loc: CalldataLocation, calldata: Memory): undefined | [string, number] {

@@ -23,21 +23,21 @@ import {
     specializeType
 } from "solc-typed-ast";
 import { DataLocation, DataLocationKind, LinearMemoryLocation, Memory } from "..";
-import { MAX_ARR_DECODE_LIMIT, bigEndianBufToBigint, checkAddrOoB, fits, uint256 } from "../..";
+import { MAX_ARR_DECODE_LIMIT, bigEndianBufToBigint, fits, readMem, uint256 } from "../..";
 
 function mem_decodeInt(
     typ: IntType,
     loc: LinearMemoryLocation,
     memory: Memory
 ): undefined | [bigint, number] {
-    const numAddr = checkAddrOoB(loc.address, memory);
+    const bytes = readMem(loc.address, 32, memory);
 
     // OoB access
-    if (numAddr === undefined) {
+    if (bytes === undefined) {
         return undefined;
     }
 
-    let res = bigEndianBufToBigint(memory.slice(numAddr, numAddr + 32));
+    let res = bigEndianBufToBigint(bytes);
 
     // Convert signed negative 2's complement values
     if (typ.signed && (res & (BigInt(1) << BigInt(typ.nBits - 1))) !== BigInt(0)) {
@@ -58,13 +58,13 @@ function mem_decodeAddress(
     loc: LinearMemoryLocation,
     memory: Memory
 ): undefined | [Address, number] {
-    const numAddr = checkAddrOoB(loc.address, memory);
+    const bytes = readMem(loc.address + 12n, 20, memory);
 
-    if (numAddr === undefined) {
+    if (bytes === undefined) {
         return undefined;
     }
 
-    return [new Address(memory.slice(numAddr + 12, numAddr + 32)), 32];
+    return [new Address(bytes), 32];
 }
 
 function mem_decodeFixedBytes(
@@ -72,23 +72,23 @@ function mem_decodeFixedBytes(
     loc: LinearMemoryLocation,
     memory: Memory
 ): undefined | [Uint8Array, number] {
-    const numAddr = checkAddrOoB(loc.address, memory);
+    const bytes = readMem(loc.address, typ.size, memory);
 
-    if (numAddr === undefined) {
+    if (bytes === undefined) {
         return undefined;
     }
 
-    return [memory.slice(numAddr, numAddr + typ.size), 32];
+    return [bytes, 32];
 }
 
 function mem_decodeBool(loc: LinearMemoryLocation, memory: Memory): undefined | [boolean, number] {
-    const numAddr = checkAddrOoB(loc.address, memory);
+    const bytes = readMem(loc.address, 32, memory);
 
-    if (numAddr === undefined) {
+    if (bytes === undefined) {
         return undefined;
     }
 
-    const res = bigEndianBufToBigint(memory.slice(numAddr, numAddr + 32)) !== BigInt(0);
+    const res = bigEndianBufToBigint(bytes) !== BigInt(0);
 
     return [res, 32];
 }
@@ -126,17 +126,11 @@ function mem_decodeBytes(
     bytesSize += lenRes[1];
     bytesSize += numLen + (numLen % 32 === 0 ? 0 : 1 - (numLen % 32));
 
-    const checkedArrDynOffset = checkAddrOoB(bytesOffset, memory);
+    const res = readMem(bytesOffset, numLen, memory);
 
-    if (checkedArrDynOffset === undefined) {
+    if (res === undefined) {
         return undefined;
     }
-
-    if (checkedArrDynOffset + numLen > memory.length) {
-        return undefined;
-    }
-
-    const res = memory.slice(checkedArrDynOffset, checkedArrDynOffset + numLen);
 
     return [res, bytesSize];
 }
