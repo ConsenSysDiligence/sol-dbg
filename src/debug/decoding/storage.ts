@@ -208,7 +208,7 @@ function stor_decodeAddress(
 /**
  * Compute the 'static' size that a variable of type `typ` would take up in storage
  */
-function typeStaticStorSize(typ: TypeNode, infer: InferType): number {
+function stor_typeStaticSize(typ: TypeNode, infer: InferType): number {
     if (typ instanceof IntType) {
         return typ.nBits / 8;
     }
@@ -231,7 +231,7 @@ function typeStaticStorSize(typ: TypeNode, infer: InferType): number {
         }
 
         if (typ.definition instanceof UserDefinedValueTypeDefinition) {
-            return typeStaticStorSize(
+            return stor_typeStaticSize(
                 infer.typeNameToTypeNode(typ.definition.underlyingType),
                 infer
             );
@@ -256,7 +256,7 @@ function typeFitsInLoc(typ: TypeNode, loc: StorageLocation, infer: InferType): b
         throw new Error(`NYI typeFitsInLoc(${typ.pp()},...)`);
     }
 
-    const size = typeStaticStorSize(typ, infer);
+    const size = stor_typeStaticSize(typ, infer);
 
     assert(size <= 32, `Unexpected type ${typ.pp()} spanning more than a single word`);
 

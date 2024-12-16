@@ -125,33 +125,6 @@ export function ppEvmStack(stack: Stack): string {
 }
 
 /**
- * Given an `offset` into some memory `buf` check that its in-bounds.
- * Since `offset` may be a bigint we must check that it can be cast to Number without
- * loss of precision and afterwards, whether it fits into the buf.
- */
-export function checkAddrOoB(offset: bigint | number, buf: Uint8Array): number | undefined {
-    let numOff: number;
-
-    if (typeof offset === "bigint") {
-        // Check that the bigint address fits in a normal number
-        if (BigInt(Number(offset)) !== offset) {
-            return undefined;
-        }
-
-        numOff = Number(offset);
-    } else {
-        numOff = offset;
-    }
-
-    // OoB access
-    if (numOff < 0 || numOff + 32 > buf.length) {
-        return undefined;
-    }
-
-    return numOff;
-}
-
-/**
  * Try to read memory from offset start to start+len. If the access is OoB return undefined
  */
 export function readMem(
@@ -313,4 +286,8 @@ export function repeat<T>(x: T, n: number): T[] {
     }
 
     return res;
+}
+
+export function nyi(s: string): never {
+    assert(false, s);
 }
