@@ -128,9 +128,8 @@ export async function addReturnInfo<T extends object & BasicStepInfo & ExternalF
     const decodeRes = cd_decodeValue(
         abiType,
         origType,
-        { kind: DataLocationKind.CallData, address: 0n },
+        { kind: DataLocationKind.CallData, address: 0n, base: 0n },
         rawReturnData,
-        0n,
         infer
     );
 

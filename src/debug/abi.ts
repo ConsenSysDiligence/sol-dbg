@@ -153,7 +153,7 @@ export function decodeMethodArgs(
 
         assert(view.abiType !== undefined && view.loc.kind === DataLocationKind.CallData, ``);
 
-        const val = cd_decodeValue(view.abiType, view.type, view.loc, data, BigInt(4), infer);
+        const val = cd_decodeValue(view.abiType, view.type, view.loc, data, infer);
 
         res.push([name, val ? val[0] : val]);
     }
@@ -185,12 +185,12 @@ export function buildMsgDataViews(
     encoderVersion: ABIEncoderVersion
 ): Array<[string, DataView | undefined]> {
     const res: Array<[string, DataView | undefined]> = [];
-    let staticOff: number;
+    let baseOff;
 
     if (callee instanceof FunctionDefinition && callee.isConstructor) {
-        staticOff = 0;
+        baseOff = 0;
     } else {
-        staticOff = 4;
+        baseOff = 4;
         const selector =
             callee instanceof FunctionDefinition
                 ? getFunctionSelector(callee, infer)
@@ -214,13 +214,16 @@ export function buildMsgDataViews(
                   .getterArgsAndReturn(callee)[0]
                   .map((typ: TypeNode, i: number) => [`ARG_${i}`, typ]);
 
+    let staticOff = 0;
     const len = data.length;
 
     for (const [name, originalType] of formals) {
         const typ = toABIEncodedType(originalType, infer, encoderVersion);
         const staticSize = abiStaticTypeSize(typ);
         const loc =
-            staticOff + staticSize <= len ? { kind, address: BigInt(staticOff) } : undefined;
+            baseOff + staticOff + staticSize <= len
+                ? { kind, address: BigInt(staticOff), base: BigInt(baseOff) }
+                : undefined;
 
         staticOff += staticSize;
 

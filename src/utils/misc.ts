@@ -96,9 +96,13 @@ export function fits(val: bigint, typ: IntType): boolean {
 export function ppLoc(loc: DataLocation): string {
     return `{kind: ${loc.kind}, ${
         loc.kind === DataLocationKind.Stack ? "offsetFromTop" : "address"
-    }: ${loc.kind === DataLocationKind.Stack ? loc.offsetFromTop : loc.address.toString(16)}}${
-        loc.kind === DataLocationKind.Storage ? `, offsetInWord: ${loc.endOffsetInWord}` : ""
-    }`;
+    }: ${loc.kind === DataLocationKind.Stack ? loc.offsetFromTop : loc.address.toString(16)}${
+        loc.kind === DataLocationKind.Storage
+            ? `, offsetInWord: ${loc.endOffsetInWord}`
+            : loc.kind === DataLocationKind.CallData
+              ? `, base: ${loc.base}`
+              : ""
+    }}`;
 }
 
 /* istanbul ignore next */

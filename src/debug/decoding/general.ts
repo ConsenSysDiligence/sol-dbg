@@ -60,7 +60,7 @@ function decodeValInt(
             return undefined;
         }
 
-        const res = cd_decodeValue(abiType, typ, loc, lastExtFrame.msgData, BigInt(4), infer);
+        const res = cd_decodeValue(abiType, typ, loc, lastExtFrame.msgData, infer);
 
         return res === undefined ? res : res[0];
     }
@@ -184,10 +184,16 @@ export function decodeValue(
                 address: off,
                 endOffsetInWord: 32
             } as StorageLocation;
-        } else if (kind === DataLocationKind.Memory || kind === DataLocationKind.CallData) {
+        } else if (kind === DataLocationKind.Memory) {
             pointedToLoc = {
                 kind,
                 address: off
+            };
+        } else if (kind === DataLocationKind.CallData) {
+            pointedToLoc = {
+                kind,
+                address: off,
+                base: 0n
             };
         } else {
             nyi(`NYI data location kind ${kind}`);
