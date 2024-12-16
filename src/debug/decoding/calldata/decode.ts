@@ -23,21 +23,15 @@ import {
     changeToLocation,
     isABITypeStaticSized
 } from "../..";
-import {
-    MAX_ARR_DECODE_LIMIT,
-    Memory,
-    bigEndianBufToBigint,
-    fits,
-    readMem,
-    uint256
-} from "../../..";
+import { MAX_ARR_DECODE_LIMIT, Memory, bigEndianBufToBigint, fits, uint256 } from "../../..";
+import { cd_readMem } from "./utils";
 
 export function cd_decodeInt(
     typ: IntType,
     loc: CalldataLocation,
     calldata: Uint8Array
 ): undefined | [bigint, number] {
-    const bytes = readMem(loc.address, 32n, calldata);
+    const bytes = cd_readMem(loc, 32n, calldata);
 
     // OoB access
     if (bytes === undefined) {
@@ -62,13 +56,13 @@ export function cd_decodeInt(
 }
 
 function cd_decodeAddress(loc: CalldataLocation, calldata: Memory): undefined | [Address, number] {
-    const bytes = readMem(loc.address + 12n, 20n, calldata);
+    const bytes = cd_readMem(loc, 32, calldata);
 
     if (bytes === undefined) {
         return undefined;
     }
 
-    const res = new Address(bytes);
+    const res = new Address(bytes.slice(12));
     return [res, 32];
 }
 
@@ -77,12 +71,12 @@ function cd_decodeFixedBytes(
     loc: CalldataLocation,
     calldata: Memory
 ): undefined | [Uint8Array, number] {
-    const res = readMem(loc.address, typ.size, calldata);
+    const res = cd_readMem(loc, typ.size, calldata);
     return res === undefined ? undefined : [res, 32]; // @todo is 32 correct here???
 }
 
 function cd_decodeBool(loc: CalldataLocation, calldata: Memory): undefined | [boolean, number] {
-    const bytes = readMem(loc.address, 32, calldata); // @todo is 32 correct here?
+    const bytes = cd_readMem(loc, 32, calldata); // @todo is 32 correct here?
 
     if (bytes === undefined) {
         return undefined;
@@ -96,15 +90,10 @@ function cd_decodeBool(loc: CalldataLocation, calldata: Memory): undefined | [bo
 function cd_decodeBytes(loc: CalldataLocation, calldata: Memory): undefined | [Uint8Array, number] {
     let bytesOffset = loc.address;
     let bytesSize = 0;
-    const bytesLoc = loc.kind;
 
-    const len = cd_decodeInt(uint256, { kind: bytesLoc, address: bytesOffset }, calldata);
+    const len = cd_decodeInt(uint256, loc, calldata);
 
-    if (len == undefined) {
-        return undefined;
-    }
-
-    if (len[0] >= MAX_ARR_DECODE_LIMIT) {
+    if (len == undefined || len[0] >= MAX_ARR_DECODE_LIMIT) {
         return undefined;
     }
 
@@ -114,7 +103,11 @@ function cd_decodeBytes(loc: CalldataLocation, calldata: Memory): undefined | [U
     bytesSize += len[1];
     bytesSize += numLen + (numLen % 32 === 0 ? 0 : 1 - (numLen % 32));
 
-    const res = readMem(bytesOffset, numLen, calldata);
+    const res = cd_readMem(
+        { kind: loc.kind, address: bytesOffset, base: loc.base },
+        numLen,
+        calldata
+    );
 
     return res === undefined ? undefined : [res, bytesSize];
 }
@@ -134,25 +127,23 @@ function cd_decodeString(loc: CalldataLocation, calldata: Memory): undefined | [
 export function cd_decodeArrayContents(
     abiType: ArrayType,
     origType: ArrayType | undefined,
-    arrOffset: bigint,
+    arrBaseOffset: bigint,
     numLen: number,
     calldata: Memory,
     infer: InferType
 ): undefined | [any[], number] {
-    let arrBytesSize = 0;
-    const arrBaseOffset = arrOffset;
-
     const res: any[] = [];
-
     const elT = origType !== undefined ? origType.elementT : undefined;
+
+    let arrBytesSize = 0;
+    let elOffset = 0n;
 
     for (let i = 0; i < numLen; i++) {
         const elementTuple = cd_decodeValue(
             abiType.elementT,
             elT,
-            { kind: DataLocationKind.CallData, address: arrOffset },
+            { kind: DataLocationKind.CallData, address: elOffset, base: arrBaseOffset },
             calldata,
-            arrBaseOffset,
             infer
         );
 
@@ -164,7 +155,7 @@ export function cd_decodeArrayContents(
 
         res.push(elementVal);
 
-        arrOffset += BigInt(elementSize);
+        elOffset += BigInt(elementSize);
         arrBytesSize += elementSize;
     }
 
@@ -178,7 +169,7 @@ function cd_decodeArray(
     calldata: Memory,
     infer: InferType
 ): undefined | [any[], number] {
-    let arrOffset = loc.address;
+    let arrOffset = loc.address + loc.base;
     let arrBytesSize = 0;
 
     let len: [bigint, number] | undefined;
@@ -189,11 +180,7 @@ function cd_decodeArray(
         len = cd_decodeInt(uint256, loc, calldata);
     }
 
-    if (len == undefined) {
-        return undefined;
-    }
-
-    if (len[0] >= MAX_ARR_DECODE_LIMIT) {
+    if (len == undefined || len[0] >= MAX_ARR_DECODE_LIMIT) {
         return undefined;
     }
 
@@ -225,11 +212,7 @@ function cd_decodeTuple(
     calldata: Memory,
     infer: InferType
 ): undefined | [any[], number] {
-    let tupleOffset: bigint = loc.address;
-    let size = 0;
-
     const tupleRes: any[] = [];
-    const tupleBase = tupleOffset;
 
     let origElementTs: TypeNode | TypeNode[] | undefined = undefined;
 
@@ -279,6 +262,10 @@ function cd_decodeTuple(
         );
     }
 
+    let tupleOffset: bigint = 0n;
+    const tupleBase = loc.address + loc.base;
+    let size = 0;
+
     for (let i = 0; i < abiType.elements.length; i++) {
         const fieldT = abiType.elements[i];
 
@@ -290,12 +277,12 @@ function cd_decodeTuple(
                   : origElementTs[i];
 
         assert(fieldT !== null, ``);
+
         const decodeRes = cd_decodeValue(
             fieldT,
             origElementT,
-            { kind: loc.kind, address: tupleOffset },
+            { kind: loc.kind, address: tupleOffset, base: tupleBase },
             calldata,
-            tupleBase,
             infer
         );
 
@@ -330,7 +317,6 @@ function cd_decodePointer(
     origType: PointerType | undefined,
     loc: CalldataLocation,
     calldata: Memory,
-    callDataBaseOff: bigint,
     infer: InferType
 ): undefined | [any, number] {
     const offRes = cd_decodeInt(uint256, loc, calldata);
@@ -340,12 +326,12 @@ function cd_decodePointer(
     }
 
     // Adjust relative pointers read **FROM** calldata by the current base offset
-    const off = offRes[0] + callDataBaseOff;
     const size = offRes[1];
 
     const pointedToLoc: DataLocation = {
         kind: DataLocationKind.CallData,
-        address: off
+        address: offRes[0],
+        base: loc.base
     };
 
     const origPointedToType = origType === undefined ? undefined : origType.to;
@@ -355,7 +341,6 @@ function cd_decodePointer(
         origPointedToType,
         pointedToLoc,
         calldata,
-        callDataBaseOff,
         infer
     );
 
@@ -371,7 +356,6 @@ export function cd_decodeValue(
     origType: TypeNode | undefined,
     loc: CalldataLocation,
     calldata: Memory,
-    callDataBaseOff = BigInt(4),
     infer: InferType
 ): undefined | [any, number] {
     /*
@@ -429,17 +413,10 @@ export function cd_decodeValue(
         if (isABITypeStaticSized(abiType)) {
             const origPointedToType = origType === undefined ? undefined : origType.to;
 
-            return cd_decodeValue(
-                abiType.to,
-                origPointedToType,
-                loc,
-                calldata,
-                callDataBaseOff,
-                infer
-            );
+            return cd_decodeValue(abiType.to, origPointedToType, loc, calldata, infer);
         }
 
-        return cd_decodePointer(abiType, origType, loc, calldata, callDataBaseOff, infer);
+        return cd_decodePointer(abiType, origType, loc, calldata, infer);
     }
 
     throw new Error(`NYI decoding ${abiType.pp()}`);

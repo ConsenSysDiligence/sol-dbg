@@ -142,6 +142,7 @@ export interface BaseMemoryLocation extends BaseDataLocation {
 
 export interface CalldataLocation extends BaseMemoryLocation {
     kind: DataLocationKind.CallData;
+    base: bigint;
 }
 
 export interface LinearMemoryLocation extends BaseMemoryLocation {
