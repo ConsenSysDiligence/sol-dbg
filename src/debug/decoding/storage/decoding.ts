@@ -28,8 +28,8 @@ import {
     StorageLocation,
     changeToLocation,
     mem_decodeValue
-} from "..";
-import { MAX_ARR_DECODE_LIMIT, bigEndianBufToBigint, bigIntToBuf, fits, uint256 } from "../..";
+} from "../..";
+import { MAX_ARR_DECODE_LIMIT, bigEndianBufToBigint, bigIntToBuf, fits, uint256 } from "../../..";
 
 /**
  * Helper to fetch the word residing at key `key` from `storage`.  Note that

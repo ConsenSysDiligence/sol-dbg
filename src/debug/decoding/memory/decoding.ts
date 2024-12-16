@@ -22,8 +22,8 @@ import {
     enumToIntType,
     specializeType
 } from "solc-typed-ast";
-import { DataLocation, DataLocationKind, LinearMemoryLocation, Memory } from "..";
-import { MAX_ARR_DECODE_LIMIT, bigEndianBufToBigint, fits, readMem, uint256 } from "../..";
+import { DataLocation, DataLocationKind, LinearMemoryLocation, Memory } from "../..";
+import { MAX_ARR_DECODE_LIMIT, bigEndianBufToBigint, fits, readMem, uint256 } from "../../..";
 
 function mem_decodeInt(
     typ: IntType,
