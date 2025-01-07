@@ -13,8 +13,8 @@ import {
     UserDefinedType,
     UserDefinedValueTypeDefinition
 } from "solc-typed-ast";
-import { Stack, StackLocation } from "..";
-import { bigEndianBufToBigint, fits, wordToAddress } from "../../utils";
+import { bigEndianBufToBigint, fits, wordToAddress } from "../../utils/misc";
+import { Stack, StackLocation } from "../types";
 
 function fetchStackWord(offsetFromTop: number, stack: Stack): Uint8Array | undefined {
     return stack.length <= offsetFromTop ? undefined : stack[stack.length - offsetFromTop - 1];

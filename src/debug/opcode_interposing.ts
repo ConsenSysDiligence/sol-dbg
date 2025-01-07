@@ -1,8 +1,8 @@
 import { Common } from "@ethereumjs/common";
 import { Address, bigIntToBytes, setLengthLeft } from "@ethereumjs/util";
-import { bigEndianBufToBigint } from "../utils";
 import { createAddressFromStackBigInt, trap, writeCallOutput } from "../utils/ethereumjs_internal";
 import { ERROR } from "../utils/ethereumjs_internal/exceptions";
+import { bigEndianBufToBigint } from "../utils/misc";
 import {
     FoundryCheatcodesAddress,
     FoundryContext,

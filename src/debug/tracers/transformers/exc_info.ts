@@ -1,7 +1,7 @@
 import { InterpreterStep } from "@ethereumjs/evm";
 import { bytesToBigInt } from "@ethereumjs/util";
 import { VM } from "@ethereumjs/vm";
-import { mustReadMem, stackInd, stackTop } from "../../../utils";
+import { mustReadMem, stackInd, stackTop } from "../../../utils/misc";
 import { IArtifactManager } from "../../artifact_manager";
 import { OPCODES } from "../../opcodes";
 import { BasicStepInfo } from "./basic_info";

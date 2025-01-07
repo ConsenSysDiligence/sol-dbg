@@ -1,7 +1,7 @@
 import { bytesToHex } from "ethereum-cryptography/utils";
 import { FunctionDefinition } from "solc-typed-ast";
-import { StepState } from "../debug";
 import { FAIL_MSG_DATA, FoundryCheatcodesAddress } from "../debug/foundry_cheatcodes";
+import { StepState } from "../debug/types";
 import { bigEndianBufToNumber, wordToAddress } from "./misc";
 import { flattenStack } from "./pp";
 

@@ -1,0 +1,66 @@
+{
+    "initialState": {
+        "accounts": {
+            "0xAaaaAaAAaaaAAaAAaAaaaaAAAAAaAaaaAaAaaAA0": {
+                "nonce": 0,
+                "balance": "0x0000000000000000000000f000000000",
+                "code": "",
+                "storage": {}
+            },
+            "0xAaAaaAAAaAaaAaAaAaaAAaAaAAAAAaAAAaaAaAa2": {
+                "nonce": 0,
+                "balance": "0x0000000000000000000000f000000000",
+                "code": "",
+                "storage": {}
+            },
+            "0xafFEaFFEAFfeAfFEAffeaFfEAfFEaffeafFeAFfE": {
+                "nonce": 0,
+                "balance": "0x0000000000000000000000f000000000",
+                "code": "",
+                "storage": {}
+            }
+        }
+    },
+    "steps": [
+        {
+            "address": "0x0000000000000000000000000000000000000000",
+            "gasLimit": "0xff0000",
+            "gasPrice": "0x1",
+            "input": "0x6080604052348015600e575f80fd5b506101ba8061001c5f395ff3fe608060405234801561000f575f80fd5b5060043610610029575f3560e01c806368b3caf31461002d575b5f80fd5b610047600480360381019061004291906100df565b610049565b005b5f82825f81811061005d5761005c61012a565b5b905060200201351461007257610071610157565b5b5050565b5f80fd5b5f80fd5b5f80fd5b5f80fd5b5f80fd5b5f8083601f84011261009f5761009e61007e565b5b8235905067ffffffffffffffff8111156100bc576100bb610082565b5b6020830191508360208202830111156100d8576100d7610086565b5b9250929050565b5f80602083850312156100f5576100f4610076565b5b5f83013567ffffffffffffffff8111156101125761011161007a565b5b61011e8582860161008a565b92509250509250929050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52603260045260245ffd5b7f4e487b71000000000000000000000000000000000000000000000000000000005f52600160045260245ffdfea26469706673582212207125174a0ae5f5bb48e441adec6b8a4403acd5111a1deeefa0f8f8a4a015c14264736f6c634300081a0033",
+            "origin": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+            "value": "0x0",
+            "blockCoinbase": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+            "blockDifficulty": "0xc",
+            "blockGasLimit": "0xff0000",
+            "blockNumber": "0x1",
+            "blockTime": "0x1",
+            "result": {
+                "kind": "contract_created",
+                "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c"
+            }
+        },
+        {
+            "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
+            "gasLimit": "0xff0000",
+            "gasPrice": "0x1",
+            "input": "0x68b3caf300000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000005000000000000000000000000000000000000000000000000000000000000002c000000000000000000000000000000000000000000000000000000000000002b000000000000000000000000000000000000000000000000000000000000002a00000000000000000000000000000000000000000000000000000000000000290000000000000000000000000000000000000000000000000000000000000028",
+            "origin": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+            "value": "0x0",
+            "blockCoinbase": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+            "blockDifficulty": "0xc",
+            "blockGasLimit": "0xff0000",
+            "blockNumber": "0x2",
+            "blockTime": "0x2",
+            "result": {
+                "kind": "revert"
+            },
+            "errorString": "assert(a[0] == 0)",
+            "errorStack": [
+                "test/samples/local/indexing/contracts/main.sol Test.indexCalldataArray([44, 43, 42, 41, 40])"
+            ],
+            "expectedIndices": [
+                ["a", [3], "41"]
+            ]
+        }
+    ]
+}

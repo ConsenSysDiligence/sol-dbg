@@ -2,6 +2,7 @@ import { Address, bytesToUtf8 } from "@ethereumjs/util";
 import {
     AddressType,
     ArrayType,
+    assert,
     BoolType,
     BytesType,
     FixedBytesType,
@@ -13,18 +14,25 @@ import {
     StructDefinition,
     TupleType,
     TypeNode,
-    UserDefinedType,
-    assert
+    UserDefinedType
 } from "solc-typed-ast";
 import {
-    CalldataLocation,
-    DataLocation,
-    DataLocationKind,
-    changeToLocation,
-    isABITypeStaticSized
-} from "../..";
-import { MAX_ARR_DECODE_LIMIT, Memory, bigEndianBufToBigint, fits, uint256 } from "../../..";
-import { cd_readMem } from "./utils";
+    bigEndianBufToBigint,
+    fits,
+    MAX_ARR_DECODE_LIMIT,
+    readMem,
+    uint256
+} from "../../../utils/misc";
+import { changeToLocation, isABITypeStaticSized } from "../../../utils/solidity";
+import { CalldataLocation, DataLocation, DataLocationKind, Memory } from "../../types";
+
+export function cd_readMem(
+    loc: CalldataLocation,
+    len: Uint8Array | bigint | number,
+    calldata: Memory
+): Uint8Array | undefined {
+    return readMem(loc.address + loc.base, len, calldata);
+}
 
 export function cd_decodeInt(
     typ: IntType,

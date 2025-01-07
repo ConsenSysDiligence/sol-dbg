@@ -88,3 +88,123 @@ export function isTypePrimitive(t: sol.TypeNode): boolean {
 export function elType(t: sol.ArrayType | sol.PackedArrayType): sol.TypeNode {
     return t instanceof sol.PackedArrayType ? sol.types.byte : t.elementT;
 }
+
+export function changeToLocation(typ: sol.TypeNode, newLoc: sol.DataLocation): sol.TypeNode {
+    if (typ instanceof sol.PointerType) {
+        return new sol.PointerType(changeToLocation(typ.to, newLoc), newLoc, typ.kind);
+    }
+
+    if (typ instanceof sol.ArrayType) {
+        return new sol.ArrayType(changeToLocation(typ.elementT, newLoc), typ.size);
+    }
+
+    if (typ instanceof sol.MappingType) {
+        sol.assert(
+            newLoc === sol.DataLocation.Storage,
+            `Cannot change type of mapping ${typ.pp()} to ${newLoc}`
+        );
+
+        return typ;
+    }
+
+    if (typ instanceof sol.TupleType) {
+        return new sol.TupleType(
+            typ.elements.map((elT: sol.TypeNode | null) =>
+                changeToLocation(elT as sol.TypeNode, newLoc)
+            )
+        );
+    }
+
+    if (
+        typ instanceof sol.IntType ||
+        typ instanceof sol.BoolType ||
+        typ instanceof sol.AddressType ||
+        typ instanceof sol.FixedBytesType ||
+        typ instanceof sol.StringType ||
+        typ instanceof sol.BytesType ||
+        typ instanceof sol.UserDefinedType
+    ) {
+        return typ;
+    }
+
+    throw new Error(`Cannot change location of type ${typ.pp()}`);
+}
+
+/**
+ * Return the static size that the type `typ` will take in the standard ABI encoding of
+ * arguments.
+ */
+export function abiStaticTypeSize(typ: sol.TypeNode): number {
+    if (
+        typ instanceof sol.IntType ||
+        typ instanceof sol.AddressType ||
+        typ instanceof sol.FixedBytesType ||
+        typ instanceof sol.BoolType ||
+        typ instanceof sol.PointerType
+    ) {
+        return 32;
+    }
+
+    if (typ instanceof sol.UserDefinedType) {
+        const def = typ.definition;
+
+        if (
+            def instanceof sol.EnumDefinition ||
+            def instanceof sol.ContractDefinition ||
+            def instanceof sol.UserDefinedValueTypeDefinition
+        ) {
+            return 32;
+        }
+
+        throw new Error(`NYI decoding user-defined type ${typ.pp()}`);
+    }
+
+    if (typ instanceof sol.TupleType) {
+        let res = 0;
+
+        for (const elT of typ.elements) {
+            sol.assert(elT !== null, ``);
+            res += abiStaticTypeSize(elT);
+        }
+
+        return res;
+    }
+
+    throw new Error(`NYI decoding type ${typ.pp()}`);
+}
+
+export function isABITypeStaticSized(type: sol.TypeNode): boolean {
+    if (type instanceof sol.ArrayType) {
+        return type.size !== undefined && isABITypeStaticSized(type.elementT);
+    }
+
+    if (type instanceof sol.PointerType) {
+        return isABITypeStaticSized(type.to);
+    }
+
+    if (type instanceof sol.TupleType) {
+        for (const elT of type.elements) {
+            sol.assert(elT !== null, ``);
+            if (!isABITypeStaticSized(elT)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    if (type instanceof sol.StringType || type instanceof sol.BytesType) {
+        return false;
+    }
+
+    if (
+        type instanceof sol.IntType ||
+        type instanceof sol.AddressType ||
+        type instanceof sol.BoolType ||
+        type instanceof sol.FixedBytesType
+    ) {
+        return true;
+    }
+
+    throw new Error(`NYI isABITypeStaticSized(${type.pp()})`);
+}

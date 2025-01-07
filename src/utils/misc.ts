@@ -3,8 +3,15 @@ import { TransactionFactory, TypedTransaction, TypedTxData } from "@ethereumjs/t
 import { Address, setLengthLeft } from "@ethereumjs/util";
 import { bytesToHex, hexToBytes } from "ethereum-cryptography/utils";
 import { FunctionDefinition, InferType, IntType, assert } from "solc-typed-ast";
-import { HexString, UnprefixedHexString } from "..";
-import { DataLocation, DataLocationKind, DataView, Stack, Storage } from "../debug/types";
+import {
+    DataLocation,
+    DataLocationKind,
+    DataView,
+    HexString,
+    Stack,
+    Storage,
+    UnprefixedHexString
+} from "../debug/types";
 
 export const ZERO_ADDRESS_STRING: HexString = "0x0000000000000000000000000000000000000000";
 export const ZERO_ADDRESS = Address.fromString(ZERO_ADDRESS_STRING);
@@ -294,4 +301,12 @@ export function repeat<T>(x: T, n: number): T[] {
 
 export function nyi(s: string): never {
     assert(false, s);
+}
+
+export function single<T>(a: T[]): T {
+    if (a.length !== 1) {
+        assert(false, `Expected 1 element not ${a.length}`);
+    }
+
+    return a[0];
 }

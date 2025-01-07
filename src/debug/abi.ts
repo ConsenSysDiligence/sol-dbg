@@ -2,17 +2,13 @@ import { bytesToHex } from "ethereum-cryptography/utils";
 import {
     AddressType,
     ArrayType,
-    BoolType,
     BytesType,
     ContractDefinition,
     EnumDefinition,
-    FixedBytesType,
     FunctionDefinition,
     InferType,
-    IntType,
     MappingType,
     PointerType,
-    DataLocation as SolDataLocation,
     StateVariableVisibility,
     StringType,
     StructDefinition,
@@ -29,100 +25,19 @@ import {
     types
 } from "solc-typed-ast";
 import { ABIEncoderVersion } from "solc-typed-ast/dist/types/abi";
+import { getFunctionSelector, zip } from "../utils/misc";
+import { abiStaticTypeSize } from "../utils/solidity";
+import { IArtifactManager } from "./artifact_manager";
+import { cd_decodeValue } from "./decoding/calldata/decode";
+import { mem_decodeValue } from "./decoding/memory/decoding";
 import {
     DataLocationKind,
     DataView,
     DecodedEventDesc,
     EventDefInfo,
     EventDesc,
-    IArtifactManager,
-    LinearMemoryLocation,
-    cd_decodeValue,
-    mem_decodeValue
-} from ".";
-import { getFunctionSelector, zip } from "../utils";
-
-export function changeToLocation(typ: TypeNode, newLoc: SolDataLocation): TypeNode {
-    if (typ instanceof PointerType) {
-        return new PointerType(changeToLocation(typ.to, newLoc), newLoc, typ.kind);
-    }
-
-    if (typ instanceof ArrayType) {
-        return new ArrayType(changeToLocation(typ.elementT, newLoc), typ.size);
-    }
-
-    if (typ instanceof MappingType) {
-        assert(
-            newLoc === SolDataLocation.Storage,
-            `Cannot change type of mapping ${typ.pp()} to ${newLoc}`
-        );
-
-        return typ;
-    }
-
-    if (typ instanceof TupleType) {
-        return new TupleType(
-            typ.elements.map((elT: TypeNode | null) => changeToLocation(elT as TypeNode, newLoc))
-        );
-    }
-
-    if (
-        typ instanceof IntType ||
-        typ instanceof BoolType ||
-        typ instanceof AddressType ||
-        typ instanceof FixedBytesType ||
-        typ instanceof StringType ||
-        typ instanceof BytesType ||
-        typ instanceof UserDefinedType
-    ) {
-        return typ;
-    }
-
-    throw new Error(`Cannot change location of type ${typ.pp()}`);
-}
-
-/**
- * Return the static size that the type `typ` will take in the standard ABI encoding of
- * arguments.
- */
-function abiStaticTypeSize(typ: TypeNode): number {
-    if (
-        typ instanceof IntType ||
-        typ instanceof AddressType ||
-        typ instanceof FixedBytesType ||
-        typ instanceof BoolType ||
-        typ instanceof PointerType
-    ) {
-        return 32;
-    }
-
-    if (typ instanceof UserDefinedType) {
-        const def = typ.definition;
-
-        if (
-            def instanceof EnumDefinition ||
-            def instanceof ContractDefinition ||
-            def instanceof UserDefinedValueTypeDefinition
-        ) {
-            return 32;
-        }
-
-        throw new Error(`NYI decoding user-defined type ${typ.pp()}`);
-    }
-
-    if (typ instanceof TupleType) {
-        let res = 0;
-
-        for (const elT of typ.elements) {
-            assert(elT !== null, ``);
-            res += abiStaticTypeSize(elT);
-        }
-
-        return res;
-    }
-
-    throw new Error(`NYI decoding type ${typ.pp()}`);
-}
+    LinearMemoryLocation
+} from "./types";
 
 /**
  * Given a callee AST Node (FunctionDefinition or VariableDeclaration
@@ -352,42 +267,6 @@ export function toABIEncodedType(
     }
 
     return type;
-}
-
-export function isABITypeStaticSized(type: TypeNode): boolean {
-    if (type instanceof ArrayType) {
-        return type.size !== undefined && isABITypeStaticSized(type.elementT);
-    }
-
-    if (type instanceof PointerType) {
-        return isABITypeStaticSized(type.to);
-    }
-
-    if (type instanceof TupleType) {
-        for (const elT of type.elements) {
-            assert(elT !== null, ``);
-            if (!isABITypeStaticSized(elT)) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    if (type instanceof StringType || type instanceof BytesType) {
-        return false;
-    }
-
-    if (
-        type instanceof IntType ||
-        type instanceof AddressType ||
-        type instanceof BoolType ||
-        type instanceof FixedBytesType
-    ) {
-        return true;
-    }
-
-    throw new Error(`NYI isABITypeStaticSized(${type.pp()})`);
 }
 
 /**
