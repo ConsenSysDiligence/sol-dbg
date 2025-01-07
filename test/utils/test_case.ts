@@ -61,6 +61,8 @@ export interface TestStep extends TxDesc {
     }>;
     // Optional sequence of the decoded return results for this call
     decodedReturns?: any[][];
+    // Set of indices to try
+    expectedIndices: [string, any[], string];
 }
 
 export interface TestCase extends Scenario {

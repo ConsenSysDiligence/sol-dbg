@@ -2,28 +2,34 @@ import { Address, bytesToUtf8 } from "@ethereumjs/util";
 import {
     AddressType,
     ArrayType,
+    assert,
     BoolType,
     BytesType,
     ContractDefinition,
     EnumDefinition,
+    enumToIntType,
     FixedBytesType,
     InferType,
     IntType,
     PointerType,
     DataLocation as SolDataLocation,
+    specializeType,
     StringType,
     StructDefinition,
     TupleType,
     TypeName,
     TypeNode,
     UserDefinedType,
-    UserDefinedValueTypeDefinition,
-    assert,
-    enumToIntType,
-    specializeType
+    UserDefinedValueTypeDefinition
 } from "solc-typed-ast";
-import { DataLocation, DataLocationKind, LinearMemoryLocation, Memory } from "../..";
-import { MAX_ARR_DECODE_LIMIT, bigEndianBufToBigint, fits, readMem, uint256 } from "../../..";
+import {
+    bigEndianBufToBigint,
+    fits,
+    MAX_ARR_DECODE_LIMIT,
+    readMem,
+    uint256
+} from "../../../utils/misc";
+import { DataLocation, DataLocationKind, LinearMemoryLocation, Memory } from "../../types";
 
 function mem_decodeInt(
     typ: IntType,

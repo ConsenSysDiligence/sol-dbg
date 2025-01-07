@@ -1,8 +1,7 @@
-import { PrefixedHexString, bytesToBigInt } from "@ethereumjs/util";
+import { bytesToBigInt } from "@ethereumjs/util";
 import { keccak256 } from "ethereum-cryptography/keccak";
 import { bytesToHex, hexToBytes, utf8ToBytes } from "ethereum-cryptography/utils";
 import {
-    ASTContext,
     ASTNode,
     ASTReader,
     ContractDefinition,
@@ -19,26 +18,18 @@ import {
 } from "solc-typed-ast";
 import { ABIEncoderVersion, abiTypeToCanonicalName } from "solc-typed-ast/dist/types/abi";
 import {
-    DecodedBytecodeSourceMapEntry,
-    EventDefInfo,
-    EventDesc,
-    PartialBytecodeDescription,
-    PartialCompiledContract,
-    PartialSolcOutput,
-    RawAST,
-    UnprefixedHexString,
     detectArtifactCompilerVersion,
-    fastParseBytecodeSourceMapping,
-    findContractDef,
-    findFallbackFun,
-    findReceiveFun,
     getCodeHash,
-    getCreationCodeHash,
-    zip3
-} from "../..";
-import { HexString } from "../../artifacts";
+    getCreationCodeHash
+} from "../../artifacts/helpers";
+import { PartialBytecodeDescription, PartialSolcOutput } from "../../artifacts/solc";
+import { zip3 } from "../../utils/misc";
+import { findContractDef, findFallbackFun, findReceiveFun } from "../../utils/solidity";
+import { DecodedBytecodeSourceMapEntry, fastParseBytecodeSourceMapping } from "../../utils/srcmap";
 import { OpcodeInfo } from "../opcodes";
+import { EventDefInfo, EventDesc, HexString, UnprefixedHexString } from "../types";
 import { BytecodeTemplate, makeTemplate, matchesTemplate } from "./bytecode_templates";
+import { ArtifactInfo, BytecodeInfo, ContractInfo, SourceFileInfo, SourceFileType } from "./types";
 
 export interface IArtifactManager {
     getContractFromDeployedBytecode(code: Uint8Array): ContractInfo | undefined;
@@ -58,51 +49,6 @@ export interface IArtifactManager {
     ): FunctionDefinition | VariableDeclaration | undefined;
     getEventDefInfo(topic: bigint | Uint8Array | EventDesc): EventDefInfo | undefined;
     getContractInfo(contract: ContractDefinition): ContractInfo | undefined;
-}
-
-export interface BytecodeInfo {
-    // Map from the file-id (used in source maps in this artifact) to the generated Yul sources for this contract's creation bytecode.
-    // Note that multiple contracts have overlapping generated units ids, so we need a mapping per-contract
-    generatedFileMap: Map<number, SourceFileInfo>;
-    srcMap: DecodedBytecodeSourceMapEntry[];
-    offsetToIndexMap: Map<number, number>;
-}
-
-export interface ContractInfo {
-    artifact: ArtifactInfo;
-    contractArtifact: PartialCompiledContract;
-    contractName: string;
-    fileName: string;
-    ast: ContractDefinition | undefined;
-    bytecode: BytecodeInfo;
-    deployedBytecode: BytecodeInfo;
-    mdHash: PrefixedHexString | undefined;
-}
-
-export interface ArtifactInfo {
-    artifact: PartialSolcOutput;
-    units: SourceUnit[];
-    ctx: ASTContext;
-    compilerVersion: string;
-    abiEncoderVersion: ABIEncoderVersion;
-    // Map from the file-id (used in source maps in this artifact) to the actual sources entry (and some additional info)
-    fileMap: Map<number, SourceFileInfo>;
-    // Map from src triples to AST nodes with that source range
-    srcMap: Map<string, ASTNode>;
-}
-
-export enum SourceFileType {
-    Solidity = "solidity",
-    InternalYul = "internal_yul"
-}
-
-export interface SourceFileInfo {
-    contents: string | undefined;
-    rawAst: RawAST;
-    ast: SourceUnit | undefined;
-    name: string;
-    fileIndex: number;
-    type: SourceFileType;
 }
 
 /**

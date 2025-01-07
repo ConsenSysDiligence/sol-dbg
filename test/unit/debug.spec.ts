@@ -2,12 +2,16 @@ import { Address } from "@ethereumjs/util";
 import { bytesToHex } from "ethereum-cryptography/utils";
 import expect from "expect";
 import fse from "fs-extra";
-import { assert, DecodedBytecodeSourceMapEntry, forAny } from "solc-typed-ast";
+import { assert, ContractDefinition, DecodedBytecodeSourceMapEntry, forAny } from "solc-typed-ast";
 import {
     ArtifactManager,
     ContractInfo,
+    DataView,
     decodeContractState,
     FoundryTxResult,
+    getContractLayout,
+    IArtifactManager,
+    indexInto,
     PartialSolcOutput,
     SolTxDebugger,
     SourceFileInfo,
@@ -21,6 +25,7 @@ import {
     findLastNonInternalStepBeforeRevert,
     ppStackTrace,
     sanitizeBigintFromJson,
+    single,
     TxRunner
 } from "../../src/utils";
 import { lsJson } from "../utils";
@@ -139,6 +144,37 @@ function getStepFailTraceStep(step: TestStep, trace: StepState[]): StepState | u
     }
 
     return findFirstCallToFail(trace);
+}
+
+function varNameToView(
+    artifactManager: IArtifactManager,
+    state: StepState,
+    name: string
+): DataView {
+    const astCtx = state.astNode;
+    assert(astCtx !== undefined, ``);
+
+    const topFrame = topExtFrame(state);
+    assert(topFrame.info !== undefined, ``);
+
+    const infer = artifactManager.infer(topFrame.info.artifact.compilerVersion);
+
+    if (topFrame.arguments) {
+        const t = topFrame.arguments.filter(([argName]) => argName === name);
+
+        if (t.length === 1) {
+            const view = t[0][1];
+            assert(view !== undefined, ``);
+            return view;
+        }
+    }
+
+    const contract = astCtx.getClosestParentByType(ContractDefinition);
+    assert(contract !== undefined, ``);
+    const layout = getContractLayout(infer, contract);
+    assert(layout !== undefined, ``);
+
+    return single(layout.filter(([decl]) => decl.name == name))[1];
 }
 
 describe("Local tests", () => {
@@ -452,6 +488,56 @@ describe("Local tests", () => {
                                     );
 
                                 expect(actualDecodedReturns).toEqual(curStep.decodedReturns);
+                            }
+                        });
+                    }
+
+                    if (forAny(testJSON.steps, (step) => step.expectedIndices !== undefined)) {
+                        it("Check indexInto is correct", async () => {
+                            for (let i = 0; i < testJSON.steps.length; i++) {
+                                const curStep = testJSON.steps[i];
+
+                                if (curStep.expectedIndices === undefined) {
+                                    continue;
+                                }
+
+                                const trace = traces[i];
+
+                                const errorStep = getStepFailTraceStep(curStep, trace);
+
+                                expect(errorStep).not.toBeUndefined();
+                                assert(
+                                    errorStep !== undefined,
+                                    "Should be catched by prev statement"
+                                );
+
+                                const astCtx = errorStep.astNode;
+                                assert(astCtx !== undefined, ``);
+
+                                const topFrame = topExtFrame(errorStep);
+                                assert(topFrame.info !== undefined, ``);
+
+                                const infer = artifactManager.infer(
+                                    topFrame.info.artifact.compilerVersion
+                                );
+
+                                for (const [
+                                    varName,
+                                    indices,
+                                    expValue
+                                ] of curStep.expectedIndices) {
+                                    let val: any = varNameToView(
+                                        artifactManager,
+                                        errorStep,
+                                        varName
+                                    );
+
+                                    for (const idx of indices) {
+                                        val = indexInto(val, idx, errorStep, infer);
+                                    }
+
+                                    expect(`${val}`).toEqual(expValue);
+                                }
                             }
                         });
                     }

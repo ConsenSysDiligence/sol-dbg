@@ -1,8 +1,9 @@
 import { Decoder } from "cbor";
 import { bytesToHex, hexToBytes } from "ethereum-cryptography/utils";
 import { assert, isExact } from "solc-typed-ast";
-import { readInt16Be, toHexString } from "..";
-import { HexString, PartialSolcOutput, UnprefixedHexString } from "./solc";
+import { HexString, UnprefixedHexString } from "../debug/types";
+import { readInt16Be, toHexString } from "../utils/misc";
+import { PartialSolcOutput } from "./solc";
 
 interface ContractMdStruct {
     // bzzr0 hash

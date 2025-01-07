@@ -10,12 +10,12 @@ import {
     TypeNode,
     VariableDeclaration
 } from "solc-typed-ast";
-import { DataView } from "../debug";
-import { ImmMap } from "../utils";
+import { ImmMap } from "../utils/immutable_map";
 import { IArtifactManager } from "./artifact_manager";
-import { nextWord, roundLocToType, stor_decodeValue } from "./decoding";
-import { getMapKeys, getStorage, KeccakPreimageMap, MapKeys } from "./tracers";
-import { DataLocationKind, Storage, StorageLocation } from "./types";
+import { nextWord, roundLocToType, stor_decodeValue } from "./decoding/storage/decoding";
+import { getStorage } from "./tracers/transformers/basic_info";
+import { getMapKeys, KeccakPreimageMap, MapKeys } from "./tracers/transformers/keccak256_invert";
+import { DataLocationKind, DataView, Storage, StorageLocation } from "./types";
 
 export interface ContractSolidityState {
     [key: string]: any;

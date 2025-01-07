@@ -8,8 +8,8 @@ import {
 } from "@ethereumjs/util";
 import { keccak256 } from "ethereum-cryptography/keccak.js";
 import { bytesToHex, concatBytes, equalsBytes, utf8ToBytes } from "ethereum-cryptography/utils";
-import { bigEndianBufToBigint, bigIntToBuf } from "../utils";
 import { ERROR, EvmErrorResult } from "../utils/ethereumjs_internal/exceptions";
+import { bigEndianBufToBigint, bigIntToBuf } from "../utils/misc";
 
 /// require("@ethereumjs/evm/dist/cjs/precompiles").PrecompileFunc
 type PrecompileFunc = any;

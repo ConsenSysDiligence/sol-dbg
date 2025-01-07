@@ -7,9 +7,9 @@ import {
     TupleType,
     VariableDeclaration
 } from "solc-typed-ast";
-import { mustReadMem, repeat, stackInd, stackTop } from "../../../utils";
+import { mustReadMem, repeat, stackInd, stackTop } from "../../../utils/misc";
 import { IArtifactManager } from "../../artifact_manager";
-import { cd_decodeValue } from "../../decoding";
+import { cd_decodeValue } from "../../decoding/calldata/decode";
 import { OPCODES } from "../../opcodes";
 import { DataLocationKind, FrameKind } from "../../types";
 import { BasicStepInfo } from "./basic_info";

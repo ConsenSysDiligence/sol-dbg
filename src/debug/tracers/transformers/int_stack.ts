@@ -2,7 +2,7 @@ import { InterpreterStep } from "@ethereumjs/evm";
 import { VM } from "@ethereumjs/vm";
 import { assert, FunctionDefinition, TypeNode, VariableDeclaration } from "solc-typed-ast";
 import { ContractInfo, IArtifactManager } from "../../artifact_manager";
-import { isCalldataArrayType } from "../../decoding";
+import { isCalldataArrayType } from "../../decoding/utils";
 import { OPCODES } from "../../opcodes";
 import {
     DataLocationKind,

@@ -5,22 +5,20 @@ import { TypedTransaction, TypedTxData } from "@ethereumjs/tx";
 import { Account, Address, PrefixedHexString } from "@ethereumjs/util";
 import { bytesToHex, hexToBytes } from "ethereum-cryptography/utils";
 import { assert } from "solc-typed-ast";
-import { HexString } from "../artifacts";
-import {
-    BaseSolTxTracer,
-    ContractStates,
-    decodeContractStates,
-    FoundryTxResult,
-    getContractGenKillSet,
-    getKeccakPreimages,
-    IArtifactManager,
-    KeccakPreimageMap,
-    SupportTracer
-} from "../debug";
+import { IArtifactManager } from "../debug/artifact_manager/artifact_manager";
+import { ContractStates, decodeContractStates } from "../debug/layout";
+import { BaseSolTxTracer, FoundryTxResult } from "../debug/tracers/base_tracer";
 import { StorageDecodeTracer } from "../debug/tracers/storage_decode_tracer";
+import { SupportTracer } from "../debug/tracers/support_tracer";
+import { getContractGenKillSet } from "../debug/tracers/transformers/contract_lifetime";
+import {
+    getKeccakPreimages,
+    KeccakPreimageMap
+} from "../debug/tracers/transformers/keccak256_invert";
 import { map_add } from "./map";
 import { hexStrToBuf32, makeFakeTransaction, ZERO_ADDRESS_STRING } from "./misc";
 import { set_add, set_subtract } from "./set";
+import { HexString } from "./types";
 
 export interface TxDesc {
     address: HexString;

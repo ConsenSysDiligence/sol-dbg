@@ -1,28 +1,19 @@
 import { Address } from "@ethereumjs/util";
 import * as sol from "solc-typed-ast";
 import { FunctionDefinition } from "solc-typed-ast";
-import { HexString, UnprefixedHexString } from "../artifacts";
-import { ImmMap } from "../utils";
-import { ArtifactInfo, ContractInfo } from "./artifact_manager";
+import { ImmMap } from "../utils/immutable_map";
+import { ArtifactInfo, ContractInfo } from "./artifact_manager/types";
 import { EVMOpInfo } from "./opcodes";
 
-export interface DeployedContractInfo {
-    address: HexString;
-    code: UnprefixedHexString;
-    info?: ContractInfo;
-}
+/**
+ * A type alias for 0x-prefixed hex strings. Used for documentation purposes.
+ */
+export type HexString = string;
 
-export interface UnknownLocation {
-    contract: DeployedContractInfo | undefined;
-}
-
-export interface SolLocation {
-    contract: DeployedContractInfo | undefined;
-    start: number;
-    length: number;
-    jump: "o" | "i" | "-";
-    file: number;
-}
+/**
+ * A type alias for hex strings without 0x prefix. Used for documentation purposes.
+ */
+export type UnprefixedHexString = string;
 
 export type DecodedSolValue = { value: any; type: string };
 

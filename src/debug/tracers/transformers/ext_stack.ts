@@ -3,13 +3,8 @@ import { TypedTransaction } from "@ethereumjs/tx";
 import { Address, bytesToHex } from "@ethereumjs/util";
 import { VM } from "@ethereumjs/vm";
 import { assert, FunctionDefinition, VariableDeclaration } from "solc-typed-ast";
-import {
-    getCodeHash,
-    getCreationCodeHash,
-    HexString,
-    UnprefixedHexString
-} from "../../../artifacts";
-import { mustReadMem, stackTop, wordToAddress, ZERO_ADDRESS } from "../../../utils";
+import { getCodeHash, getCreationCodeHash } from "../../../artifacts";
+import { mustReadMem, stackTop, wordToAddress, ZERO_ADDRESS } from "../../../utils/misc";
 import { buildMsgDataViews, findMethodBySelector } from "../../abi";
 import { ContractInfo, IArtifactManager } from "../../artifact_manager";
 import { createsContract, increasesDepth, OPCODES } from "../../opcodes";
@@ -19,7 +14,9 @@ import {
     DataLocationKind,
     DataView,
     ExternalFrame,
-    FrameKind
+    FrameKind,
+    HexString,
+    UnprefixedHexString
 } from "../../types";
 import { BasicStepInfo } from "./basic_info";
 

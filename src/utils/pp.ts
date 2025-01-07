@@ -20,17 +20,10 @@ import {
     UserDefinedType,
     UserDefinedValueTypeDefinition
 } from "solc-typed-ast";
-import {
-    ArtifactManager,
-    ContractInfo,
-    decodeValue,
-    ExternalFrame,
-    Frame,
-    FrameKind,
-    SolTxDebugger,
-    SourceFileInfo,
-    StepState
-} from "../debug";
+import { ArtifactManager } from "../debug/artifact_manager/artifact_manager";
+import { ContractInfo, SourceFileInfo } from "../debug/artifact_manager/types";
+import { decodeValue } from "../debug/decoding";
+import { SolTxDebugger } from "../debug/tracers";
 import {
     decodeSourceLoc,
     ExternalFrameInfo,
@@ -39,6 +32,7 @@ import {
     MapKeys,
     topExtFrame
 } from "../debug/tracers/transformers";
+import { ExternalFrame, Frame, FrameKind, StepState } from "../debug/types";
 
 const srcLocation = require("src-location");
 const fse = require("fs-extra");

@@ -1,45 +1,80 @@
-import { ArrayType, assert, InferType, PointerType, TypeNode } from "solc-typed-ast";
-import { ABIEncoderVersion } from "solc-typed-ast/dist/types/abi";
-import { nyi, uint256 } from "../../utils/misc";
+import {
+    ABIEncoderVersion,
+    ArrayType,
+    assert,
+    InferType,
+    PackedArrayType,
+    PointerType,
+    DataLocation as SolDataLocation,
+    TypeNode
+} from "solc-typed-ast";
+import { MAX_ARR_DECODE_LIMIT, nyi, uint256 } from "../../utils/misc";
 import { topExtFrame } from "../tracers/transformers/ext_stack";
-import { MapKeys } from "../tracers/transformers/keccak256_invert";
 import {
     DataLocation,
     DataLocationKind,
     DataView,
     MemoryLocation,
     MemoryLocationKind,
+    StackLocation,
     StepState,
     StorageLocation
 } from "../types";
-import { cd_decodeArrayContents, cd_decodeValue } from "./calldata";
-import { mem_decodeValue } from "./memory";
-import { st_decodeInt, st_decodeValue } from "./stack";
-import { stor_decodeValue } from "./storage";
-import {
-    getCDArrayInStackOffAndLen,
-    isCalldataArrayType,
-    solLocToMemoryLocationKind
-} from "./utils";
+import { cd_decodeArrayContents, cd_indexInto } from "./calldata";
+import { mem_indexInto } from "./memory";
+import { st_decodeInt } from "./stack";
+import { stor_indexInto } from "./storage";
 
-/**
- * Helper to dispatch the decoding of a given type `typ` at a given data location `loc` in a given `state`.
- * to the proper decoding logic (memory, calldata, storage, stack)
- */
-function decodeValInt(
-    typ: TypeNode,
-    loc: DataLocation,
-    state: StepState,
-    infer: InferType,
-    mapKeys?: MapKeys
-): any {
-    if (loc.kind === DataLocationKind.Memory) {
-        const res = mem_decodeValue(typ, loc, state.memory, infer);
-
-        return res === undefined ? res : res[0];
+export function solLocToMemoryLocationKind(loc: SolDataLocation): MemoryLocationKind {
+    if (loc === SolDataLocation.Default) {
+        return DataLocationKind.Memory;
     }
 
-    if (loc.kind === DataLocationKind.CallData) {
+    return loc as unknown as MemoryLocationKind;
+}
+
+/**
+ * Array pointers to calldata in the stack are stored as 2 slots - offset and
+ * length. This is to support array slices. Return the offset and length of the
+ * array (slice).
+ */
+export function getCDArrayInStackOffAndLen(
+    loc: StackLocation,
+    state: StepState
+): [bigint, number] | [undefined, undefined] {
+    const off = st_decodeInt(uint256, loc, state.evmStack);
+
+    if (off === undefined) {
+        return [undefined, undefined];
+    }
+
+    const len = st_decodeInt(
+        uint256,
+        { kind: loc.kind, offsetFromTop: loc.offsetFromTop - 1 },
+        state.evmStack
+    );
+
+    if (len === undefined) {
+        return [undefined, undefined];
+    }
+
+    if (len > MAX_ARR_DECODE_LIMIT) {
+        return [undefined, undefined];
+    }
+
+    return [off, Number(len)];
+}
+
+export function indexInto_int(
+    typ: PointerType,
+    loc: DataLocation,
+    index: any,
+    state: StepState,
+    infer: InferType
+): any {
+    if (loc.kind === DataLocationKind.Memory) {
+        return mem_indexInto(typ, loc, index, state.memory, infer);
+    } else if (loc.kind === DataLocationKind.CallData) {
         const lastExtFrame = topExtFrame(state);
 
         let abiType: TypeNode;
@@ -50,33 +85,34 @@ function decodeValInt(
             return undefined;
         }
 
-        const res = cd_decodeValue(abiType, typ, loc, lastExtFrame.msgData, infer);
+        assert(abiType instanceof PointerType, `Unexpected abi type {0}`, abiType);
 
-        return res === undefined ? res : res[0];
+        return cd_indexInto(abiType, typ, loc, index, lastExtFrame.msgData, infer);
+    } else if (loc.kind === DataLocationKind.Storage) {
+        return stor_indexInto(typ, loc, index, state.storage, infer);
     }
 
-    if (loc.kind === DataLocationKind.Stack) {
-        return st_decodeValue(typ, loc, state.evmStack, infer);
-    }
+    nyi(`Indexing into ${loc.kind}`);
+}
 
-    const res = stor_decodeValue(typ, loc, state.storage, infer, mapKeys);
-
-    return res === undefined ? res : res[0];
+export function isCalldataArrayType(typ: TypeNode): boolean {
+    return (
+        typ instanceof PointerType &&
+        ((typ.to instanceof ArrayType && typ.to.size === undefined) ||
+            typ.to instanceof PackedArrayType) &&
+        typ.location === SolDataLocation.CallData
+    );
 }
 
 /**
  * Decode a generic value expressed as a `DataView` (i.e. a tuple of type and location) given
  * the dbg state `state` at some step.
  */
-export function decodeValue(
-    view: DataView,
-    state: StepState,
-    infer: InferType,
-    mapKeys?: MapKeys
-): any {
+export function indexInto(view: DataView, index: any, state: StepState, infer: InferType): any {
     const typ = view.type;
     const loc = view.loc;
 
+    assert(typ instanceof PointerType, `Unexpected type {0}`, typ);
     /**
      * The only case where a pointer from one area of the state crosses into another
      * area of the state are pointers in the stack. All other pointers stay in their
@@ -148,14 +184,14 @@ export function decodeValue(
             nyi(`NYI data location kind ${kind}`);
         }
 
-        const res = decodeValInt(typ.to, pointedToLoc, state, infer, mapKeys);
+        const res = indexInto_int(typ, pointedToLoc, index, state, infer);
 
-        //console.error(`decodeValue: res ${res}`);
+        //console.error(`indexInto: res ${res}`);
         return res;
     }
 
-    const res = decodeValInt(typ, loc, state, infer, mapKeys);
-    //console.error(`decodeValue: res ${res}`);
+    const res = indexInto_int(typ, loc, index, state, infer);
+    //console.error(`indexInto: res ${res}`);
 
     return res;
 }

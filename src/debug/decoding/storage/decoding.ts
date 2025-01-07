@@ -22,14 +22,16 @@ import {
     enumToIntType
 } from "solc-typed-ast";
 import {
-    DataLocationKind,
-    MapKeys,
-    Storage,
-    StorageLocation,
-    changeToLocation,
-    mem_decodeValue
-} from "../..";
-import { MAX_ARR_DECODE_LIMIT, bigEndianBufToBigint, bigIntToBuf, fits, uint256 } from "../../..";
+    MAX_ARR_DECODE_LIMIT,
+    bigEndianBufToBigint,
+    bigIntToBuf,
+    fits,
+    uint256
+} from "../../../utils/misc";
+import { changeToLocation } from "../../../utils/solidity";
+import { MapKeys } from "../../tracers/transformers/keccak256_invert";
+import { DataLocationKind, Storage, StorageLocation } from "../../types";
+import { mem_decodeValue } from "../memory/decoding";
 
 /**
  * Helper to fetch the word residing at key `key` from `storage`.  Note that
