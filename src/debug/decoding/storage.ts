@@ -38,7 +38,7 @@ import { checkOOB } from "../../solvm/utils";
  * this always succeeds as all uninitialized values in storage are defined to
  * contain 0.
  */
-function fetchWord(key: bigint, storage: Storage): Uint8Array {
+export function stor_fetchWord(key: bigint, storage: Storage): Uint8Array {
     const keyHash = bigEndianBufToBigint(keccak256(bigIntToBuf(key, 32, "big")));
     const res = storage.get(keyHash);
 
@@ -60,7 +60,7 @@ function fetchBytes(
     numBytes: number,
     storage: Storage
 ): Uint8Array {
-    let curBuf = fetchWord(wordOff, storage);
+    let curBuf = stor_fetchWord(wordOff, storage);
     const res = new Uint8Array(numBytes);
 
     for (let i = 0; i < numBytes; i++) {
@@ -71,7 +71,7 @@ function fetchBytes(
         if (offInWord === 0 && i < numBytes - 1) {
             wordOff++;
 
-            curBuf = fetchWord(wordOff, storage);
+            curBuf = stor_fetchWord(wordOff, storage);
         }
     }
 
@@ -353,7 +353,7 @@ function stor_decodeBytes(
         loc.address
     );
 
-    const word = fetchWord(loc.address, storage);
+    const word = stor_fetchWord(loc.address, storage);
     const lByte = word[31];
 
     if (lByte % 2 === 0) {
@@ -638,6 +638,18 @@ export function stor_decodeValue(
     throw new Error(`NYI storage decode for type ${typ.pp()}`);
 }
 
+export function stor_mustDecodeValue(
+    typ: TypeNode,
+    loc: StorageLocation,
+    storage: Storage,
+    infer: InferType,
+    mapKeys?: MapKeys
+): [any, StorageLocation] {
+    const res = stor_decodeValue(typ, loc, storage, infer, mapKeys);
+    assert(res !== undefined, `Failed decoding storage loc {0} of type {1}`, loc.address, typ);
+    return res;
+}
+
 /**
  * Given a location `loc` with expected type `typ` return the location of the
  * index element in `loc`
@@ -705,6 +717,6 @@ function stor_decodeIndexLoc_array(
     return {
         kind: loc.kind,
         address: contentsLoc.address + wordIdx,
-        endOffsetInWord: remainingSize
+        endOffsetInWord: remainingSize + elSize
     };
 }

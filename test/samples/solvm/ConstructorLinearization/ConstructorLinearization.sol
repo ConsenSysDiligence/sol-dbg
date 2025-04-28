@@ -84,7 +84,18 @@ contract ConstructorLinearization {
         assert(z.getArr(7) == 8);
         assert(z.getArr(8) == 9);
         assert(z.getArr(9) == 10);
-        return (z.getArr(0), z.getArr(1), z.getArr(2), z.getArr(3), z.getArr(4), z.getArr(5), z.getArr(6), z.getArr(7), z.getArr(8), z.getArr(9));
+        return (
+            z.getArr(0),
+            z.getArr(1),
+            z.getArr(2),
+            z.getArr(3),
+            z.getArr(4),
+            z.getArr(5),
+            z.getArr(6),
+            z.getArr(7),
+            z.getArr(8),
+            z.getArr(9)
+        );
     }
 }
 
@@ -95,7 +106,18 @@ contract __IRTest__ {
     }
 
     function __testCase352__(ConstructorLinearization __this__) internal {
-        (uint256 ret_352_0, uint256 ret_352_1, uint256 ret_352_2, uint256 ret_352_3, uint256 ret_352_4, uint256 ret_352_5, uint256 ret_352_6, uint256 ret_352_7, uint256 ret_352_8, uint256 ret_352_9) = __this__.main();
+        (
+            uint256 ret_352_0,
+            uint256 ret_352_1,
+            uint256 ret_352_2,
+            uint256 ret_352_3,
+            uint256 ret_352_4,
+            uint256 ret_352_5,
+            uint256 ret_352_6,
+            uint256 ret_352_7,
+            uint256 ret_352_8,
+            uint256 ret_352_9
+        ) = __this__.main();
         assert(ret_352_0 == uint256(1));
         assert(ret_352_1 == uint256(5));
         assert(ret_352_2 == uint256(2));

@@ -7,6 +7,7 @@ import {
     ExceptionStep,
     ExecStep,
     ExternalCallStep,
+    ExternalReturnStep,
     InternalReturnStep,
     SolTrace,
     SolTraceStep
@@ -34,7 +35,11 @@ export function pp(t: SolTraceStep | SolTrace): string {
     }
 
     if (t instanceof InternalReturnStep) {
-        return `Return ${t.values}`;
+        return `Internal Return ${t.values}`;
+    }
+
+    if (t instanceof ExternalReturnStep) {
+        return `Extenral Return ${bytesToHex(t.data)}`;
     }
 
     if (t instanceof ExecStep) {

@@ -4,14 +4,22 @@ import { lt } from "semver";
 import * as sol from "solc-typed-ast";
 import {
     buildMsgDataViews,
+    cd_decodeValue,
     ContractInfo,
+    DataLocation,
     DataLocationKind,
+    decodeIndexLoc,
+    decodeValue,
     IArtifactManager,
     mem_decodeValue,
     Memory,
     OPCODES,
+    StepState,
+    stor_decodeIndexLoc,
     stor_decodeValue,
-    Storage
+    stor_mustDecodeValue,
+    Storage,
+    StorageLocation
 } from "../debug";
 import { stackTop, ZERO_ADDRESS } from "../utils";
 import { PanicCodes } from "./constants";
@@ -25,25 +33,38 @@ import {
     SolRevert
 } from "./exceptions";
 import { BaseScope, BlockScope, ContractScope, FunScope, GlobalScope } from "./scope";
-import { LValue, noType, POISON, SolMessage, SolTuple, SolValue, VmDataView } from "./state";
+import {
+    isTypedVMDataView,
+    LValue,
+    noType,
+    POISON,
+    SolMessage,
+    SolTuple,
+    SolValue,
+    TypedVmDataView,
+    VmDataView
+} from "./state";
 import {
     DefaultConstructorStep,
     EvalStep,
     ExceptionStep,
     ExecStep,
     ExternalCallStep,
+    ExternalReturnStep,
     InternalReturnStep,
     ScopeNode,
     SolTrace
 } from "./trace";
 import {
     asyncMap,
-    coerceToLValue,
     decodeReturns,
     encodeCall,
+    encodeReturns,
     findConstructor,
     getFunCallTarget,
-    grabInheritanceArgs
+    grabInheritanceArgs,
+    isTypePrimitive,
+    stor_assignValue
 } from "./utils";
 
 export interface SolCallResult {
@@ -76,6 +97,7 @@ export class SolVM {
     protected trace: SolTrace = [];
     protected storage: Storage;
     protected memory: Memory;
+    protected cdArgBaseOff: number;
 
     constructor(
         protected env: WorldInterface,
@@ -95,6 +117,13 @@ export class SolVM {
 
         this.scopes.push(new GlobalScope(this.contract.vScope));
         this.scopes.push(new ContractScope(this.contract, this.infer));
+
+        if (this.msg.to.equals(ZERO_ADDRESS)) {
+            // For creation Txs the base cd offset is the length of the bytecode
+            this.cdArgBaseOff = info.contractArtifact.evm.bytecode.object.length / 2;
+        } else {
+            this.cdArgBaseOff = 4;
+        }
     }
 
     /**
@@ -166,7 +195,10 @@ export class SolVM {
             }
 
             const args = argMap.get(base);
-            sol.assert(args !== undefined, `Missing args for base ${base.name}`);
+            sol.assert(
+                args !== undefined,
+                `Missing args for base ${base.name} of ${contract.name}`
+            );
 
             // Evaluate any parent-contract args in the scope of this constructor
             for (const [subContract, baseContract] of parentScopeMap) {
@@ -192,6 +224,12 @@ export class SolVM {
             // Execute this constructor (and any of its concrete modifiers)
             await this.execFun(base.vConstructor, args);
         }
+
+        // This is invalid in the cse of immutable references
+        // @todo: add test to fail this with immutable refs; fix broken test
+        this.trace.push(
+            new ExternalReturnStep(hexToBytes(info.contractArtifact.evm.deployedBytecode.object))
+        );
     }
 
     private solException(e: SolBaseException): never {
@@ -225,12 +263,17 @@ export class SolVM {
             this.encoderVersion
         );
 
-        return await this.execFun(
+        const rets = await this.execFun(
             entry,
             views.map((v) =>
                 v[1] === undefined ? { val: POISON, type: noType } : { val: v[1], type: v[1].type }
             )
         );
+
+        const encodedSolidityRet = encodeReturns(entry, rets, this.infer, sol.ABIEncoderVersion.V2);
+        this.trace.push(new ExternalReturnStep(encodedSolidityRet));
+
+        return rets;
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -266,30 +309,6 @@ export class SolVM {
         }
 
         fail(`Undeclared identifier ${name}`);
-    }
-
-    private getValue(view: VmDataView, typ: sol.TypeNode): SolValue {
-        let res: SolValue | undefined;
-
-        if (view.kind === "local") {
-            const scope = view.scope;
-            if (
-                scope instanceof GlobalScope ||
-                scope instanceof BlockScope ||
-                scope instanceof FunScope
-            ) {
-                res = scope.deref(view);
-            }
-        } else if (view.kind === "storage") {
-            res = stor_decodeValue(typ, view, this.storage, this.infer);
-        } else if (view.kind === "memory") {
-            res = mem_decodeValue(typ, view, this.memory, this.infer);
-        } else {
-            fail(`Unexpected view ${view.kind}`);
-        }
-
-        sol.assert(res !== undefined, ``);
-        return res;
     }
 
     private async execModifier(mod: sol.ModifierInvocation): Promise<ControlFlow> {
@@ -690,7 +709,8 @@ export class SolVM {
         if (expr instanceof sol.Conditional) {
             nyi(`evalLVConditional(${expr.constructor.name})`);
         } else if (expr instanceof sol.FunctionCall) {
-            res = coerceToLValue(await this.evalFunctionCall(expr));
+            //res = coerceToLValue(await this.evalFunctionCall(expr));
+            nyi(`evalLValue(FunctionCall)`);
         } else if (expr instanceof sol.Identifier) {
             res = await this.evalLVIdentifier(expr);
         } else if (expr instanceof sol.IndexAccess) {
@@ -718,7 +738,7 @@ export class SolVM {
     }
 
     private async evalLVIdentifier(expr: sol.Identifier): Promise<LValue> {
-        return this.lookup(expr.name);
+        return { type: this.infer.typeOf(expr), view: this.lookup(expr.name) };
     }
 
     private async evalLVIndexAccess(expr: sol.IndexAccess): Promise<LValue> {
@@ -854,14 +874,16 @@ export class SolVM {
             return;
         }
 
-        if (lhs.kind === "local") {
-            lhs.scope.assign(lhs.name as any, rhs);
-        } else if (lhs.kind === "storage") {
-            nyi("Storage assignments");
-        } else if (lhs.kind === "memory") {
+        const view = lhs.view;
+
+        if (view.kind === "local") {
+            view.scope.assign(view.name as any, rhs);
+        } else if (view.kind === "storage") {
+            this.storage = stor_assignValue(lhs.type, view, rhs, this.storage);
+        } else if (view.kind === "memory") {
             nyi("Memory assignments");
         } else {
-            nyi(`Assignment location ${lhs.kind}`);
+            nyi(`Assignment location ${view.kind}`);
         }
     }
 
@@ -1100,6 +1122,61 @@ export class SolVM {
             nyi(`evalBuiltinFunctionCall ${callee.name}`);
         }
 
+        if (callee instanceof sol.MemberAccess) {
+            if (callee.memberName === "push") {
+                sol.assert(expr.vArguments.length <= 1, ``);
+                const base = await this.evalLValue(callee.vExpression);
+                let newEl: SolValue;
+
+                if (expr.vArguments.length === 0) {
+                    // 0-initialized case
+                    // @todo 0-init of maps? (e.g. mapping(uint=>uint)[] arr, arr.push())
+                    nyi("0-init push");
+                } else {
+                    newEl = await this.evalExpression(expr.vArguments[0]);
+                }
+
+                sol.assert(!(base instanceof Array), ``);
+
+                console.error(`base: `, base, ` newEl: `, newEl);
+                const len = stor_mustDecodeValue(
+                    sol.types.uint256,
+                    base.view as StorageLocation,
+                    this.storage,
+                    this.infer
+                )[0];
+
+                sol.assert(
+                    typeof len === `bigint` &&
+                        base.type instanceof sol.PointerType &&
+                        base.type.to instanceof sol.ArrayType,
+                    ``
+                );
+
+                // Increment length
+                this.assign({ type: sol.types.uint256, view: base.view }, len + 1n);
+                // Push new value
+                const newValLoc = stor_decodeIndexLoc(
+                    base.type,
+                    base.view as StorageLocation,
+                    len,
+                    this.storage,
+                    this.infer
+                );
+
+                sol.assert(newValLoc !== undefined, ``);
+
+                const newValView: TypedVmDataView = {
+                    type: base.type.to.elementT,
+                    view: newValLoc
+                };
+
+                this.assign(newValView, newEl);
+
+                return newValView;
+            }
+        }
+
         nyi(`evalBuiltinFunctionCall ${callee.constructor.name}`);
     }
 
@@ -1176,7 +1253,13 @@ export class SolVM {
 
         // @todo what happens when the callee encoder version is different from the caller?
         // 2 cases - older and newer. Need separate tests!!!
-        return decodeReturns(calleeDef, res.data, this.infer, this.encoderVersion);
+        const retVals = decodeReturns(calleeDef, res.data, this.infer, this.encoderVersion);
+
+        return retVals.length === 0
+            ? POISON
+            : retVals.length === 1
+              ? retVals[0]
+              : new SolTuple(retVals);
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -1322,16 +1405,116 @@ export class SolVM {
         }
     }
 
+    /**
+     * Given a typed view, return the corresponding value at that location.
+     * If the view is of a primitive type, return the type at that location.
+     * If the view is of a complex type, return the view itself.
+     * If the view if of a local variable of a complex type (pointer) return the value inside.
+     */
+    private getValAtLoc(view: TypedVmDataView): SolValue {
+        const type = view.type;
+        const loc = view.view;
+
+        // Case 1 - local "stack" variable - just return it
+        if (loc.kind === "local") {
+            // For local variables just return their value from the "stack". If this is a refernce type,
+            // we will have stored a pointer on the stack
+            const res = loc.scope.deref(loc);
+            sol.assert(res !== undefined, `Failed deref`);
+
+            return res;
+        }
+
+        sol.assert(
+            loc.kind === DataLocationKind.Memory ||
+                loc.kind === DataLocationKind.Storage ||
+                loc.kind === DataLocationKind.CallData,
+            ``
+        );
+
+        // Case 2 -  a primitive type from memory/storage/calldata - just read it from memory
+        if (isTypePrimitive(type)) {
+            if (loc.kind === DataLocationKind.Memory) {
+                const res = mem_decodeValue(type, loc, this.memory, this.infer);
+                sol.assert(
+                    res !== undefined,
+                    `Unable to decode value of type {0} from mem addr {1}`,
+                    type,
+                    loc.address
+                );
+
+                return res[0];
+            } else if (loc.kind === DataLocationKind.Storage) {
+                const res = stor_decodeValue(type, loc, this.storage, this.infer);
+                sol.assert(
+                    res !== undefined,
+                    `Unable to decode value of type {0} from mem addr {1}`,
+                    type,
+                    loc.address
+                );
+
+                return res[0];
+            } else if (loc.kind === DataLocationKind.CallData) {
+                const abiType = this.infer.toABIEncodedType(type, sol.ABIEncoderVersion.V2);
+                const res = cd_decodeValue(
+                    abiType,
+                    type,
+                    loc,
+                    this.msg.data,
+                    BigInt(this.cdArgBaseOff),
+                    this.infer
+                );
+
+                sol.assert(
+                    res !== undefined,
+                    `Unable to decode value of type {0} from mem addr {1}`,
+                    type,
+                    loc.address
+                );
+
+                return res[0];
+            } else {
+                nyi(`Identifier loc ${loc}`);
+            }
+        }
+
+        // Case 3 - A complex type in storage/memory/calldata - evalutes to just the address
+        sol.assert(loc.kind !== DataLocationKind.Storage || loc.endOffsetInWord === 32, ``);
+
+        return view;
+    }
+
     private evalIdentifier(expr: sol.Identifier): SolValue {
         const view = this.lookup(expr.name);
-        const typ = this.infer.typeOf(expr);
+        const type = this.infer.typeOf(expr);
 
-        return this.getValue(view, typ);
+        return this.getValAtLoc({ type, view });
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    private evalIndexAccess(expr: sol.IndexAccess): SolValue {
-        nyi("IndexAccess");
+    private async evalIndexAccess(expr: sol.IndexAccess): Promise<SolValue> {
+        const baseV = await this.evalExpression(expr.vBaseExpression);
+        const baseT = this.infer.typeOf(expr.vBaseExpression);
+        const resT = this.infer.typeOf(expr);
+        sol.assert(expr.vIndexExpression !== undefined, ``);
+
+        const idxV = await this.evalExpression(expr.vIndexExpression);
+
+        sol.assert(isTypedVMDataView(baseV) && baseT instanceof sol.PointerType, ``);
+        const state = { storage: this.storage, memory: this.memory } as any as StepState;
+
+        const valLoc = decodeIndexLoc(
+            { type: baseV.type, loc: baseV.view as DataLocation },
+            idxV,
+            state,
+            this.infer
+        );
+
+        sol.assert(valLoc !== undefined, ``);
+
+        if (isTypePrimitive(valLoc.type)) {
+            return decodeValue(valLoc, state, this.infer);
+        }
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -1352,8 +1535,38 @@ export class SolVM {
         nyi("Literal");
     }
 
+    private async evalBuiltinMemberAccess(expr: sol.MemberAccess): Promise<SolValue> {
+        const base = await this.evalExpression(expr.vExpression);
+        const baseT = this.infer.typeOf(expr.vExpression);
+
+        if (
+            baseT instanceof sol.PointerType &&
+            baseT.to instanceof sol.ArrayType &&
+            expr.memberName === "length"
+        ) {
+            sol.assert(isTypedVMDataView(base), ``);
+
+            return decodeValue(
+                { type: sol.types.uint256, loc: base.view as DataLocation },
+                {
+                    memory: this.memory,
+                    storage: this.storage
+                } as any as StepState,
+                this.infer,
+                new Map()
+            );
+        }
+
+        nyi(`evalBuiltinMemberAccess(${expr.memberName})`);
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    private evalMemberAccess(expr: sol.MemberAccess): SolValue {
+    private async evalMemberAccess(expr: sol.MemberAccess): Promise<SolValue> {
+        const def = expr.vReferencedDeclaration;
+
+        if (def === undefined) {
+            return this.evalBuiltinMemberAccess(expr);
+        }
         nyi("MemberAccess");
     }
 

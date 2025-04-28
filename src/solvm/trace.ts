@@ -35,6 +35,12 @@ export class InternalReturnStep extends InternalSolStep {
     }
 }
 
+export class ExternalReturnStep extends BaseSolStep {
+    constructor(public readonly data: Uint8Array) {
+        super();
+    }
+}
+
 /**
  * Marks an external call. Applies to both calls and contract deployments
  */

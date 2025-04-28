@@ -2,13 +2,7 @@ import { TypedTransaction } from "@ethereumjs/tx";
 import { bytesToHex } from "ethereum-cryptography/utils";
 import expect from "expect";
 import fse from "fs-extra";
-import {
-    ABIEncoderVersion,
-    assert,
-    ContractDefinition,
-    FunctionDefinition,
-    InferType
-} from "solc-typed-ast";
+import { ContractDefinition } from "solc-typed-ast";
 import {
     ArtifactManager,
     buildSolTrace,
@@ -25,9 +19,8 @@ import {
 import {
     DefaultConstructorStep,
     ExternalCallStep,
-    InternalReturnStep
+    ExternalReturnStep
 } from "../../src/solvm/trace";
-import { encodeReturns } from "../../src/solvm/utils";
 
 function makeTest(artifact: PartialSolcOutput, fileName: string): Scenario {
     const bytecode = artifact.contracts[fileName]["__IRTest__"].evm.bytecode.object;
@@ -65,7 +58,7 @@ function makeTest(artifact: PartialSolcOutput, fileName: string): Scenario {
 }
 
 describe("Local tests", () => {
-    for (const sample of ["WhileV04"] /*fse.readdirSync("test/samples/solvm")*/) {
+    for (const sample of ["ConstructorLinearization"] /*fse.readdirSync("test/samples/solvm")*/) {
         describe(`Sample ${sample}`, () => {
             let artifact: PartialSolcOutput;
             let artifactManager: ArtifactManager;
@@ -105,24 +98,11 @@ describe("Local tests", () => {
                     expect(info).toBeDefined();
                     const ast = (info as ContractInfo).ast as ContractDefinition;
                     expect(ast).toBeDefined();
-                    const infer = new InferType(info.artifact.compilerVersion);
 
-                    if (solStep instanceof InternalReturnStep) {
-                        assert(
-                            frame.callee instanceof FunctionDefinition,
-                            `NYI callee {0}`,
-                            frame.callee
-                        );
-
-                        const encodedSolidityRet = encodeReturns(
-                            frame.callee,
-                            solStep.values,
-                            infer,
-                            ABIEncoderVersion.V2
-                        );
+                    if (solStep instanceof ExternalReturnStep) {
                         expect(evmStep.retInfo).toBeDefined();
                         expect(bytesToHex(evmStep.retInfo?.rawReturnData as Uint8Array)).toEqual(
-                            bytesToHex(encodedSolidityRet)
+                            bytesToHex(solStep.data)
                         );
                     } else if (solStep instanceof ExternalCallStep) {
                         expect(solStep.opcode === evmStep.op.opcode);

@@ -1,7 +1,8 @@
 import { Common } from "@ethereumjs/common";
 import { TransactionFactory, TypedTransaction, TypedTxData } from "@ethereumjs/tx";
-import { Address, setLengthLeft } from "@ethereumjs/util";
-import { bytesToHex, hexToBytes } from "ethereum-cryptography/utils";
+import { Address, bigIntToBytes, setLengthLeft } from "@ethereumjs/util";
+import { bytesToHex, concatBytes, hexToBytes } from "ethereum-cryptography/utils";
+import * as sol from "solc-typed-ast";
 import {
     ContractDefinition,
     FunctionDefinition,
@@ -252,6 +253,30 @@ export function bigEndianBufToBigint(buf: Uint8Array): bigint {
     }
 
     return res;
+}
+
+export function fillBytes(byte: number, len: number): Uint8Array {
+    const res = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+        res[i] = byte;
+    }
+
+    return res;
+}
+
+/**
+ * Convert a bigint to a big-endian 2's complement encoding. Add padding up to
+ * the expected type length.
+ */
+export function bigIntToBigEndianBuf(num: bigint, type: sol.IntType): Uint8Array {
+    const b = bigIntToBytes(num);
+    const nExpBytes = type.nBits / 8;
+
+    sol.assert(b.length <= nExpBytes, ``);
+
+    return b.length < nExpBytes
+        ? concatBytes(fillBytes(type.signed && num < 0 ? 0xff : 0x00, nExpBytes - b.length), b)
+        : b;
 }
 
 /**

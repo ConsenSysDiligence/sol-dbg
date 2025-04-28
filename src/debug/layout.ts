@@ -105,7 +105,7 @@ export function getContractLayout(
 
             res.push([varDecl, { type: typeNode, loc }]);
 
-            const arg = stor_decodeValue(typeNode, loc, emptyStorage, infer);
+            const arg = stor_decodeValue(typeNode, loc, emptyStorage, infer, new Map());
 
             if (arg === undefined) {
                 return undefined;

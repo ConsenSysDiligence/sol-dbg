@@ -469,23 +469,25 @@ export class ArtifactManager implements IArtifactManager {
                 continue;
             }
 
-            const inf = this.infer(contract.artifact.compilerVersion);
             const ast = contract.ast;
+            const inf = this.infer(contract.artifact.compilerVersion);
 
-            const candidates = [
-                ...ast.vFunctions.filter(
-                    (method) =>
-                        method.visibility === FunctionVisibility.External ||
-                        method.visibility === FunctionVisibility.Public
-                ),
-                ...ast.vStateVariables.filter(
-                    (getter) => getter.visibility === StateVariableVisibility.Public
-                )
-            ];
+            for (const base of ast.vLinearizedBaseContracts) {
+                const candidates = [
+                    ...base.vFunctions.filter(
+                        (method) =>
+                            method.visibility === FunctionVisibility.External ||
+                            method.visibility === FunctionVisibility.Public
+                    ),
+                    ...base.vStateVariables.filter(
+                        (getter) => getter.visibility === StateVariableVisibility.Public
+                    )
+                ];
 
-            for (const node of candidates) {
-                if (inf.signatureHash(node) === selector) {
-                    return [contract, node];
+                for (const node of candidates) {
+                    if (inf.signatureHash(node) === selector) {
+                        return [contract, node];
+                    }
                 }
             }
         }

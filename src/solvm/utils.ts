@@ -1,11 +1,82 @@
 import { AbiCoder } from "@ethersproject/abi";
 import { concatBytes, hexToBytes } from "ethereum-cryptography/utils";
 import * as sol from "solc-typed-ast";
-import { ZERO_ADDRESS } from "../utils";
+import { stor_fetchWord, Storage, StorageLocation } from "../debug";
+import { bigIntToBigEndianBuf, ZERO_ADDRESS } from "../utils";
 import { nyi } from "./exceptions";
-import { LValue, SolValue } from "./state";
+import { SolValue } from "./state";
 
 export const coder = new AbiCoder();
+
+export function bytesSplice(target: Uint8Array, newBytes: Uint8Array, off: number): Uint8Array {
+    const res = new Uint8Array(target);
+    sol.assert(off >= 0 && off + newBytes.length <= res.length, `OoB in bytesSplice`);
+
+    for (let i = 0; i < newBytes.length; i++) {
+        res[i + off] = newBytes[i];
+    }
+
+    return res;
+}
+
+export function stor_assignValue(
+    typ: sol.TypeNode,
+    loc: StorageLocation,
+    value: SolValue,
+    storage: Storage
+): Storage {
+    let val = stor_fetchWord(loc.address, storage);
+
+    if (typ instanceof sol.IntType) {
+        sol.assert(typeof value === "bigint", `Unexpected value ${value}} in stor_assignValue`);
+        const newBytes = bigIntToBigEndianBuf(value, typ);
+        sol.assert(
+            newBytes.length <= loc.endOffsetInWord,
+            `Misaligned store ${value} of type ${typ.pp()} with bytes ${newBytes.length} assigned ending at off ${loc.endOffsetInWord}`
+        );
+        val = bytesSplice(val, newBytes, loc.endOffsetInWord - newBytes.length);
+    } else {
+        nyi(`stor_assignValue(${typ.pp()}, ${loc.address}, ${value})`);
+    }
+
+    return storage.set(loc.address, val);
+}
+
+export function isTypePrimitive(t: sol.TypeNode): boolean {
+    if (
+        t instanceof sol.IntType ||
+        t instanceof sol.BoolType ||
+        t instanceof sol.AddressType ||
+        t instanceof sol.FixedBytesType ||
+        t instanceof sol.FunctionType
+    ) {
+        return true;
+    }
+
+    if (t instanceof sol.PointerType) {
+        return false;
+    }
+
+    /*
+    if (
+        t instanceof sol.UserDefinedType &&
+        (t.definition instanceof sol.ContractDefinition ||
+            t.definition instanceof sol.EnumDefinition)
+    ) {
+        return true;
+    }
+
+    if (
+        t instanceof sol.ArrayType ||
+        t instanceof sol.MappingType ||
+        (t instanceof sol.UserDefinedType && t.definition instanceof sol.StructDefinition)
+    ) {
+        return false;
+    }
+    */
+
+    nyi(`isPrimitive(${t.pp()})`);
+}
 
 export async function asyncMap<T1, T2>(
     arr: T1[],
@@ -174,16 +245,6 @@ export function getFunCallTarget(
     return callee;
 }
 
-export function coerceToLValue(val: SolValue): LValue {
-    if (val instanceof Array) {
-        return val.map(coerceToLValue);
-    }
-
-    sol.assert(typeof val === "object" && "kind" in val, ``);
-
-    return val;
-}
-
 export function bigintToInt(v: bigint, min?: number, max?: number): number {
     min = min === undefined ? Number.MIN_SAFE_INTEGER : min;
     max = max === undefined ? Number.MAX_SAFE_INTEGER : max;
@@ -257,14 +318,8 @@ export function grabInheritanceArgs(
 
         grabInheritanceArgs(base, argsMap, parentScopeMap);
 
-        if (inheritanceSpecifier.vArguments.length) {
-            /**
-             * Overwrite here is just fine as Solc 0.4+ does the same (with warning).
-             * Solc 0.5+ will not compile at all.
-             */
-            argsMap.set(base, inheritanceSpecifier.vArguments);
-            parentScopeMap.set(base, contract);
-        }
+        argsMap.set(base, inheritanceSpecifier.vArguments);
+        parentScopeMap.set(base, contract);
     }
 
     if (contract.vConstructor) {

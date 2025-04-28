@@ -20,6 +20,7 @@ import {
     StorageLocation
 } from "..";
 import { MAX_ARR_DECODE_LIMIT, uint256 } from "../..";
+import { SolValue } from "../../solvm/state";
 import { MapKeys, topExtFrame } from "../tracers/transformers";
 import { cd_decodeArrayContents, cd_decodeValue } from "./calldata";
 import { mem_decodeIndexLoc, mem_decodeValue } from "./memory";
@@ -187,7 +188,7 @@ export function decodeValue(
  */
 export function decodeIndexLoc(
     view: DataView,
-    idx: bigint | Uint8Array,
+    idx: SolValue,
     state: StepState,
     infer: InferType
 ): DataView | undefined {
