@@ -88,7 +88,8 @@
                 "lib/forge-std/lib/ds-test/src/test.sol:112:12 DSTest.assertEq(0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0, 0x0000000000000000000000000000000000000002)",
                 "test/Cheatcodes.t.sol:84:5 CheatcodeTest.testBothPranks03()"
             ],
-            "decodedEvents": [["log", [["", "Error: a == b not satisfied [address]"]]]]
+            "decodedEvents": [["log", [["", "Error: a == b not satisfied [address]"]]]],
+            "decodedCalldata": "testBothPranks03()"
         }
     ]
 }

@@ -93,7 +93,8 @@
             "errorStack": [
                 "test/expectRevert.t.sol:405:12 Test_expectRevert.test_expectRevert_22()"
             ],
-            "decodedEvents": [["AssertionFailed", [["message", "test_expectRevert_22@2"]]]]
+            "decodedEvents": [["AssertionFailed", [["message", "test_expectRevert_22@2"]]]],
+            "decodedCalldata": "test_expectRevert_22()"
         }
     ]
 }

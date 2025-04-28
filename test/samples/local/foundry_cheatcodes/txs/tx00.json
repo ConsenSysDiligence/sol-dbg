@@ -104,7 +104,8 @@
                         ["val", "19"]
                     ]
                 ]
-            ]
+            ],
+            "decodedCalldata": "testRoll()"
         }
     ]
 }

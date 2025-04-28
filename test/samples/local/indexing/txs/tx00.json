@@ -58,9 +58,8 @@
             "errorStack": [
                 "test/samples/local/indexing/contracts/main.sol Test.indexCalldataArray([44, 43, 42, 41, 40])"
             ],
-            "expectedIndices": [
-                ["a", [3], "41"]
-            ]
+            "expectedIndices": [["a", [3], "41"]],
+            "decodedCalldata": "indexCalldataArray([44, 43, 42, 41, 40])"
         }
     ]
 }

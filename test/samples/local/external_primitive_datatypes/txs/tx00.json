@@ -54,7 +54,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "decodedCalldata": "wasntMe(0x0000000000000000000000000000000000000000)"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -74,7 +75,8 @@
             "errorString": "assert(a != address(this))",
             "errorStack": [
                 "test/samples/local/external_primitive_datatypes/contracts/main.sol Failing.wasntMe(0xf084a83954ce917799e0b4dbd03934a2ea65888c)"
-            ]
+            ],
+            "decodedCalldata": "wasntMe(0xf084a83954ce917799e0b4dbd03934a2ea65888c)"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -91,7 +93,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "decodedCalldata": "isAll42(2a2a2a2a2a2a2a)"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -111,7 +114,8 @@
             "errorString": "assert(b[i] == bytes1(0x2a))",
             "errorStack": [
                 "test/samples/local/external_primitive_datatypes/contracts/main.sol Failing.isAll42(2a2a2a2a2a2a2b)"
-            ]
+            ],
+            "decodedCalldata": "isAll42(2a2a2a2a2a2a2b)"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -128,7 +132,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "decodedCalldata": "areDifferent(true,ffffffffff,0000000000)"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -148,7 +153,8 @@
             "errorString": "assert(c == bytes5(uint40((1 << 40) - 1)))",
             "errorStack": [
                 "test/samples/local/external_primitive_datatypes/contracts/main.sol Failing.areDifferent(true, ffffffffff, 0100000000)"
-            ]
+            ],
+            "decodedCalldata": "areDifferent(true,ffffffffff,0100000000)"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -165,7 +171,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "decodedCalldata": "areDifferent(false,0a0b0c0d0e,0a0b0c0d0e)"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -185,7 +192,8 @@
             "errorString": "assert(c == bytes5(uint40(0x0)))",
             "errorStack": [
                 "test/samples/local/external_primitive_datatypes/contracts/main.sol Failing.areDifferent(false, 1a0b0c0d0e, 0a0b0c0d0e)"
-            ]
+            ],
+            "decodedCalldata": "areDifferent(false,1a0b0c0d0e,0a0b0c0d0e)"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -202,7 +210,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "decodedCalldata": "isConcat(25994377907754200443621621894611996396710692477276620992200926367528997506143,95401788518828737164849068496112995423,76390610959261840103023727920302156120)"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -222,7 +231,8 @@
             "errorString": "assert(n == t)",
             "errorStack": [
                 "test/samples/local/external_primitive_datatypes/contracts/main.sol Failing.isConcat(25994377907754200443621621894611996396710692477276620992200926367528997506143, 95401788518828737164849068496112995423, 76390610959261840103023727920302156121)"
-            ]
+            ],
+            "decodedCalldata": "isConcat(25994377907754200443621621894611996396710692477276620992200926367528997506143,95401788518828737164849068496112995423,76390610959261840103023727920302156121)"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -239,7 +249,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "decodedCalldata": "shouldBeO3(E.O3)"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -259,7 +270,8 @@
             "errorString": "assert(e == E.O3)",
             "errorStack": [
                 "test/samples/local/external_primitive_datatypes/contracts/main.sol Failing.shouldBeO3(E.O4)"
-            ]
+            ],
+            "decodedCalldata": "shouldBeO3(E.O4)"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -276,7 +288,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "decodedCalldata": "wasntMe2(0xf084a83954ce917799e0b4dbd03934a2ea65888d)"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -297,7 +310,8 @@
             "errorStack": [
                 "test/samples/local/external_primitive_datatypes/contracts/main.sol Failing.checkItsNotMe(0xf084a83954ce917799e0b4dbd03934a2ea65888c, 0xf084a83954ce917799e0b4dbd03934a2ea65888c)",
                 "test/samples/local/external_primitive_datatypes/contracts/main.sol Failing.wasntMe2(0xf084a83954ce917799e0b4dbd03934a2ea65888c)"
-            ]
+            ],
+            "decodedCalldata": "wasntMe2(0xf084a83954ce917799e0b4dbd03934a2ea65888c)"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -314,7 +328,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "decodedCalldata": "isPositive(1)"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -334,7 +349,8 @@
             "errorString": "assert(DummyInt16.unwrap(t) > 0)",
             "errorStack": [
                 "test/samples/local/external_primitive_datatypes/contracts/main.sol Failing.isPositive(-1)"
-            ]
+            ],
+            "decodedCalldata": "isPositive(-1)"
         }
     ]
 }

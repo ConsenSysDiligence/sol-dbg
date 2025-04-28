@@ -63,6 +63,8 @@ export interface TestStep extends TxDesc {
     decodedReturns?: any[][];
     // Set of indices to try
     expectedIndices: [string, any[], string];
+    // What the calldata should decode to
+    decodedCalldata?: string;
 }
 
 export interface TestCase extends Scenario {

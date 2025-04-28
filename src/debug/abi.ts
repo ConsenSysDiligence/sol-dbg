@@ -1,16 +1,13 @@
 import { bytesToHex } from "ethereum-cryptography/utils";
 import {
-    AddressType,
     ArrayType,
-    BytesType,
     ContractDefinition,
+    DataLocation,
     EnumDefinition,
     FunctionDefinition,
     InferType,
-    MappingType,
+    PackedArrayType,
     PointerType,
-    StateVariableVisibility,
-    StringType,
     StructDefinition,
     TupleType,
     TypeName,
@@ -25,11 +22,13 @@ import {
     types
 } from "solc-typed-ast";
 import { ABIEncoderVersion } from "solc-typed-ast/dist/types/abi";
-import { getFunctionSelector, zip } from "../utils/misc";
+import { getFunctionSelector, repeat, zip } from "../utils/misc";
 import { abiStaticTypeSize } from "../utils/solidity";
 import { IArtifactManager } from "./artifact_manager";
 import { cd_decodeValue } from "./decoding/calldata/decode";
+import { TupleCalldataView } from "./decoding/calldata/view";
 import { mem_decodeValue } from "./decoding/memory/decoding";
+import { View } from "./decoding/view";
 import {
     DataLocationKind,
     DataView,
@@ -88,6 +87,7 @@ export function isTypeUnknownContract(t: TypeName | undefined): boolean {
 }
 
 /**
+ * TODO: remove
  * An ABI-decoder implementation that is resilient to failures in some arguments decoding.
  * This function will return partial decoding results. This is needed since the fuzzer may not
  * always produce inputs that decode in their entirety.
@@ -133,7 +133,7 @@ export function buildMsgDataViews(
     const len = data.length;
 
     for (const [name, originalType] of formals) {
-        const typ = toABIEncodedType(originalType, infer, encoderVersion);
+        const typ = infer.toABIEncodedType(originalType, encoderVersion);
         const staticSize = abiStaticTypeSize(typ);
         const loc =
             baseOff + staticOff + staticSize <= len
@@ -167,152 +167,20 @@ export function buildMsgDataViews(
  *  1. Check again that its not possible for tuples in internal calls to somehow get encoded on the stack
  *  2. What happens with return tuples? Are they always in memory?
  */
-function isTypeEncodingDynamic(typ: TypeNode): boolean {
-    if (
-        typ instanceof PointerType ||
-        typ instanceof ArrayType ||
-        typ instanceof StringType ||
-        typ instanceof BytesType
-    ) {
-        return true;
-    }
-
-    // Tuples in calldata with static elements
-    if (typ instanceof TupleType) {
-        for (const elT of typ.elements) {
-            assert(elT !== null, ``);
-
-            if (isTypeEncodingDynamic(elT)) {
-                return true;
-            }
-        }
-
+export function isTypeEncodedInline(typ: TypeNode): boolean {
+    if (!(typ instanceof PointerType)) {
         return false;
     }
 
+    if (typ.to instanceof PackedArrayType) {
+        return true;
+    }
+
+    if (typ.to instanceof ArrayType && typ.to.size === undefined) {
+        return true;
+    }
+
     return false;
-}
-
-/**
- * Convert an internal TypeNode to the external TypeNode that would correspond to it
- * after ABI-encoding with encoder version `encoderVersion`. Follows the following rules:
- *
- * 1. Contract definitions turned to address.
- * 2. Enum definitions turned to uint of minimal fitting size.
- * 3. Any storage pointer types are converted to memory pointer types.
- * 4. Throw an error on any nested mapping types.
- * 5. Fixed-size arrays with fixed-sized element types are encoded as inlined tuples
- * 6. Structs with fixed-sized elements are encoded as inlined tuples
- *
- * @see https://docs.soliditylang.org/en/latest/abi-spec.html
- */
-export function toABIEncodedType(
-    type: TypeNode,
-    infer: InferType,
-    encoderVersion: ABIEncoderVersion
-): TypeNode {
-    if (type instanceof MappingType) {
-        throw new Error("Cannot abi-encode mapping types");
-    }
-
-    if (type instanceof ArrayType) {
-        const encodedElementT = toABIEncodedType(type.elementT, infer, encoderVersion);
-
-        if (type.size !== undefined) {
-            const elements = [];
-
-            for (let i = 0; i < type.size; i++) {
-                elements.push(encodedElementT);
-            }
-
-            return new TupleType(elements);
-        }
-
-        return new ArrayType(encodedElementT, type.size);
-    }
-
-    if (type instanceof PointerType) {
-        const toT = toABIEncodedType(type.to, infer, encoderVersion);
-
-        return isTypeEncodingDynamic(toT) ? new PointerType(toT, type.location) : toT;
-    }
-
-    if (type instanceof UserDefinedType) {
-        if (type.definition instanceof UserDefinedValueTypeDefinition) {
-            return infer.typeNameToTypeNode(type.definition.underlyingType);
-        }
-
-        if (type.definition instanceof ContractDefinition) {
-            return new AddressType(false);
-        }
-
-        if (type.definition instanceof EnumDefinition) {
-            return enumToIntType(type.definition);
-        }
-
-        if (type.definition instanceof StructDefinition) {
-            assert(
-                encoderVersion !== ABIEncoderVersion.V1,
-                "Getters of struct return type are not supported by ABI encoder v1"
-            );
-
-            const fieldTs = type.definition.vMembers.map((fieldT: VariableDeclaration) =>
-                infer.variableDeclarationToTypeNode(fieldT)
-            );
-
-            return new TupleType(
-                fieldTs.map((fieldT: TypeNode) => toABIEncodedType(fieldT, infer, encoderVersion))
-            );
-        }
-    }
-
-    return type;
-}
-
-/**
- * Given a 4-byte selector, a target contract and an `InferType` object return
- * the ASTNode that corresponds to the target callee. Must be either a
- * `FunctionDefinition`, a `VariableDeclaration` (for public state var getters),
- * or undefined (if we cannot identify it)
- */
-export function findMethodBySelector(
-    selector: Uint8Array | string,
-    contract: ContractDefinition,
-    infer: InferType
-): FunctionDefinition | VariableDeclaration | undefined {
-    const strSelector = typeof selector === "string" ? selector : bytesToHex(selector);
-
-    for (const base of contract.vLinearizedBaseContracts) {
-        if (!base) {
-            continue;
-        }
-
-        for (const fun of base.vFunctions) {
-            const funSel = getFunctionSelector(fun, infer);
-            if (funSel == strSelector) {
-                return fun;
-            }
-        }
-
-        for (const v of base.vStateVariables) {
-            if (v.visibility !== StateVariableVisibility.Public) {
-                continue;
-            }
-
-            let hash: string | undefined;
-
-            try {
-                hash = infer.signatureHash(v);
-            } catch (e) {
-                continue;
-            }
-
-            if (hash == strSelector) {
-                return v;
-            }
-        }
-    }
-    return undefined;
 }
 
 /**
@@ -337,7 +205,7 @@ function buildEventDataViews(
         }
 
         // @todo (dimo) Is it ok to hardcode the encoder version here?
-        const typ = toABIEncodedType(originalType, infer, ABIEncoderVersion.V2);
+        const typ = infer.toABIEncodedType(originalType, ABIEncoderVersion.V2);
         const staticSize = abiStaticTypeSize(typ);
         const loc: LinearMemoryLocation | undefined =
             staticOff + staticSize <= len
@@ -416,4 +284,182 @@ export function decodeEvent(
         def: defInfo,
         args: argVals
     };
+}
+
+function toABIEncodedType(
+    type: TypeNode,
+    encoderVersion: ABIEncoderVersion,
+    normalizePointers = false,
+    infer: InferType
+): TypeNode {
+    assert(
+        infer.isABIEncodable(type, encoderVersion),
+        'Can not ABI-encode type "{0}" with encoder "{1}"',
+        type,
+        encoderVersion
+    );
+
+    if (type instanceof ArrayType) {
+        const elT = toABIEncodedType(type.elementT, encoderVersion, normalizePointers, infer);
+
+        if (type.size !== undefined) {
+            return new TupleType(repeat(elT, Number(type.size)));
+        }
+
+        return new ArrayType(elT, type.size);
+    }
+
+    if (type instanceof PointerType) {
+        const toT = toABIEncodedType(type.to, encoderVersion, normalizePointers, infer);
+
+        if (toT instanceof TupleType) {
+            return toT;
+        }
+
+        if (toT instanceof PackedArrayType || toT instanceof ArrayType) {
+            return new PointerType(toT, normalizePointers ? DataLocation.Memory : type.location);
+        }
+
+        assert(false, `Unexpected ABI pointer type {0}`, toT);
+    }
+
+    if (type instanceof UserDefinedType) {
+        if (type.definition instanceof UserDefinedValueTypeDefinition) {
+            return infer.typeNameToTypeNode(type.definition.underlyingType);
+        }
+
+        if (type.definition instanceof ContractDefinition) {
+            return types.address;
+        }
+
+        if (type.definition instanceof EnumDefinition) {
+            return enumToIntType(type.definition);
+        }
+
+        if (type.definition instanceof StructDefinition) {
+            const fieldTs = type.definition.vMembers.map((fieldT) =>
+                infer.variableDeclarationToTypeNode(fieldT)
+            );
+
+            return new TupleType(
+                fieldTs.map((fieldT) =>
+                    toABIEncodedType(fieldT, encoderVersion, normalizePointers, infer)
+                )
+            );
+        }
+    }
+
+    return type;
+}
+
+/**
+ * Lift a value corresponding to an ABI type to a value corresponding to the "original" type.
+ * We only lift tuples back up to structs here
+ */
+export function liftABIValue(value: any, originalType: TypeNode, infer: InferType): any {
+    if (originalType instanceof PointerType) {
+        if (originalType.to instanceof ArrayType) {
+            const elT = originalType.to.elementT;
+            assert(value instanceof Array, ``);
+            return value.map((el) => liftABIValue(el, elT, infer));
+        }
+
+        if (
+            originalType.to instanceof UserDefinedType &&
+            originalType.to.definition instanceof StructDefinition
+        ) {
+            const fields = originalType.to.definition.vMembers;
+            const res: any = {};
+
+            assert(value instanceof Array && value.length === fields.length, ``);
+            for (let i = 0; i < fields.length; i++) {
+                const field = fields[i];
+
+                try {
+                    const fieldT = infer.variableDeclarationToTypeNode(field);
+                    res[field.name] = liftABIValue(value[i], fieldT, infer);
+                } catch (e) {
+                    res[field.name] = undefined;
+                }
+            }
+
+            return res;
+        }
+    }
+
+    if (originalType instanceof TupleType) {
+        assert(value instanceof Array, ``);
+        return value.map((el, i) => liftABIValue(el, originalType.elements[i] as TypeNode, infer));
+    }
+
+    return value;
+}
+
+/**
+ * An ABI-decoder implementation that is resilient to failures in some arguments decoding.
+ * This function will return partial decoding results. This is needed since the fuzzer may not
+ * always produce inputs that decode in their entirety.
+ */
+export function buildCalldataViews(
+    callee: FunctionDefinition | VariableDeclaration,
+    calldata: Uint8Array,
+    infer: InferType
+): Array<[string, View | undefined, TypeNode]> {
+    const res: Array<[string, View | undefined, TypeNode]> = [];
+    let baseOff;
+
+    if (callee instanceof FunctionDefinition && callee.isConstructor) {
+        baseOff = 0;
+    } else {
+        baseOff = 4;
+        const selector =
+            callee instanceof FunctionDefinition
+                ? getFunctionSelector(callee, infer)
+                : infer.signatureHash(callee);
+
+        assert(
+            selector === bytesToHex(calldata.slice(0, 4)),
+            `Expected selector ${selector} instead got ${calldata.slice(0, 4)}`
+        );
+    }
+
+    const formals: Array<[string, TypeNode]> =
+        callee instanceof FunctionDefinition
+            ? callee.vParameters.vParameters.map((argDef: VariableDeclaration) => [
+                  argDef.name,
+                  isTypeUnknownContract(argDef.vType)
+                      ? types.address
+                      : infer.variableDeclarationToTypeNode(argDef)
+              ])
+            : infer
+                  .getterArgsAndReturn(callee)[0]
+                  .map((typ: TypeNode, i: number) => [`ARG_${i}`, typ]);
+
+    let argStaticOff = 0;
+    const len = calldata.length;
+
+    for (const [name, originalType] of formals) {
+        if (baseOff + argStaticOff + 32 > len) {
+            res.push([name, undefined, originalType]);
+        }
+
+        try {
+            const abiType = toABIEncodedType(originalType, ABIEncoderVersion.V2, false, infer);
+            const view = TupleCalldataView.decodeElementAt(
+                abiType,
+                infer,
+                BigInt(baseOff + argStaticOff),
+                BigInt(baseOff),
+                calldata
+            );
+
+            res.push([name, view, originalType]);
+        } catch (e) {
+            res.push([name, undefined, originalType]);
+        }
+
+        argStaticOff += 32;
+    }
+
+    return res;
 }

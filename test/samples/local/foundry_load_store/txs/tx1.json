@@ -103,7 +103,8 @@
                         ["val", "20"]
                     ]
                 ]
-            ]
+            ],
+            "decodedCalldata": "testStore()"
         }
     ]
 }

@@ -54,7 +54,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "decodedCalldata": "allNonZero([1, 2, 3])"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -74,7 +75,8 @@
             "errorString": "assert(arr[i] != 0)",
             "errorStack": [
                 "test/samples/local/arrays/contracts/main.sol Arrays.allNonZero([1, 2, 0])"
-            ]
+            ],
+            "decodedCalldata": "allNonZero([1, 2, 0])"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -91,7 +93,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "decodedCalldata": "allNonZeroExt([5, 6, 7])"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -111,7 +114,8 @@
             "errorString": "assert(arr[i] != 0)",
             "errorStack": [
                 "test/samples/local/arrays/contracts/main.sol Arrays.allNonZeroExt([5, 0, 7])"
-            ]
+            ],
+            "decodedCalldata": "allNonZeroExt([5, 0, 7])"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -128,7 +132,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "decodedCalldata": "noByte42(0x2b2b2b2b)"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -148,7 +153,8 @@
             "errorString": "assert(b[i] != 0x2a)",
             "errorStack": [
                 "test/samples/local/arrays/contracts/main.sol Arrays.noByte42(0x2b2b2b2a)"
-            ]
+            ],
+            "decodedCalldata": "noByte42(0x2b2b2b2a)"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -165,7 +171,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "decodedCalldata": "checkBytesEq(0x2a2b2c2d2e2f,0x2a2b2c2d2e2f)"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -185,7 +192,8 @@
             "errorString": "assert(a.length == b.length)",
             "errorStack": [
                 "test/samples/local/arrays/contracts/main.sol Arrays.checkBytesEq(0x2a2b2c2d2e2f, 0x2a2b2c2d2e)"
-            ]
+            ],
+            "decodedCalldata": "checkBytesEq(0x2a2b2c2d2e2f,0x2a2b2c2d2e)"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -205,7 +213,8 @@
             "errorString": "assert(a[i] == b[i])",
             "errorStack": [
                 "test/samples/local/arrays/contracts/main.sol Arrays.checkBytesEq(0x2a2b2c2d2e2f, 0x2a2b2c2d2e3f)"
-            ]
+            ],
+            "decodedCalldata": "checkBytesEq(0x2a2b2c2d2e2f,0x2a2b2c2d2e3f)"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -222,7 +231,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "decodedCalldata": "checkStrEq(\"what am I doing?\",\"what am I doing?\")"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -243,7 +253,8 @@
             "errorStack": [
                 "test/samples/local/arrays/contracts/main.sol Arrays.checkBytesEq(0x7768617420616d204920646f696e673f, 0x7768617420616d204920646f696e3f)",
                 "test/samples/local/arrays/contracts/main.sol Arrays.checkStrEq(\"what am I doing?\", \"what am I doin?\")"
-            ]
+            ],
+            "decodedCalldata": "checkStrEq(\"what am I doing?\",\"what am I doin?\")"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -260,7 +271,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "decodedCalldata": "noZeros2D([[1, 2, 3], [4, 5], [6, 7, 8, 9]])"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -280,7 +292,8 @@
             "errorString": "assert(arr[i][j] != 0)",
             "errorStack": [
                 "test/samples/local/arrays/contracts/main.sol Arrays.noZeros2D([[1, 2, 3], [4, 0], [6, 7, 8, 9]])"
-            ]
+            ],
+            "decodedCalldata": "noZeros2D([[1, 2, 3], [4, 0], [6, 7, 8, 9]])"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -297,7 +310,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "decodedCalldata": "noZeros3D([[[1, 2, 3], [], [4]], [[5, 6, 7], [10], [8, 9]]])"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -317,7 +331,8 @@
             "errorString": "assert(arr[i][j][k] != 0)",
             "errorStack": [
                 "test/samples/local/arrays/contracts/main.sol Arrays.noZeros3D([[[1, 2, 3], [], [4]], [[5, 6, 7], [0], [8, 9]]])"
-            ]
+            ],
+            "decodedCalldata": "noZeros3D([[[1, 2, 3], [], [4]], [[5, 6, 7], [0], [8, 9]]])"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -334,7 +349,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "decodedCalldata": "noByte422D([0x2babde10fa, 0x2b, 0x0a0b0c0d0e0f])"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -355,7 +371,8 @@
             "errorStack": [
                 "test/samples/local/arrays/contracts/main.sol Arrays.noByte42(0x0a0b2a0d0e0f)",
                 "test/samples/local/arrays/contracts/main.sol Arrays.noByte422D([0x2babde10fa, 0x2b, 0x0a0b2a0d0e0f])"
-            ]
+            ],
+            "decodedCalldata": "noByte422D([0x2babde10fa, 0x2b, 0x0a0b2a0d0e0f])"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -372,7 +389,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "decodedCalldata": "noStringInArr([\"sup\", \"bruh\"],\"howsit\")"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -393,7 +411,8 @@
             "errorStack": [
                 "test/samples/local/arrays/contracts/main.sol Arrays.checkStrNEq(\"bruh\", \"bruh\")",
                 "test/samples/local/arrays/contracts/main.sol Arrays.noStringInArr([\"sup\", \"bruh\"], \"bruh\")"
-            ]
+            ],
+            "decodedCalldata": "noStringInArr([\"sup\", \"bruh\"],\"bruh\")"
         }
     ]
 }

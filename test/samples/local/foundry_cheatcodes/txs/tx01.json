@@ -104,7 +104,8 @@
                         ["val", "67"]
                     ]
                 ]
-            ]
+            ],
+            "decodedCalldata": "testWarp()"
         }
     ]
 }

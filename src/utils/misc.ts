@@ -303,6 +303,10 @@ export function nyi(s: string): never {
     assert(false, s);
 }
 
+export function fail(s: string): never {
+    assert(false, s);
+}
+
 export function single<T>(a: T[]): T {
     if (a.length !== 1) {
         assert(false, `Expected 1 element not ${a.length}`);

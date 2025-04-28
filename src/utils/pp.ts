@@ -37,7 +37,7 @@ import { ExternalFrame, Frame, FrameKind, StepState } from "../debug/types";
 const srcLocation = require("src-location");
 const fse = require("fs-extra");
 
-function ppValue(typ: TypeNode, v: any, infer: InferType): string {
+export function ppValue(typ: TypeNode, v: any, infer: InferType): string {
     if (v === undefined) {
         return `<failed decoding>`;
     }

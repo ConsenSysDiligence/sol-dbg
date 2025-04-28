@@ -103,7 +103,8 @@
                         ["val", "17"]
                     ]
                 ]
-            ]
+            ],
+            "decodedCalldata": "testLoad()"
         }
     ]
 }

@@ -54,7 +54,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "decodedCalldata": "allNonZero([1, 2, 3])"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -74,7 +75,8 @@
             "errorString": "assert(arr[i] != 0)",
             "errorStack": [
                 "test/samples/local/arrays_cd_05/contracts/main.sol Arrays.allNonZero([1, 2, 0])"
-            ]
+            ],
+            "decodedCalldata": "allNonZero([1, 2, 0])"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -91,7 +93,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "decodedCalldata": "allNonZeroExt([5, 6, 7])"
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -111,7 +114,8 @@
             "errorString": "assert(arr[i] != 0)",
             "errorStack": [
                 "test/samples/local/arrays_cd_05/contracts/main.sol Arrays.allNonZeroExt([5, 0, 7])"
-            ]
+            ],
+            "decodedCalldata": "allNonZeroExt([5, 0, 7])"
         }
     ]
 }

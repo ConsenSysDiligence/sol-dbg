@@ -73,7 +73,8 @@
                 "kind": "value_returned",
                 "value": ""
             },
-            "liveContracts": ["0x1faca6f2f8e169c54e0b1fe6d889dfc21ab5737e"]
+            "liveContracts": ["0x1faca6f2f8e169c54e0b1fe6d889dfc21ab5737e"],
+            "decodedCalldata": "die()"
         },
         {
             "address": "0x0000000000000000000000000000000000000000",
@@ -135,7 +136,8 @@
                 "0x66d9baa1e8afa844766e15103b3b2a533304af5b",
                 "0x8d57cb6b2c9889b43514e729b70c17d7afb8227c",
                 "0x99ef7cc5214b804f7ffba13c70a2d7c2f9763d60"
-            ]
+            ],
+            "decodedCalldata": "die()"
         },
         {
             "address": "0x5706659cf82b70d4b805ba2e9540cbc1b60fec22",
@@ -157,7 +159,8 @@
                 "0x5706659cf82b70d4b805ba2e9540cbc1b60fec22",
                 "0x66d9baa1e8afa844766e15103b3b2a533304af5b",
                 "0x99ef7cc5214b804f7ffba13c70a2d7c2f9763d60"
-            ]
+            ],
+            "decodedCalldata": "die()"
         },
         {
             "address": "0x66d9baa1e8afa844766e15103b3b2a533304af5b",
@@ -178,7 +181,8 @@
             "liveContracts": [
                 "0x66d9baa1e8afa844766e15103b3b2a533304af5b",
                 "0x99ef7cc5214b804f7ffba13c70a2d7c2f9763d60"
-            ]
+            ],
+            "decodedCalldata": "die()"
         },
         {
             "address": "0x99ef7cc5214b804f7ffba13c70a2d7c2f9763d60",
@@ -196,7 +200,8 @@
                 "kind": "value_returned",
                 "value": ""
             },
-            "liveContracts": ["0x99ef7cc5214b804f7ffba13c70a2d7c2f9763d60"]
+            "liveContracts": ["0x99ef7cc5214b804f7ffba13c70a2d7c2f9763d60"],
+            "decodedCalldata": "die()"
         },
         {
             "address": "0x99ef7cc5214b804f7ffba13c70a2d7c2f9763d60",
@@ -214,7 +219,8 @@
                 "kind": "value_returned",
                 "value": ""
             },
-            "liveContracts": []
+            "liveContracts": [],
+            "decodedCalldata": "die()"
         }
     ]
 }

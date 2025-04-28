@@ -1,0 +1,151 @@
+Milestone 0: read and write Solidity datastrutures in storage,calldata and memory
+  - implement indexInto for calldata
+    - array
+      - test
+    - packed array
+        - test
+  - implement indexInto for memory
+    - array
+        - test
+    - packed array
+        - test
+  - implement indexInto for storage
+    - array
+        - test
+    - packed array
+        - test
+    - map
+        - test
+
+  - test for get contract layout
+
+  - implement arrayLength for calldata array
+      - test
+  - implement arrayLength for calldata packed array
+      - test
+  - implement arrayLength for memory array
+      - test
+  - implement arrayLength for calldata packed array
+      - test
+
+  - implement memberOf for calldata
+    - struct
+      - test
+
+  - implement memberOf for memory
+    - struct
+      - test
+
+  - implement memberOf for storage
+    - struct
+      - test
+    
+  - document
+
+///// TODO: Read through this. Delete and integrate anything useful into existing plan
+
+
+The first draft is getting unwiedly. Time to simplify. Current problems:
+
+0. Simplift state:
+
+SolValue = bigint | bool | Address | Uint8Array /* fixed bytes */ | SolTuple | Poison | DataView
+
+1. Scope classes are getting confusing:
+    - Single Scope class, just contains
+
+{
+  node: ASTNode
+  defs: Map<string | number, SolVal>
+
+  get(name: string | number, SolVal>
+  set(name: string | number, SolVal>
+}
+    
+
+2. Typed values vs. Untyped values?
+   - IDK. 
+
+3. The data view thing is getting confusing
+
+4. First implement the index and member functions in decoding and test them separately, move the contract layout and any other relevant functionality
+
+5. Separate expression eval from statement exec in 2 classes, 2 files
+
+6. Eval should work with "failing" storage
+
+7. Add a global class for "WorldState" containing: Storage, Memory, Transient, Message, Block, Constant
+  - Problem: Adding "Constant" to DataLocation requires a SolDataLocation
+
+8. Add "failing" classes for Storage, Memory, Transient, Message, Block (for use with constant eval). Add helper for constantEval
+
+Plan:
+
+0. Move contract layout and any storage decoding functions
+0.5. Move exception info
+1. Add index, member, length functions to general, storage, memory
+  - re-factor cd views to include base off
+  - clean test run - no need
+  - add indexInto for CD
+
+  - add test for indexInto for CD
+
+  - add indexInto for remaining
+  - add test for indexInto for remaining
+
+  - add static, dynamic and total size
+  - add test for sizes
+  - add encodeValue()
+  - add test for encodeValue()
+  - add memberOf
+  - add test for memberOf
+  - add arrLen
+  - add test for arrLen
+
+2. Add tests for those?
+  - find entry point
+  - get contract layout
+  - index storage (map, array, bytes), index memory (map, array, bytes), member storage (struct, array len) member memory (struct, array len)
+  - add a test with indexing into a multidimensional cd array
+
+3. Add state definitions
+4. Add failing versions of those
+5. Copy over evaluator
+6. Split into expression and subclassing statement exec
+7. Move over testing infrastructure
+
+
+
+/**
+ * Given a view to an "indexable" type, an index value, and the state, return
+ * the value (or view) at that index. For primitive value types we return the
+ * value, if the value type is complex, we return a view to that type.
+ */
+/*
+export function indexInto(view: DataView, index: any, state: StepState, infer: InferType): any {
+    const typ = view.type;
+    const loc = view.loc;
+
+    assert(typ instanceof PointerType, `Unexpected non-indexable type {0}`, typ);
+
+    const toT = typ.to;
+
+    assert(
+        toT instanceof MappingType || toT instanceof ArrayType || toT instanceof PackedArrayType,
+        `Unexpected non-indexable type {0}`,
+        typ
+    );
+
+    if (typ instanceof PointerType && loc.kind === DataLocationKind.Stack) {
+        const off = st_decodeInt(uint256, loc, state.evmStack);
+
+        if (off === undefined) {
+            return undefined;
+        }
+
+        const kind: MemoryLocationKind = solLocToDataKind(typ.location);
+
+        if (kind === )
+    }
+}
+*/
