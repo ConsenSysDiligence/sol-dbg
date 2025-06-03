@@ -18,26 +18,6 @@ interface ContractMdStruct {
     experimental?: boolean;
 }
 
-function getAllStringsAfterPrefix(hay: string, prefix: string, expLen: number): string[] {
-    const res: string[] = [];
-
-    let off = hay.length;
-
-    while (true) {
-        off = hay.lastIndexOf(prefix, off - 1);
-
-        if (off === -1) {
-            return res;
-        }
-
-        if (off + prefix.length + expLen >= hay.length) {
-            continue;
-        }
-
-        res.push(hay.slice(off + prefix.length, off + prefix.length + expLen));
-    }
-}
-
 /**
  * Find the last (right-most) index in hay where `needle` appears. If `off` is specified, search before `off` (`off` inclusive).
  * If `needle` is not found, return -1;
@@ -108,44 +88,24 @@ const bzzr0BufPrefix = hexToBytes(bzzr0);
 const bzzr1 = "65627a7a72315820";
 const bzzr1BufPrefix = hexToBytes(bzzr1);
 
-function getBytecodeHashHacky(bytecode: string | Uint8Array): ContractMdStruct | undefined {
-    if (typeof bytecode === "string") {
-        const ipfsCandidates = new Set(getAllStringsAfterPrefix(bytecode, ipfsStrPrefix, 34));
-        const bzzr0Candidates = new Set(getAllStringsAfterPrefix(bytecode, bzzr0, 32));
-        const bzzr1Candidates = new Set(getAllStringsAfterPrefix(bytecode, bzzr1, 32));
+function getBytecodeHashHacky(bytecode: Uint8Array): ContractMdStruct | undefined {
+    const ipfsCandidates = new Set(getAllBuffersAfterPrefix(bytecode, ipfsBufPrefix, 34));
+    const bzzr0Candidates = new Set(getAllBuffersAfterPrefix(bytecode, bzzr0BufPrefix, 32));
+    const bzzr1Candidates = new Set(getAllBuffersAfterPrefix(bytecode, bzzr1BufPrefix, 32));
 
-        if (ipfsCandidates.size + bzzr0Candidates.size + bzzr1Candidates.size !== 1) {
-            return undefined;
-        }
-
-        if (ipfsCandidates.size === 1) {
-            return { ipfs: [...ipfsCandidates][0] };
-        }
-
-        if (bzzr0Candidates.size === 1) {
-            return { bzzr0: [...bzzr0Candidates][0] };
-        }
-
-        return { bzzr1: [...bzzr1Candidates][0] };
-    } else {
-        const ipfsCandidates = new Set(getAllBuffersAfterPrefix(bytecode, ipfsBufPrefix, 34));
-        const bzzr0Candidates = new Set(getAllBuffersAfterPrefix(bytecode, bzzr0BufPrefix, 32));
-        const bzzr1Candidates = new Set(getAllBuffersAfterPrefix(bytecode, bzzr1BufPrefix, 32));
-
-        if (ipfsCandidates.size + bzzr0Candidates.size + bzzr1Candidates.size !== 1) {
-            return undefined;
-        }
-
-        if (ipfsCandidates.size === 1) {
-            return { ipfs: "0x" + bytesToHex([...ipfsCandidates][0]) };
-        }
-
-        if (bzzr0Candidates.size === 1) {
-            return { bzzr0: "0x" + bytesToHex([...bzzr0Candidates][0]) };
-        }
-
-        return { bzzr1: "0x" + bytesToHex([...bzzr1Candidates][0]) };
+    if (ipfsCandidates.size + bzzr0Candidates.size + bzzr1Candidates.size !== 1) {
+        return undefined;
     }
+
+    if (ipfsCandidates.size === 1) {
+        return { ipfs: "0x" + bytesToHex([...ipfsCandidates][0]) };
+    }
+
+    if (bzzr0Candidates.size === 1) {
+        return { bzzr0: "0x" + bytesToHex([...bzzr0Candidates][0]) };
+    }
+
+    return { bzzr1: "0x" + bytesToHex([...bzzr1Candidates][0]) };
 }
 
 function getDeployedBytecodeMdInfo(
@@ -231,7 +191,7 @@ export function getCodeHash(deplBytecode: UnprefixedHexString | Uint8Array): Hex
 }
 
 export function getCreationCodeHash(
-    creationBytecode: UnprefixedHexString | Uint8Array
+    creationBytecode: Uint8Array
 ): HexString | undefined {
     const md = getBytecodeHashHacky(creationBytecode);
 
