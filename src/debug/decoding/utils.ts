@@ -6,11 +6,7 @@ import {
     TypeNode
 } from "solc-typed-ast";
 import { MAX_ARR_DECODE_LIMIT, uint256 } from "../../utils/misc";
-import {
-    DataLocationKind,
-    MemoryLocationKind,
-    StackLocation,
-    StepState} from "../types";
+import { DataLocationKind, MemoryLocationKind, StackLocation, StepState } from "../types";
 import { st_decodeInt } from "./stack";
 
 export function solLocToMemoryLocationKind(loc: SolDataLocation): MemoryLocationKind {

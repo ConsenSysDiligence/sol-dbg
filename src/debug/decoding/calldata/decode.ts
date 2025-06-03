@@ -80,7 +80,7 @@ function cd_decodeFixedBytes(
     calldata: Memory
 ): undefined | [Uint8Array, number] {
     const res = cd_readMem(loc, typ.size, calldata);
-    return res === undefined ? undefined : [res, 32]; // @todo is 32 correct here???
+    return res === undefined ? undefined : [res, 32];
 }
 
 function cd_decodeBool(loc: CalldataLocation, calldata: Memory): undefined | [boolean, number] {

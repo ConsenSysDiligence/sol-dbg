@@ -452,19 +452,6 @@ export class ArtifactManager implements IArtifactManager {
             return undefined;
         }
 
-        // No data
-        if (data.length === 0) {
-            // First check if receive function is specified
-            const recvF = findReceiveFun(contract);
-
-            if (recvF) {
-                return recvF;
-            }
-
-            // Otherwise we fall back to the fallback fun
-            return findFallbackFun(contract);
-        }
-
         // Not enough data for a signature
         if (data.length < 4) {
             // First check if receive function is specified

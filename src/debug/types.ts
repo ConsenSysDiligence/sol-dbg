@@ -193,30 +193,71 @@ export interface StepVMState {
 
 /**
  * State that the debugger maintains for each trace step.
- * It includes the basic VM state (`StepVmState`) and optionally (if we have debug info for this contract)
- * includes the decoded source location, any AST nodes that are mapped to this instruction and any events
- * that may be emitted on this step.
+ * It includes the basic VM state (`StepVmState`) and all the info computed
+ * by additional transformers
  */
 export interface StepState extends StepVMState {
+    /**
+     * List of external call frames
+     */
     stack: ExternalFrame[];
+    /**
+     * If the current instruction is a return, include return information
+     */
     retInfo?: {
-        // Step at which the call that just returned started
+        /**
+         * Step at which the call that just returned started
+         */
         callStartStep: number;
-        // Raw returned data
+        /**
+         * Raw returned data
+         */
         rawReturnData: Uint8Array;
-        // Decoded returned data (if ast info is available)
+        /**
+         * Decoded returned data (if ast info is available)
+         */
         decodedReturnData?: any[];
     };
+    /**
+     * If the current instruction throws an exception, includes exception info
+     */
     excInfo?: {
+        /**
+         * Raw exception bytes
+         */
         data: Uint8Array;
     };
+    /**
+     * Internal call stack at the current instruction
+     */
     intStack: InternalCallFrame[];
+    /**
+     * Source location for the current instruction (if a src map is available)
+     */
     src: sol.DecodedBytecodeSourceMapEntry | undefined;
+    /**
+     * AST node that corresponds to the source location of the current instruction (if any)
+     */
     astNode: sol.ASTNode | undefined;
+    /**
+     * If the current instruction emits an event, includes the raw event info
+     */
     emittedEvent: EventDesc | undefined;
+    /**
+     * If we were able to decode the event, include the decoded event info
+     */
     decodedEvent: DecodedEventDesc | undefined;
+    /**
+     * If this is the instruction after we return from a create call, add the newly created address here.
+     */
     contractCreated?: Address;
+    /**
+     * If this is a SELFDESTRUCT instruction, recored the destroyed contract
+     */
     contractKilled?: Address;
+    /**
+     * If this is a KECCAK256 instruction record the preimage and the hash
+     */
     keccak?: {
         from: Uint8Array;
         to: bigint;
