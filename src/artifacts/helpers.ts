@@ -190,9 +190,7 @@ export function getCodeHash(deplBytecode: UnprefixedHexString | Uint8Array): Hex
     return undefined;
 }
 
-export function getCreationCodeHash(
-    creationBytecode: Uint8Array
-): HexString | undefined {
+export function getCreationCodeHash(creationBytecode: Uint8Array): HexString | undefined {
     const md = getBytecodeHashHacky(creationBytecode);
 
     if (md === undefined) {
