@@ -2,16 +2,16 @@ import { Common } from "@ethereumjs/common";
 import { TransactionFactory, TypedTransaction, TypedTxData } from "@ethereumjs/tx";
 import { Address, setLengthLeft } from "@ethereumjs/util";
 import { bytesToHex, hexToBytes } from "ethereum-cryptography/utils";
+import { FunctionDefinition, InferType, IntType, assert } from "solc-typed-ast";
 import {
-    ContractDefinition,
-    FunctionDefinition,
-    InferType,
-    IntType,
-    SourceUnit,
-    assert
-} from "solc-typed-ast";
-import { HexString, UnprefixedHexString } from "..";
-import { DataLocation, DataLocationKind, DataView, Stack, Storage } from "../debug/types";
+    DataLocation,
+    DataLocationKind,
+    DataView,
+    HexString,
+    Stack,
+    Storage,
+    UnprefixedHexString
+} from "../debug/types";
 
 export const ZERO_ADDRESS_STRING: HexString = "0x0000000000000000000000000000000000000000";
 export const ZERO_ADDRESS = Address.fromString(ZERO_ADDRESS_STRING);
@@ -79,36 +79,6 @@ export function makeFakeTransaction(
     return tx;
 }
 
-export function findContractDef(
-    units: SourceUnit[],
-    fileName: string,
-    contractName: string
-): ContractDefinition | undefined {
-    for (const unit of units) {
-        if (unit.sourceEntryKey !== fileName) {
-            continue;
-        }
-
-        for (const contract of unit.vContracts) {
-            if (contract.name === contractName) {
-                return contract;
-            }
-        }
-    }
-
-    return undefined;
-}
-
-export function resolveConstructor(contract: ContractDefinition): FunctionDefinition | undefined {
-    for (const contr of contract.vLinearizedBaseContracts) {
-        if (contr.vConstructor) {
-            return contr.vConstructor;
-        }
-    }
-
-    return undefined;
-}
-
 /**
  * Return the (inclusive) limits of a 2's complement int type as a pair `[min, max]` `bigint`s
  */
@@ -133,9 +103,13 @@ export function fits(val: bigint, typ: IntType): boolean {
 export function ppLoc(loc: DataLocation): string {
     return `{kind: ${loc.kind}, ${
         loc.kind === DataLocationKind.Stack ? "offsetFromTop" : "address"
-    }: ${loc.kind === DataLocationKind.Stack ? loc.offsetFromTop : loc.address.toString(16)}}${
-        loc.kind === DataLocationKind.Storage ? `, offsetInWord: ${loc.endOffsetInWord}` : ""
-    }`;
+    }: ${loc.kind === DataLocationKind.Stack ? loc.offsetFromTop : loc.address.toString(16)}${
+        loc.kind === DataLocationKind.Storage
+            ? `, offsetInWord: ${loc.endOffsetInWord}`
+            : loc.kind === DataLocationKind.CallData
+              ? `, base: ${loc.base}`
+              : ""
+    }}`;
 }
 
 /* istanbul ignore next */
@@ -159,33 +133,6 @@ export function ppStorage(storage: Storage): string {
 /* istanbul ignore next */
 export function ppEvmStack(stack: Stack): string {
     return stack.map((word) => bytesToHex(word)).join("\n");
-}
-
-/**
- * Given an `offset` into some memory `buf` check that its in-bounds.
- * Since `offset` may be a bigint we must check that it can be cast to Number without
- * loss of precision and afterwards, whether it fits into the buf.
- */
-export function checkAddrOoB(offset: bigint | number, buf: Uint8Array): number | undefined {
-    let numOff: number;
-
-    if (typeof offset === "bigint") {
-        // Check that the bigint address fits in a normal number
-        if (BigInt(Number(offset)) !== offset) {
-            return undefined;
-        }
-
-        numOff = Number(offset);
-    } else {
-        numOff = offset;
-    }
-
-    // OoB access
-    if (numOff < 0 || numOff + 32 > buf.length) {
-        return undefined;
-    }
-
-    return numOff;
 }
 
 /**
@@ -350,4 +297,16 @@ export function repeat<T>(x: T, n: number): T[] {
     }
 
     return res;
+}
+
+export function nyi(s: string): never {
+    assert(false, s);
+}
+
+export function single<T>(a: T[]): T {
+    if (a.length !== 1) {
+        assert(false, `Expected 1 element not ${a.length}`);
+    }
+
+    return a[0];
 }

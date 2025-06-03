@@ -1,8 +1,7 @@
-import { PrefixedHexString, bytesToBigInt } from "@ethereumjs/util";
+import { bytesToBigInt } from "@ethereumjs/util";
 import { keccak256 } from "ethereum-cryptography/keccak";
 import { bytesToHex, hexToBytes, utf8ToBytes } from "ethereum-cryptography/utils";
 import {
-    ASTContext,
     ASTNode,
     ASTReader,
     ContractDefinition,
@@ -19,24 +18,18 @@ import {
 } from "solc-typed-ast";
 import { ABIEncoderVersion, abiTypeToCanonicalName } from "solc-typed-ast/dist/types/abi";
 import {
-    DecodedBytecodeSourceMapEntry,
-    EventDefInfo,
-    EventDesc,
-    PartialBytecodeDescription,
-    PartialCompiledContract,
-    PartialSolcOutput,
-    RawAST,
-    UnprefixedHexString,
     detectArtifactCompilerVersion,
-    fastParseBytecodeSourceMapping,
-    findContractDef,
     getCodeHash,
-    getCreationCodeHash,
-    zip3
-} from "../..";
-import { HexString } from "../../artifacts";
+    getCreationCodeHash
+} from "../../artifacts/helpers";
+import { PartialBytecodeDescription, PartialSolcOutput } from "../../artifacts/solc";
+import { zip3 } from "../../utils/misc";
+import { findContractDef, findFallbackFun, findReceiveFun } from "../../utils/solidity";
+import { DecodedBytecodeSourceMapEntry, fastParseBytecodeSourceMapping } from "../../utils/srcmap";
 import { OpcodeInfo } from "../opcodes";
+import { EventDefInfo, EventDesc, HexString, UnprefixedHexString } from "../types";
 import { BytecodeTemplate, makeTemplate, matchesTemplate } from "./bytecode_templates";
+import { ArtifactInfo, BytecodeInfo, ContractInfo, SourceFileInfo, SourceFileType } from "./types";
 
 export interface IArtifactManager {
     getContractFromDeployedBytecode(code: Uint8Array): ContractInfo | undefined;
@@ -50,52 +43,12 @@ export interface IArtifactManager {
     findMethod(
         selector: HexString | Uint8Array
     ): [ContractInfo, FunctionDefinition | VariableDeclaration] | undefined;
+    findEntryPoint(
+        data: HexString | Uint8Array,
+        contract: ContractInfo
+    ): FunctionDefinition | VariableDeclaration | undefined;
     getEventDefInfo(topic: bigint | Uint8Array | EventDesc): EventDefInfo | undefined;
-}
-
-export interface BytecodeInfo {
-    // Map from the file-id (used in source maps in this artifact) to the generated Yul sources for this contract's creation bytecode.
-    // Note that multiple contracts have overlapping generated units ids, so we need a mapping per-contract
-    generatedFileMap: Map<number, SourceFileInfo>;
-    srcMap: DecodedBytecodeSourceMapEntry[];
-    offsetToIndexMap: Map<number, number>;
-}
-
-export interface ContractInfo {
-    artifact: ArtifactInfo;
-    contractArtifact: PartialCompiledContract;
-    contractName: string;
-    fileName: string;
-    ast: ContractDefinition | undefined;
-    bytecode: BytecodeInfo;
-    deployedBytecode: BytecodeInfo;
-    mdHash: PrefixedHexString | undefined;
-}
-
-export interface ArtifactInfo {
-    artifact: PartialSolcOutput;
-    units: SourceUnit[];
-    ctx: ASTContext;
-    compilerVersion: string;
-    abiEncoderVersion: ABIEncoderVersion;
-    // Map from the file-id (used in source maps in this artifact) to the actual sources entry (and some additional info)
-    fileMap: Map<number, SourceFileInfo>;
-    // Map from src triples to AST nodes with that source range
-    srcMap: Map<string, ASTNode>;
-}
-
-export enum SourceFileType {
-    Solidity = "solidity",
-    InternalYul = "internal_yul"
-}
-
-export interface SourceFileInfo {
-    contents: string | undefined;
-    rawAst: RawAST;
-    ast: SourceUnit | undefined;
-    name: string;
-    fileIndex: number;
-    type: SourceFileType;
+    getContractInfo(contract: ContractDefinition): ContractInfo | undefined;
 }
 
 /**
@@ -351,6 +304,16 @@ export class ArtifactManager implements IArtifactManager {
         return this._artifacts;
     }
 
+    getContractInfo(contract: ContractDefinition): ContractInfo | undefined {
+        for (const info of this._contracts) {
+            if (info.ast === contract) {
+                return info;
+            }
+        }
+
+        return undefined;
+    }
+
     getContractFromMDHash(hash: HexString): ContractInfo | undefined {
         return this._mdHashToContractInfo.get(hash);
     }
@@ -365,7 +328,7 @@ export class ArtifactManager implements IArtifactManager {
         for (let i = 0; i < this._deployedBytecodeTemplates.length; i++) {
             const templ = this._deployedBytecodeTemplates[i];
 
-            if (matchesTemplate(bytecode, templ)) {
+            if (matchesTemplate(bytecode, templ, false)) {
                 return this._contracts[i];
             }
         }
@@ -383,7 +346,7 @@ export class ArtifactManager implements IArtifactManager {
         for (let i = 0; i < this._creationBytecodeTemplates.length; i++) {
             const templ = this._creationBytecodeTemplates[i];
 
-            if (matchesTemplate(creationBytecode, templ)) {
+            if (matchesTemplate(creationBytecode, templ, true)) {
                 return this._contracts[i];
             }
         }
@@ -436,13 +399,14 @@ export class ArtifactManager implements IArtifactManager {
     }
 
     findMethod(
-        selector: HexString | Uint8Array
+        selector: HexString | Uint8Array,
+        info?: ContractInfo
     ): [ContractInfo, FunctionDefinition | VariableDeclaration] | undefined {
         if (selector instanceof Uint8Array) {
             selector = bytesToHex(selector);
         }
 
-        for (const contract of this._contracts) {
+        for (const contract of info ? [info] : this._contracts) {
             if (!contract.ast) {
                 continue;
             }
@@ -469,6 +433,44 @@ export class ArtifactManager implements IArtifactManager {
         }
 
         return undefined;
+    }
+
+    /**
+     * Given a msg.data and a target contract, compute the intended AST entry point. If any.
+     * This handles the following cases:
+     *      - receive functions
+     *      - fallback functions
+     *      - normal function match
+     */
+    findEntryPoint(
+        data: HexString | Uint8Array,
+        info: ContractInfo
+    ): FunctionDefinition | VariableDeclaration | undefined {
+        const contract = info.ast;
+
+        if (!contract) {
+            return undefined;
+        }
+
+        // Not enough data for a signature
+        if (data.length < 4) {
+            // First check if receive function is specified
+            const recvF = findReceiveFun(contract);
+
+            if (recvF) {
+                return recvF;
+            }
+
+            // Otherwise we fall back to the fallback fun
+            return findFallbackFun(contract);
+        }
+
+        const selector = data.slice(0, 4);
+
+        const funMatch = this.findMethod(selector, info);
+
+        // Return either the fun match, or fallback fun if there is one
+        return funMatch ? funMatch[1] : findFallbackFun(contract);
     }
 
     getEventDefInfo(arg: bigint | Uint8Array | EventDesc): EventDefInfo | undefined {

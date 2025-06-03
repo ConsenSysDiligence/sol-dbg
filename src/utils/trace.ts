@@ -1,7 +1,7 @@
 import { bytesToHex } from "ethereum-cryptography/utils";
 import { FunctionDefinition } from "solc-typed-ast";
-import { StepState } from "../debug";
 import { FAIL_MSG_DATA, FoundryCheatcodesAddress } from "../debug/foundry_cheatcodes";
+import { StepState } from "../debug/types";
 import { bigEndianBufToNumber, wordToAddress } from "./misc";
 import { flattenStack } from "./pp";
 
@@ -35,6 +35,25 @@ export function findLastNonInternalStepBeforeRevert(trace: StepState[]): StepSta
 
     for (; i < trace.length; i++) {
         if (trace[i].op.opcode === 0xfd) {
+            break;
+        }
+    }
+
+    if (i === trace.length) {
+        return undefined;
+    }
+
+    return findLastNonInternalStepBeforeStepI(trace, i);
+}
+
+/**
+ * Find the last step in the non-internal code, that leads to the first revert
+ */
+export function findLastNonInternalStepBeforeAssert(trace: StepState[]): StepState | undefined {
+    let i = 0;
+
+    for (; i < trace.length; i++) {
+        if (trace[i].op.opcode === 0xfe) {
             break;
         }
     }

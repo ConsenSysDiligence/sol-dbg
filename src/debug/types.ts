@@ -1,28 +1,19 @@
 import { Address } from "@ethereumjs/util";
 import * as sol from "solc-typed-ast";
 import { FunctionDefinition } from "solc-typed-ast";
-import { HexString, UnprefixedHexString } from "../artifacts";
-import { ImmMap } from "../utils";
-import { ArtifactInfo, ContractInfo } from "./artifact_manager";
+import { ImmMap } from "../utils/immutable_map";
+import { ArtifactInfo, ContractInfo } from "./artifact_manager/types";
 import { EVMOpInfo } from "./opcodes";
 
-export interface DeployedContractInfo {
-    address: HexString;
-    code: UnprefixedHexString;
-    info?: ContractInfo;
-}
+/**
+ * A type alias for 0x-prefixed hex strings. Used for documentation purposes.
+ */
+export type HexString = string;
 
-export interface UnknownLocation {
-    contract: DeployedContractInfo | undefined;
-}
-
-export interface SolLocation {
-    contract: DeployedContractInfo | undefined;
-    start: number;
-    length: number;
-    jump: "o" | "i" | "-";
-    file: number;
-}
+/**
+ * A type alias for hex strings without 0x prefix. Used for documentation purposes.
+ */
+export type UnprefixedHexString = string;
 
 export type DecodedSolValue = { value: any; type: string };
 
@@ -142,6 +133,7 @@ export interface BaseMemoryLocation extends BaseDataLocation {
 
 export interface CalldataLocation extends BaseMemoryLocation {
     kind: DataLocationKind.CallData;
+    base: bigint;
 }
 
 export interface LinearMemoryLocation extends BaseMemoryLocation {
@@ -201,27 +193,71 @@ export interface StepVMState {
 
 /**
  * State that the debugger maintains for each trace step.
- * It includes the basic VM state (`StepVmState`) and optionally (if we have debug info for this contract)
- * includes the decoded source location, any AST nodes that are mapped to this instruction and any events
- * that may be emitted on this step.
+ * It includes the basic VM state (`StepVmState`) and all the info computed
+ * by additional transformers
  */
 export interface StepState extends StepVMState {
+    /**
+     * List of external call frames
+     */
     stack: ExternalFrame[];
+    /**
+     * If the current instruction is a return, include return information
+     */
     retInfo?: {
-        // Step at which the call that just returned started
+        /**
+         * Step at which the call that just returned started
+         */
         callStartStep: number;
-        // Raw returned data
+        /**
+         * Raw returned data
+         */
         rawReturnData: Uint8Array;
-        // Decoded returned data (if ast info is available)
+        /**
+         * Decoded returned data (if ast info is available)
+         */
         decodedReturnData?: any[];
     };
+    /**
+     * If the current instruction throws an exception, includes exception info
+     */
+    excInfo?: {
+        /**
+         * Raw exception bytes
+         */
+        data: Uint8Array;
+    };
+    /**
+     * Internal call stack at the current instruction
+     */
     intStack: InternalCallFrame[];
+    /**
+     * Source location for the current instruction (if a src map is available)
+     */
     src: sol.DecodedBytecodeSourceMapEntry | undefined;
+    /**
+     * AST node that corresponds to the source location of the current instruction (if any)
+     */
     astNode: sol.ASTNode | undefined;
+    /**
+     * If the current instruction emits an event, includes the raw event info
+     */
     emittedEvent: EventDesc | undefined;
+    /**
+     * If we were able to decode the event, include the decoded event info
+     */
     decodedEvent: DecodedEventDesc | undefined;
+    /**
+     * If this is the instruction after we return from a create call, add the newly created address here.
+     */
     contractCreated?: Address;
+    /**
+     * If this is a SELFDESTRUCT instruction, recored the destroyed contract
+     */
     contractKilled?: Address;
+    /**
+     * If this is a KECCAK256 instruction record the preimage and the hash
+     */
     keccak?: {
         from: Uint8Array;
         to: bigint;

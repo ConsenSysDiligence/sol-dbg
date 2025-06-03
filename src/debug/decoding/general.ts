@@ -1,12 +1,8 @@
-import {
-    ArrayType,
-    assert,
-    InferType,
-    PointerType,
-    DataLocation as SolDataLocation,
-    TypeNode
-} from "solc-typed-ast";
+import { ArrayType, assert, InferType, PointerType, TypeNode } from "solc-typed-ast";
 import { ABIEncoderVersion } from "solc-typed-ast/dist/types/abi";
+import { nyi, uint256 } from "../../utils/misc";
+import { topExtFrame } from "../tracers/transformers/ext_stack";
+import { MapKeys } from "../tracers/transformers/keccak256_invert";
 import {
     DataLocation,
     DataLocationKind,
@@ -15,21 +11,16 @@ import {
     MemoryLocationKind,
     StepState,
     StorageLocation
-} from "..";
-import { MAX_ARR_DECODE_LIMIT, uint256 } from "../..";
-import { MapKeys, topExtFrame } from "../tracers/transformers";
+} from "../types";
 import { cd_decodeArrayContents, cd_decodeValue } from "./calldata";
 import { mem_decodeValue } from "./memory";
 import { st_decodeInt, st_decodeValue } from "./stack";
 import { stor_decodeValue } from "./storage";
-
-function solLocToDataKind(loc: SolDataLocation): MemoryLocationKind {
-    if (loc === SolDataLocation.Default) {
-        return DataLocationKind.Memory;
-    }
-
-    return loc as unknown as MemoryLocationKind;
-}
+import {
+    getCDArrayInStackOffAndLen,
+    isCalldataArrayType,
+    solLocToMemoryLocationKind
+} from "./utils";
 
 /**
  * Helper to dispatch the decoding of a given type `typ` at a given data location `loc` in a given `state`.
@@ -59,7 +50,7 @@ function decodeValInt(
             return undefined;
         }
 
-        const res = cd_decodeValue(abiType, typ, loc, lastExtFrame.msgData, BigInt(4), infer);
+        const res = cd_decodeValue(abiType, typ, loc, lastExtFrame.msgData, infer);
 
         return res === undefined ? res : res[0];
     }
@@ -71,15 +62,6 @@ function decodeValInt(
     const res = stor_decodeValue(typ, loc, state.storage, infer, mapKeys);
 
     return res === undefined ? res : res[0];
-}
-
-export function isCalldataType2Slots(typ: TypeNode): boolean {
-    return (
-        typ instanceof PointerType &&
-        typ.to instanceof ArrayType &&
-        typ.location === SolDataLocation.CallData &&
-        typ.to.size === undefined
-    );
 }
 
 /**
@@ -101,17 +83,13 @@ export function decodeValue(
      * own memory region
      */
     if (typ instanceof PointerType && loc.kind === DataLocationKind.Stack) {
-        const off = st_decodeInt(uint256, loc, state.evmStack);
+        if (isCalldataArrayType(typ)) {
+            const [off, len] = getCDArrayInStackOffAndLen(loc, state);
 
-        if (off === undefined) {
-            return undefined;
-        }
+            if (off === undefined || len === undefined) {
+                return undefined;
+            }
 
-        const kind: MemoryLocationKind = solLocToDataKind(typ.location);
-
-        let pointedToLoc: MemoryLocation;
-
-        if (isCalldataType2Slots(typ)) {
             const lastExtFrame = topExtFrame(state);
 
             let abiType: TypeNode;
@@ -127,20 +105,6 @@ export function decodeValue(
                 `InternalError`
             );
 
-            const len = st_decodeInt(
-                uint256,
-                { kind: loc.kind, offsetFromTop: loc.offsetFromTop - 1 },
-                state.evmStack
-            );
-
-            if (len === undefined) {
-                return undefined;
-            }
-
-            if (len > MAX_ARR_DECODE_LIMIT) {
-                return undefined;
-            }
-
             const res = cd_decodeArrayContents(
                 abiType.to,
                 typ.to as ArrayType,
@@ -153,17 +117,35 @@ export function decodeValue(
             return res === undefined ? res : res[0];
         }
 
+        const off = st_decodeInt(uint256, loc, state.evmStack);
+
+        if (off === undefined) {
+            return undefined;
+        }
+
+        const kind: MemoryLocationKind = solLocToMemoryLocationKind(typ.location);
+
+        let pointedToLoc: MemoryLocation;
+
         if (kind === DataLocationKind.Storage) {
             pointedToLoc = {
                 kind,
                 address: off,
                 endOffsetInWord: 32
             } as StorageLocation;
-        } else {
+        } else if (kind === DataLocationKind.Memory) {
             pointedToLoc = {
                 kind,
                 address: off
             };
+        } else if (kind === DataLocationKind.CallData) {
+            pointedToLoc = {
+                kind,
+                address: off,
+                base: 0n
+            };
+        } else {
+            nyi(`NYI data location kind ${kind}`);
         }
 
         const res = decodeValInt(typ.to, pointedToLoc, state, infer, mapKeys);

@@ -22,14 +22,16 @@ import {
     enumToIntType
 } from "solc-typed-ast";
 import {
-    DataLocationKind,
-    MapKeys,
-    Storage,
-    StorageLocation,
-    changeToLocation,
-    mem_decodeValue
-} from "..";
-import { MAX_ARR_DECODE_LIMIT, bigEndianBufToBigint, bigIntToBuf, fits, uint256 } from "../..";
+    MAX_ARR_DECODE_LIMIT,
+    bigEndianBufToBigint,
+    bigIntToBuf,
+    fits,
+    uint256
+} from "../../../utils/misc";
+import { changeToLocation } from "../../../utils/solidity";
+import { MapKeys } from "../../tracers/transformers/keccak256_invert";
+import { DataLocationKind, Storage, StorageLocation } from "../../types";
+import { mem_decodeValue } from "../memory/decoding";
 
 /**
  * Helper to fetch the word residing at key `key` from `storage`.  Note that
@@ -208,7 +210,7 @@ function stor_decodeAddress(
 /**
  * Compute the 'static' size that a variable of type `typ` would take up in storage
  */
-function typeStaticStorSize(typ: TypeNode, infer: InferType): number {
+function stor_typeStaticSize(typ: TypeNode, infer: InferType): number {
     if (typ instanceof IntType) {
         return typ.nBits / 8;
     }
@@ -231,7 +233,7 @@ function typeStaticStorSize(typ: TypeNode, infer: InferType): number {
         }
 
         if (typ.definition instanceof UserDefinedValueTypeDefinition) {
-            return typeStaticStorSize(
+            return stor_typeStaticSize(
                 infer.typeNameToTypeNode(typ.definition.underlyingType),
                 infer
             );
@@ -256,7 +258,7 @@ function typeFitsInLoc(typ: TypeNode, loc: StorageLocation, infer: InferType): b
         throw new Error(`NYI typeFitsInLoc(${typ.pp()},...)`);
     }
 
-    const size = typeStaticStorSize(typ, infer);
+    const size = stor_typeStaticSize(typ, infer);
 
     assert(size <= 32, `Unexpected type ${typ.pp()} spanning more than a single word`);
 

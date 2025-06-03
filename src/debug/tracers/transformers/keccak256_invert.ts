@@ -1,6 +1,6 @@
 import { InterpreterStep } from "@ethereumjs/evm";
 import { VM } from "@ethereumjs/vm";
-import { bigEndianBufToBigint, mustReadMem } from "../../../utils";
+import { bigEndianBufToBigint, mustReadMem } from "../../../utils/misc";
 import { OPCODES } from "../../opcodes";
 import { BasicStepInfo } from "./basic_info";
 
