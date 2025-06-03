@@ -16,7 +16,10 @@
         "lint": "eslint src/ test/ --ext=ts",
         "lint:fix": "eslint src/ test/ --ext=ts --fix",
         "test": "NODE_OPTIONS='--max-old-space-size=2048' jest --coverage",
-        "prepare": "npm run build"
+        "prepare": "npm run build",
+        "docs:render": "typedoc",
+        "docs:clear": "rm -rf docs/",
+        "docs:refresh": "npm run docs:clear && npm run docs:render"
     },
     "dependencies": {
         "@ethereumjs/block": "5.2.0",
@@ -50,7 +53,8 @@
         "prettier": "^3.2.5",
         "ts-jest": "^29.1.2",
         "ts-node": "^10.9.2",
-        "typescript": "^5.3.3"
+        "typescript": "^5.3.3",
+        "typedoc": "^0.28.5"
     },
     "homepage": "https://github.com/ConsenSys/sol-dbg",
     "bugs": "https://github.com/ConsenSys/sol-dbg/issues",

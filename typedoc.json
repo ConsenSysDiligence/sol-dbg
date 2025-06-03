@@ -1,0 +1,9 @@
+{
+    "out": "docs",
+    "gitRevision": "master",
+    "excludePrivate": true,
+    "excludeProtected": true,
+    "excludeExternals": true,
+    "exclude": ["./package.json", "./dist/**", "./node_modules/**", "./static/**", "./test/**"],
+    "entryPoints": ["./src/"]
+}

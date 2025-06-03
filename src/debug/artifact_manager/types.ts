@@ -49,7 +49,7 @@ export interface ContractInfo {
      */
     fileName: string;
     /**
-     * A solc-typed-ast built AST for this contract (if any)
+     * A solc-typed-ast built {@link https://consensysdiligence.github.io/solc-typed-ast/classes/ContractDefinition.html ContractDefinition} for this contract (if any)
      */
     ast: ContractDefinition | undefined;
     /**
@@ -75,11 +75,11 @@ export interface ArtifactInfo {
      */
     artifact: PartialSolcOutput;
     /**
-     * List of solc-typed-ast decoded {@link SourceUnit}s
+     * List of solc-typed-ast decoded {@link https://consensysdiligence.github.io/solc-typed-ast/classes/SourceUnit.html SourceUnit}s
      */
     units: SourceUnit[];
     /**
-     * solc-typed-ast context that owns all the decoded {@link SourceUnit}s
+     * solc-typed-ast {@link https://consensysdiligence.github.io/solc-typed-ast/classes/ASTContext.html ASTContext} that owns all the decoded {@link https://consensysdiligence.github.io/solc-typed-ast/classes/SourceUnit.html SourceUnit}s
      */
     ctx: ASTContext;
     /**
