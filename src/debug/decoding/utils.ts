@@ -57,3 +57,14 @@ export function isCalldataArrayType(typ: TypeNode): boolean {
         typ.location === SolDataLocation.CallData
     );
 }
+
+/**
+ * Returns true IFF the  n >= min && n <= max
+ * 
+ * @param n 
+ * @param min 
+ * @param max 
+ */
+export function inRange(n: number | bigint, min: number | bigint, max: number | bigint): boolean {
+    return BigInt(n) >= BigInt(min) && BigInt(n) <= BigInt(max);
+}
