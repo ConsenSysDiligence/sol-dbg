@@ -5,41 +5,40 @@ export class ExternalFunRef {
     constructor(
         public readonly address: Address,
         public readonly selector: Uint8Array
-    ) {
-    }
+    ) {}
 }
 
 export class InternalFunRef {
-    constructor(
-        public readonly fun: FunctionDefinition,
-    ) {
-    }
+    constructor(public readonly fun: FunctionDefinition) {}
 }
 
-export type FunctionValue = ExternalFunRef | InternalFunRef
+export type FunctionValue = ExternalFunRef | InternalFunRef;
 
 export class Struct {
-    constructor(public readonly entries: [string, Value][]) { }
+    constructor(public readonly entries: Array<[string, Value]>) {}
 }
 
 export class Slice {
-    constructor(public readonly array: Value[], public readonly start: number, public readonly end: number) { }
+    constructor(
+        public readonly array: Value[],
+        public readonly start: number,
+        public readonly end: number
+    ) {}
 }
 
 /**
  * Typescript types corresponding to various Solidity types.
  * Includes both primitive (value) types and compound types
  */
-export type Value
-    = bigint // int/uint
+export type Value =
+    | bigint // int/uint
     | boolean // bool
     | Uint8Array // byte, bytesN, bytes
     | string // string
-    | number  // enum
+    | number // enum
     | Address // address
     | FunctionValue // function types
     //  | @todo Rationals?
     | Value[] // sized and unsized arrays
     | Slice // array slices
-    | Struct // Structs
-    ;
+    | Struct; // Structs

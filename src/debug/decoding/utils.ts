@@ -60,11 +60,25 @@ export function isCalldataArrayType(typ: TypeNode): boolean {
 
 /**
  * Returns true IFF the  n >= min && n <= max
- * 
- * @param n 
- * @param min 
- * @param max 
+ *
+ * @param n
+ * @param min
+ * @param max
  */
 export function inRange(n: number | bigint, min: number | bigint, max: number | bigint): boolean {
     return BigInt(n) >= BigInt(min) && BigInt(n) <= BigInt(max);
+}
+
+/**
+ * Return the sum of the give numbers.
+ * @param ns
+ * @returns
+ */
+export function sum(...ns: number[]): number {
+    let res = 0;
+    for (const n of ns) {
+        res += n;
+    }
+
+    return res;
 }
