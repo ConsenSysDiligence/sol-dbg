@@ -133,9 +133,9 @@ export abstract class BaseCalldataView<
     Type extends TypeNode = TypeNode
 > extends View<Memory, Val, bigint, Type> {
     constructor(
-        public readonly type: Type,
-        public readonly infer: InferType,
-        protected loc: bigint,
+        type: Type,
+        infer: InferType,
+        loc: bigint,
         protected base: bigint
     ) {
         super(type, infer, loc);
@@ -350,7 +350,7 @@ export class TupleCalldataView extends BaseCalldataView<Value[], TupleType> {
 
 export class ArrayCalldataView extends BaseCalldataView<Value[], PointerType> {
     /**
-     * Array fixed size (if any)
+     * Array type
      */
     arrT: ArrayType;
 

@@ -1,8 +1,7 @@
 import { InferType, TypeNode } from "solc-typed-ast";
 import { Value } from "./value";
-import { Memory, Stack, Storage } from "../types";
 
-export class ViewError<State> extends Error {
+export class DecodingError<State> extends Error {
     constructor(
         public readonly view: View<any, any, any, any>,
         public readonly state: State,
@@ -30,44 +29,8 @@ export abstract class View<State, Val extends Value, Loc, Type extends TypeNode 
     abstract pp(): string;
 
     protected fail(state: State, msg: string = ""): never {
-        throw new ViewError(this, state, msg);
+        throw new DecodingError(this, state, msg);
     }
 
     //abstract encode(state: State, value: Val)
-}
-
-/**
- * Base class for all memory views (calldata/memory) and the storage view
- */
-export abstract class MemView<Val extends Value, Type extends TypeNode = TypeNode> extends View<
-    Memory | Storage,
-    Val,
-    bigint,
-    Type
-> {
-    constructor(type: Type, infer: InferType, loc: bigint) {
-        super(type, infer, loc);
-    }
-
-    get address(): bigint {
-        return this.loc;
-    }
-}
-
-/**
- * Base class for all stack views
- */
-export abstract class StackView<Val extends Value, Type extends TypeNode = TypeNode> extends View<
-    Stack,
-    Val,
-    number,
-    Type
-> {
-    constructor(type: Type, infer: InferType, loc: number) {
-        super(type, infer, loc);
-    }
-
-    get offset(): number {
-        return this.loc;
-    }
 }
