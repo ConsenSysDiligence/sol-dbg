@@ -184,11 +184,7 @@ export class ArrayMemView extends BaseMemoryView<Value[], ArrayType> {
 export class StructMemView extends BaseMemoryView<Struct, UserDefinedType> {
     fields: Array<[string, TypeNode]>;
 
-    constructor(
-        public readonly type: UserDefinedType,
-        public readonly infer: InferType,
-        loc: bigint
-    ) {
+    constructor(type: UserDefinedType, infer: InferType, loc: bigint) {
         super(type, infer, loc);
 
         if (!(type instanceof UserDefinedType && type.definition instanceof StructDefinition)) {

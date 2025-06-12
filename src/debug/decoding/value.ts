@@ -1,5 +1,5 @@
 import { Address } from "@ethereumjs/util";
-import { FunctionDefinition } from "solc-typed-ast";
+import { assert, FunctionDefinition } from "solc-typed-ast";
 
 export class ExternalFunRef {
     constructor(
@@ -16,6 +16,16 @@ export type FunctionValue = ExternalFunRef | InternalFunRef;
 
 export class Struct {
     constructor(public readonly entries: Array<[string, Value]>) {}
+    field(name: string): Value {
+        // @todo optimize if we end up using this more
+        for (const [fieldName, val] of this.entries) {
+            if (name === fieldName) {
+                return val;
+            }
+        }
+
+        assert(false, `No field ${name} in ${this.entries}`);
+    }
 }
 
 export class Slice {
@@ -41,4 +51,5 @@ export type Value =
     //  | @todo Rationals?
     | Value[] // sized and unsized arrays
     | Slice // array slices
-    | Struct; // Structs
+    | Struct // Structs
+    | Map<Value, Value>; // Mappings

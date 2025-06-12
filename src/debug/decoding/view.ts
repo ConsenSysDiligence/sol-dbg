@@ -4,7 +4,7 @@ import { Value } from "./value";
 export class DecodingError<State> extends Error {
     constructor(
         public readonly view: View<any, any, any, any>,
-        public readonly state: State,
+        public readonly state: State | undefined,
         msg: string = ""
     ) {
         super(`Error decoding ${view.pp()}: ${msg}`);
@@ -28,7 +28,7 @@ export abstract class View<State, Val extends Value, Loc, Type extends TypeNode 
     abstract decode(state: State): Val;
     abstract pp(): string;
 
-    protected fail(state: State, msg: string = ""): never {
+    protected fail(state: State | undefined, msg: string = ""): never {
         throw new DecodingError(this, state, msg);
     }
 
