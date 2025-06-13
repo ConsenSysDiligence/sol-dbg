@@ -31,7 +31,7 @@ import {
     uint8
 } from "../../../utils";
 import { keccak256 } from "ethereum-cryptography/keccak";
-import { Address } from "@ethereumjs/util";
+import { Address, bytesToUtf8 } from "@ethereumjs/util";
 import { ExpStructType } from "../exp_types";
 import { assert } from "console";
 import { MapKeys } from "../../tracers";
@@ -420,6 +420,49 @@ export class MapStorageView extends BaseStorageView<Map<Value, Value>, MappingTy
     }
 }
 
+export abstract class PackedArrayStorageView<V extends Value, T extends TypeNode> extends BaseStorageView<V, T> {
+    nextLoc(): StorageLocation {
+        return nextWord(this.loc);
+    }
+
+    decodeBytes(state: Storage): Uint8Array {
+        const word = this.fetchWord(this.key, state);
+        const lByte = word[31];
+
+        if (lByte % 2 === 0) {
+            /// Less than 31 bytes - length * 2 stored in lowest byte
+            const len = lByte / 2;
+            assert(len <= 31, `Unexpected length of more than 31`);
+
+            return word.slice(0, len);
+        }
+
+        let len = this.decodeIntAt(this.key, this.endOffsetInWord, uint256, state);
+        len = (len - 1n) / 2n;
+
+        if (len > MAX_ARR_DECODE_LIMIT) {
+            this.fail(state, `${this.type.pp()} too large - ${len}`);
+        }
+
+        const numLen = Number(len);
+        const addr = keccakOfAddr(this.key);
+
+        return this.fetchBytes(addr, 0, numLen, state);
+    }
+}
+
+export class BytesStorageView extends PackedArrayStorageView<Uint8Array, BytesType> {
+    decode(state: Storage): Uint8Array {
+        return this.decodeBytes(state);
+    }
+}
+
+export class StringStorageView extends PackedArrayStorageView<string, StringType> {
+    decode(state: Storage): string {
+        return bytesToUtf8(this.decodeBytes(state));
+    }
+}
+
 /**
  * Return true if the given type `typ` fits in the storage word location pointed by
  * `loc`. This checks that the type actually fits, and that its not one of the types
@@ -527,7 +570,6 @@ export function makeStorageView(
         return new FixedBytesStorageView(type, loc);
     }
 
-    /*
     if (type instanceof BytesType) {
         return new BytesStorageView(type, infer, loc);
     }
@@ -536,7 +578,6 @@ export function makeStorageView(
         return new StringStorageView(type, infer, loc);
     }
 
-    */
     if (type instanceof ArrayType) {
         return new ArrayStorageView(type, infer, loc, mapKeys);
     }
