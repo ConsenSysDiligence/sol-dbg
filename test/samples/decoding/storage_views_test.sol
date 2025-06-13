@@ -214,3 +214,45 @@ contract MoreStructs {
 
     function foo() public {}
 }
+
+contract Misc {
+    struct SmallerThanWord {
+        uint120 a;
+        uint112 b;
+    }
+
+    struct OneWord {
+        uint120 a;
+        uint136 b;
+    }
+
+    struct MoreThanOneWord {
+        uint120 a;
+        uint144 b;
+    }
+    
+    struct ThreeWords {
+        uint120 a;
+        uint248 c;
+        uint144 b;
+    }
+
+    struct FourWords {
+        uint120 a;
+        uint256 c;
+        uint248 d;
+        uint144 b;
+    }
+
+    int120[2][2] x = [[int120(1),2], [int120(3),4]];
+    int128[2][2] y = [[int128(1),2], [int128(3),4]];
+    int136[2][2] z = [[int136(1),2], [int136(3),4]];
+
+    SmallerThanWord[2] p = [SmallerThanWord(1, 2), SmallerThanWord(3, 4)];
+    OneWord[2] q = [OneWord(1, 2), OneWord(3, 4)];
+    MoreThanOneWord[2] r = [MoreThanOneWord(1, 2), MoreThanOneWord(3, 4)];
+    ThreeWords[2] s = [ThreeWords(1, 2, 3), ThreeWords(4, 5, 6)];
+    FourWords[2] t = [FourWords(1, 2, 3, 4), FourWords(5, 6, 7, 8)];
+
+    function foo() public {}
+}

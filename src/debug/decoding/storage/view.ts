@@ -275,14 +275,22 @@ export class ArrayStorageView extends BaseStorageView<Value[], ArrayType> {
             let tmpL: StorageLocation = [0n, 32];
             let nEls = 0n;
 
-            while (tmpL[0] === 0n) {
+            while (typeFitsInLoc(type.elementT, tmpL, infer) && tmpL[0] === 0n) {
                 nEls++;
                 const elView = makeStorageView(type.elementT, infer, tmpL);
                 tmpL = elView.nextLoc();
             }
 
-            const nWords = (type.size / nEls + (type.size % nEls === 0n ? 0n : 1n)) * tmpL[0];
-            this._nextLoc = [this.loc[0] + nWords, 32];
+            // Number of words needed for nEls elements
+            const nWords = tmpL[0] + (tmpL[1] === 32 ? 0n : 1n);
+            // Number of groups of "nEls" needed to fit in size
+            const nGroups = type.size / nEls + (type.size % nEls === 0n ? 0n : 1n);
+            // Number of words for the entire fixed sized array.
+            // Note that the last groups may have fewer than nEls elements.
+            // But it will still consume the same number of words. Its either 1 word,
+            // Or its a 1-element group that takes multiple words.
+            const nWordsPerArray = nGroups * nWords;
+            this._nextLoc = [this.loc[0] + nWordsPerArray, 32];
         }
     }
 
@@ -420,7 +428,10 @@ export class MapStorageView extends BaseStorageView<Map<Value, Value>, MappingTy
     }
 }
 
-export abstract class PackedArrayStorageView<V extends Value, T extends TypeNode> extends BaseStorageView<V, T> {
+export abstract class PackedArrayStorageView<
+    V extends Value,
+    T extends TypeNode
+> extends BaseStorageView<V, T> {
     nextLoc(): StorageLocation {
         return nextWord(this.loc);
     }
@@ -491,8 +502,7 @@ function typeStartsInNewWord(t: TypeNode): boolean {
         return typeStartsInNewWord(t.to);
     }
 
-    return (t instanceof ArrayType || t instanceof MappingType || t instanceof
-        ExpStructType);
+    return t instanceof ArrayType || t instanceof MappingType || t instanceof ExpStructType;
 }
 
 /**
@@ -534,7 +544,7 @@ function staticSize(typ: TypeNode, infer: InferType): number {
         }
     }
 
-    if ( typ instanceof BytesType || typ instanceof StringType ) {
+    if (typ instanceof BytesType || typ instanceof StringType) {
         return 32;
     }
 

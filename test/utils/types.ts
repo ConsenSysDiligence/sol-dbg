@@ -24,12 +24,20 @@ export const uint8 = new IntType(8, false);
 export const uint16 = new IntType(16, false);
 export const uint24 = new IntType(24, false);
 export const uint64 = new IntType(64, false);
+export const uint112 = new IntType(112, false);
+export const uint120 = new IntType(120, false);
+export const uint128 = new IntType(128, false);
+export const uint136 = new IntType(136, false);
+export const uint144 = new IntType(144, false);
+export const uint248 = new IntType(248, false);
 
 export const int8 = new IntType(8, true);
 export const int16 = new IntType(16, true);
 export const int32 = new IntType(32, true);
 export const int48 = new IntType(48, true);
+export const int120 = new IntType(120, true);
 export const int128 = new IntType(128, true);
+export const int136 = new IntType(136, true);
 export const int256 = new IntType(256, true);
 
 export const bytes = new BytesType();
