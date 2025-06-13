@@ -534,11 +534,12 @@ function staticSize(typ: TypeNode, infer: InferType): number {
         }
     }
 
-    if (
-        typ instanceof PointerType &&
-        (typ.to instanceof BytesType || typ.to instanceof StringType)
-    ) {
+    if ( typ instanceof BytesType || typ instanceof StringType ) {
         return 32;
+    }
+
+    if (typ instanceof PointerType) {
+        return staticSize(typ.to, infer);
     }
 
     nyi(`NYI staticSize(${typ.pp()})`);

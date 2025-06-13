@@ -161,8 +161,8 @@ const MoreStructsLayoutType = new ExpStructType("MoreStructs", [
 const bytesLayoutType = new ExpStructType("Bytes", [
     ["smallB", new PointerType(new BytesType(), DataLocation.Storage)],
     ["bigB", new PointerType(new BytesType(), DataLocation.Storage)],
-    ["smallB", new PointerType(new StringType(), DataLocation.Storage)],
-    ["bigB", new PointerType(new StringType(), DataLocation.Storage)],
+    ["smallS", new PointerType(new StringType(), DataLocation.Storage)],
+    ["bigS", new PointerType(new StringType(), DataLocation.Storage)],
 ])
 
 const samples: Array<[StorageDesc, number, number, TypeNode | TypeGenerator, Value]> = [
@@ -296,7 +296,12 @@ const samples: Array<[StorageDesc, number, number, TypeNode | TypeGenerator, Val
             ["a2", [-1n, -2n, -3n, -4n]]
         ])],
     ])],
-    [bytesStorDesc, 0, 32, bytesLayoutType, new Struct([])]
+    [bytesStorDesc, 0, 32, bytesLayoutType, new Struct([
+        ["smallB", hexToBytes("000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e")],
+        ["bigB", hexToBytes("000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f")],
+        ["smallS", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
+        ["bigS", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
+    ])]
 ];
 
 let unit: SourceUnit;
