@@ -39,96 +39,10 @@ import { makeMemoryView } from "../memory";
 
 type StorageLocation = [bigint, number];
 
-/**
- * Compute the 'static' size that a variable of type `typ` would take up in storage
- */
-function staticSize(typ: TypeNode, infer: InferType): number {
-    if (typ instanceof IntType) {
-        return typ.nBits / 8;
-    }
-
-    if (typ instanceof FixedBytesType) {
-        return typ.size;
-    }
-
-    if (typ instanceof BoolType) {
-        return 1;
-    }
-
-    if (typ instanceof AddressType) {
-        return 20;
-    }
-
-    if (typ instanceof UserDefinedType) {
-        if (typ.definition instanceof EnumDefinition) {
-            return enumToIntType(typ.definition).nBits / 8;
-        }
-
-        if (typ.definition instanceof UserDefinedValueTypeDefinition) {
-            return staticSize(infer.typeNameToTypeNode(typ.definition.underlyingType), infer);
-        }
-    }
-
-    if (typ instanceof PointerType) {
-        if (typ.to instanceof ArrayType && typ.to.size !== undefined) {
-            return Number(typ.to.size) * staticSize(typ.to.elementT, infer);
-        }
-
-        return 32;
-    }
-
-    if (typ instanceof MappingType) {
-        return 32;
-    }
-
-    nyi(`NYI staticStorSize(${typ.pp()})`);
-}
-
-/**
- * If a given `type` starts at location `start` return the location at which it *ends* in storage.
- * This computes a [key, endOffsetInWord] pair, and rounds up to the next word for arrays and structs.
- * (Since anything after an array or sturcts starts in its own slot).
- * @param start
- * @param type
- * @param infer
- * @returns
- */
-function endLoc(start: StorageLocation, type: TypeNode, infer: InferType): StorageLocation {
-    const [key, endOffsetInWord] = start;
-    const ssize = staticSize(type, infer);
-
-    if (ssize >= endOffsetInWord || type instanceof ArrayType || type instanceof ExpStructType) {
-        return [key + BigInt(Math.floor(ssize / 32)) + (ssize % 32 === 0 ? 0n : 1n), 32];
-    }
-
-    return [key, endOffsetInWord - ssize];
-}
-
-/**
- * Return true if the given type `typ` fits in the storage word location pointed by
- * `loc`. This checks that the type actually fits, and that its not one of the types
- * that need to start in their own word (Arrays and Structs)
- * @param typ
- * @param loc
- * @param infer
- * @returns
- */
-function typeFitsInLoc(typ: TypeNode, loc: StorageLocation, infer: InferType): boolean {
-    const [, endOffsetInWord] = loc;
-
-    if (
-        typ instanceof PointerType &&
-        (typ.to instanceof ArrayType || typ.to instanceof ExpStructType) &&
-        endOffsetInWord < 32
-    ) {
-        return false;
-    }
-
-    return staticSize(typ, infer) <= endOffsetInWord;
-}
-
-export function nextWord(loc: StorageLocation): StorageLocation {
-    return [loc[0] + 1n, 32];
+function move(loc: StorageLocation, byBytes: number): StorageLocation {
+    const [key, endOffsetInWord] = loc;
+    assert(endOffsetInWord >= byBytes, ``);
+    return endOffsetInWord === byBytes ? [key + 1n, 32] : [key, endOffsetInWord - byBytes];
 }
 
 export function roundLocToType(
@@ -244,6 +158,11 @@ export abstract class BaseStorageView<
     pp(): string {
         return `<${this.type.pp()}@${this.loc} in storage>`;
     }
+
+    /**
+     * The first location after the end of this view
+     */
+    abstract nextLoc(): StorageLocation;
 }
 
 export class IntStorageView extends BaseStorageView<bigint, IntType> {
@@ -254,6 +173,10 @@ export class IntStorageView extends BaseStorageView<bigint, IntType> {
     decode(state: Storage): bigint {
         return this.decodeIntAt(this.key, this.endOffsetInWord, this.type, state);
     }
+
+    nextLoc(): StorageLocation {
+        return move(this.loc, this.type.nBits / 8);
+    }
 }
 
 export class BoolStorageView extends BaseStorageView<boolean, BoolType> {
@@ -263,6 +186,10 @@ export class BoolStorageView extends BaseStorageView<boolean, BoolType> {
 
     decode(state: Storage): boolean {
         return this.decodeIntAt(this.key, this.endOffsetInWord, uint8, state) !== BigInt(0);
+    }
+
+    nextLoc(): StorageLocation {
+        return move(this.loc, 1);
     }
 }
 
@@ -275,22 +202,9 @@ export class AddressStorageView extends BaseStorageView<Address, AddressType> {
         const bytes = this.fetchBytes(this.key, this.endOffsetInWord - 20, 20, state);
         return new Address(bytes);
     }
-}
 
-export class EnumStorageView extends BaseStorageView<number, UserDefinedType> {
-    innerType: IntType;
-    constructor(type: UserDefinedType, loc: [bigint, number]) {
-        super(type, defaultInfer, loc);
-
-        if (!(type.definition instanceof EnumDefinition)) {
-            this.fail(undefined, `Invalid type ${type.pp()} for EnumStorageView`);
-        }
-
-        this.innerType = enumToIntType(type.definition);
-    }
-
-    decode(state: Storage): number {
-        return Number(this.decodeIntAt(this.key, this.endOffsetInWord, this.innerType, state));
+    nextLoc(): StorageLocation {
+        return move(this.loc, 20);
     }
 }
 
@@ -298,6 +212,7 @@ export class FixedBytesStorageView extends BaseStorageView<Uint8Array, FixedByte
     constructor(type: FixedBytesType, loc: [bigint, number]) {
         super(type, defaultInfer, loc);
     }
+
     decode(state: Storage): Uint8Array {
         if (this.endOffsetInWord < this.type.size) {
             this.fail(
@@ -313,6 +228,10 @@ export class FixedBytesStorageView extends BaseStorageView<Uint8Array, FixedByte
             state
         );
     }
+
+    nextLoc(): StorageLocation {
+        return move(this.loc, this.type.size);
+    }
 }
 
 export class PointerStorageView extends BaseStorageView<Value, PointerType> {
@@ -325,6 +244,10 @@ export class PointerStorageView extends BaseStorageView<Value, PointerType> {
     decode(state: Storage): Value {
         return this.innerView.decode(state);
     }
+
+    nextLoc(): StorageLocation {
+        return this.innerView.nextLoc();
+    }
 }
 
 function keccakOfAddr(addr: bigint): bigint {
@@ -335,6 +258,8 @@ function keccakOfAddr(addr: bigint): bigint {
 }
 
 export class ArrayStorageView extends BaseStorageView<Value[], ArrayType> {
+    private _nextLoc: StorageLocation;
+
     constructor(
         type: ArrayType,
         infer: InferType,
@@ -342,6 +267,27 @@ export class ArrayStorageView extends BaseStorageView<Value[], ArrayType> {
         private readonly mapKeys: MapKeys | undefined = undefined
     ) {
         super(type, infer, loc);
+
+        if (type.size === undefined) {
+            this._nextLoc = nextWord(loc);
+        } else {
+            // Dirty way to compute how many elements fit in how many words
+            let tmpL: StorageLocation = [0n, 32];
+            let nEls = 0n;
+
+            while (tmpL[0] === 0n) {
+                nEls++;
+                const elView = makeStorageView(type.elementT, infer, tmpL);
+                tmpL = elView.nextLoc();
+            }
+
+            const nWords = (type.size / nEls + (type.size % nEls === 0n ? 0n : 1n)) * tmpL[0];
+            this._nextLoc = [this.loc[0] + nWords, 32];
+        }
+    }
+
+    nextLoc(): StorageLocation {
+        return this._nextLoc;
     }
 
     decode(state: Storage): Value[] {
@@ -369,9 +315,7 @@ export class ArrayStorageView extends BaseStorageView<Value[], ArrayType> {
         for (let i = 0; i < size; i++) {
             const view = makeStorageView(elT, this.infer, elLoc, this.mapKeys);
             res.push(view.decode(state));
-
-            const endL = endLoc(elLoc, elT, this.infer);
-            elLoc = typeFitsInLoc(elT, endL, this.infer) ? endL : nextWord(endL);
+            elLoc = view.nextLoc();
         }
 
         return res;
@@ -380,6 +324,7 @@ export class ArrayStorageView extends BaseStorageView<Value[], ArrayType> {
 
 export class StructStorageView extends BaseStorageView<Struct, ExpStructType> {
     fieldViews: Array<[string, BaseStorageView<Value, TypeNode>]> = [];
+    private _nextLoc: StorageLocation;
 
     constructor(type: ExpStructType, infer: InferType, loc: StorageLocation, mapKeys?: MapKeys) {
         super(type, infer, loc);
@@ -388,10 +333,16 @@ export class StructStorageView extends BaseStorageView<Struct, ExpStructType> {
         let fieldLoc = this.loc;
 
         for (const [name, fieldT] of this.type.fields) {
-            fieldLoc = typeFitsInLoc(fieldT, fieldLoc, this.infer) ? fieldLoc : nextWord(fieldLoc);
-            this.fieldViews.push([name, makeStorageView(fieldT, this.infer, fieldLoc, mapKeys)]);
-            fieldLoc = endLoc(fieldLoc, fieldT, this.infer);
+            const fieldView = makeStorageView(fieldT, this.infer, fieldLoc, mapKeys);
+            this.fieldViews.push([name, fieldView]);
+            fieldLoc = fieldView.nextLoc();
         }
+
+        this._nextLoc = fieldLoc[1] === 32 ? fieldLoc : nextWord(fieldLoc);
+    }
+
+    nextLoc(): StorageLocation {
+        return this._nextLoc;
     }
 
     decode(state: Storage): Struct {
@@ -411,6 +362,10 @@ export class MapStorageView extends BaseStorageView<Map<Value, Value>, MappingTy
         private readonly mapKeys: MapKeys | undefined = undefined
     ) {
         super(type, infer, loc);
+    }
+
+    nextLoc(): StorageLocation {
+        return nextWord(this.loc);
     }
 
     decode(state: Storage): Map<Value, Value> {
@@ -465,12 +420,97 @@ export class MapStorageView extends BaseStorageView<Map<Value, Value>, MappingTy
     }
 }
 
+/**
+ * Return true if the given type `typ` fits in the storage word location pointed by
+ * `loc`. This checks that the type actually fits, and that its not one of the types
+ * that need to start in their own word (Arrays and Structs)
+ * @param typ
+ * @param loc
+ * @param infer
+ * @returns
+ */
+function typeFitsInLoc(typ: TypeNode, loc: StorageLocation, infer: InferType): boolean {
+    const [, endOffsetInWord] = loc;
+
+    if (typeStartsInNewWord(typ)) {
+        return endOffsetInWord == 32;
+    }
+
+    return staticSize(typ, infer) <= endOffsetInWord;
+}
+
+export function nextWord(loc: StorageLocation): StorageLocation {
+    return [loc[0] + 1n, 32];
+}
+
+function typeStartsInNewWord(t: TypeNode): boolean {
+    if (t instanceof PointerType) {
+        return typeStartsInNewWord(t.to);
+    }
+
+    return (t instanceof ArrayType || t instanceof MappingType || t instanceof
+        ExpStructType);
+}
+
+/**
+ * Compute the 'static' size that a variable of primitive type `typ` would take
+ * up in storage.  Primitive here means not an array, struct or a map. Those
+ * have special layout rules (always start in a new word, next item in layout
+ * starts in own word too).
+ */
+function staticSize(typ: TypeNode, infer: InferType): number {
+    if (typ instanceof IntType) {
+        return typ.nBits / 8;
+    }
+
+    if (typ instanceof FixedBytesType) {
+        return typ.size;
+    }
+
+    if (typ instanceof BoolType) {
+        return 1;
+    }
+
+    if (typ instanceof AddressType) {
+        return 20;
+    }
+
+    // @todo maybe remove all these in a pre-pass
+    if (typ instanceof UserDefinedType) {
+        if (typ.definition instanceof EnumDefinition) {
+            return enumToIntType(typ.definition).nBits / 8;
+        }
+
+        // @todo remove this in a pre-pass
+        if (typ.definition instanceof UserDefinedValueTypeDefinition) {
+            return staticSize(infer.typeNameToTypeNode(typ.definition.underlyingType), infer);
+        }
+
+        if (typ.definition instanceof ContractDefinition) {
+            return 20;
+        }
+    }
+
+    if (
+        typ instanceof PointerType &&
+        (typ.to instanceof BytesType || typ.to instanceof StringType)
+    ) {
+        return 32;
+    }
+
+    nyi(`NYI staticSize(${typ.pp()})`);
+}
+
 export function makeStorageView(
     type: TypeNode,
     infer: InferType,
-    loc: [bigint, number],
+    loc: StorageLocation,
     mapKeys?: MapKeys
 ): BaseStorageView<Value, TypeNode> {
+    if (!typeFitsInLoc(type, loc, infer)) {
+        loc = nextWord(loc);
+    }
+
     if (type instanceof IntType) {
         return new IntStorageView(type, loc);
     }
@@ -485,17 +525,6 @@ export function makeStorageView(
 
     if (type instanceof FixedBytesType) {
         return new FixedBytesStorageView(type, loc);
-    }
-
-    if (type instanceof UserDefinedType) {
-        const def = type.definition;
-        if (def instanceof EnumDefinition) {
-            return new EnumStorageView(type, loc);
-        }
-
-        if (def instanceof ContractDefinition) {
-            return new AddressStorageView(loc);
-        }
     }
 
     /*

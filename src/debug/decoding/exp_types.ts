@@ -1,6 +1,7 @@
 import {
     ArrayType,
     assert,
+    ContractDefinition,
     DataLocation,
     InferType,
     MappingType,
@@ -11,6 +12,7 @@ import {
     UserDefinedType,
     UserDefinedValueTypeDefinition
 } from "solc-typed-ast";
+import { address } from "../../utils";
 
 /**
  * An internal struct type that converts all field VariableDeclaration(s) to
@@ -32,24 +34,29 @@ export class ExpStructType extends TypeNode {
 }
 
 /**
- * Convert any `UserDefinedType(StructDefinition)` to an `ExpStructType`
+ * Simplify the given solc-typed-ast types for use in encoding. This does the following conversions:
+ *
+ * - Convert `UserDefinedType(StructDefinition)` to `ExpStructType`
+ * - Convert `UserDefinedType(UserDefinedValueTypeDefinition)` to the underlying type
+ * - Convert `UserDefinedType(ContractDefinition)` to address
+ *
  * in the given rawT
  * @param rawT
  */
-export function expandType(
+export function simplifyType(
     rawT: TypeNode,
     infer: InferType,
     loc: DataLocation | undefined
 ): TypeNode {
     if (rawT instanceof ArrayType) {
-        const expElT = expandType(rawT.elementT, infer, loc);
+        const expElT = simplifyType(rawT.elementT, infer, loc);
 
         return expElT === rawT.elementT ? rawT : new ArrayType(expElT, rawT.size, rawT.src);
     }
 
     if (rawT instanceof MappingType) {
-        const keyT = expandType(rawT.keyType, infer, loc);
-        const valueT = expandType(rawT.valueType, infer, loc);
+        const keyT = simplifyType(rawT.keyType, infer, loc);
+        const valueT = simplifyType(rawT.valueType, infer, loc);
 
         return keyT === rawT.keyType && valueT === rawT.valueType
             ? rawT
@@ -58,31 +65,38 @@ export function expandType(
 
     if (rawT instanceof TupleType) {
         return new TupleType(
-            rawT.elements.map((elT) => (elT === null ? elT : expandType(elT, infer, loc)))
+            rawT.elements.map((elT) => (elT === null ? elT : simplifyType(elT, infer, loc)))
         );
     }
 
     if (rawT instanceof PointerType) {
-        const toT = expandType(rawT.to, infer, rawT.location);
+        const toT = simplifyType(rawT.to, infer, rawT.location);
 
         return toT === rawT.to ? rawT : new PointerType(toT, rawT.location, rawT.kind, rawT.src);
     }
 
-    if (rawT instanceof UserDefinedType && rawT.definition instanceof StructDefinition) {
-        assert(loc !== undefined, `Missing location in struct expansion {0}`, rawT);
-        const fields: Array<[string, TypeNode]> = rawT.definition.vMembers.map((decl) => [
-            decl.name,
-            infer.typeNameToSpecializedTypeNode(decl, loc)
-        ]);
+    if (rawT instanceof UserDefinedType) {
+        if (rawT.definition instanceof StructDefinition) {
+            assert(loc !== undefined, `Missing location in struct expansion {0}`, rawT);
+            const fields: Array<[string, TypeNode]> = rawT.definition.vMembers.map((decl) => [
+                decl.name,
+                infer.typeNameToSpecializedTypeNode(decl, loc)
+            ]);
 
-        return new ExpStructType(rawT.name, fields, rawT);
-    }
+            return new ExpStructType(rawT.name, fields, rawT);
+        }
 
-    if (
-        rawT instanceof UserDefinedType &&
-        rawT.definition instanceof UserDefinedValueTypeDefinition
-    ) {
-        return expandType(infer.typeNameToTypeNode(rawT.definition.underlyingType), infer, loc);
+        if (rawT.definition instanceof UserDefinedValueTypeDefinition) {
+            return simplifyType(
+                infer.typeNameToTypeNode(rawT.definition.underlyingType),
+                infer,
+                loc
+            );
+        }
+
+        if (rawT.definition instanceof ContractDefinition) {
+            return address;
+        }
     }
 
     return rawT;
