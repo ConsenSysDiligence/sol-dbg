@@ -5,9 +5,11 @@ import {
     DataLocation,
     InferType,
     MappingType,
+    Mutability,
     PointerType,
     StructDefinition,
     TupleType,
+    TypeName,
     TypeNode,
     UserDefinedType,
     UserDefinedValueTypeDefinition
@@ -100,4 +102,83 @@ export function simplifyType(
     }
 
     return rawT;
+}
+
+export class MissingType extends TypeNode {
+    constructor(public readonly rawTypeName: TypeName | undefined) {
+        super();
+    }
+
+    pp(): string {
+        return `<missing type info for ${this.rawTypeName?.print()}>`;
+    }
+}
+
+function isTypeStringStatic32Bytes(t: string): boolean {
+    return t.endsWith("[]") || t.includes("mapping(");
+}
+
+/**
+ * Given a `ContractDefinition` try and compute an `ExpStructType` struct that
+ * describes the layout of the class.  This takes into account all base classes,
+ * and simplifies types using `simplifyType`.
+ * 
+ * Since we may be missing AST information for some user-defined types, or even
+ * entire bases, the layout may be partial. It may be only up to a given base,
+ * and it may be missing exact type information for certain fields. 
+ * 
+ * We return a tuple with the resulting layout, and a boolean specifying whether
+ * the layout is complete.
+ * 
+ * @param def 
+ * @param infer 
+ */
+export function getContractLayoutType(contract: ContractDefinition, infer: InferType): [ExpStructType, boolean] {
+    const stateVars: [string, TypeNode][] = [];
+    let complete = true;
+
+    for (const base of [...contract.vLinearizedBaseContracts].reverse()) {
+        if (base === null || base === undefined) {
+            complete = false;
+            break
+        }
+
+        for (const varDecl of base.vStateVariables) {
+            // Not part of layout
+            if (
+                varDecl.mutability === Mutability.Constant ||
+                varDecl.mutability === Mutability.Immutable
+            ) {
+                continue;
+            }
+
+            let typeNode: TypeNode;
+
+            try {
+                typeNode = infer.variableDeclarationToTypeNode(varDecl);
+            } catch (e) {
+                /**
+                 * Missing type info. If this is a:
+                 *  - map type
+                 *  - array type
+                 *
+                 * then we can continue decoding as it takes exactly 32 bytes
+                 * statically in the layout. Otherwise we have to abort decoding
+                 */
+                complete = false;
+                if (isTypeStringStatic32Bytes(varDecl.typeString)) {
+                    typeNode = new MissingType(varDecl.vType)
+                } else {
+                    break;
+                }
+
+                continue;
+            }
+
+            stateVars.push([varDecl.name, typeNode]);
+        }
+    }
+
+
+    return [new ExpStructType(contract.name, stateVars), complete];
 }

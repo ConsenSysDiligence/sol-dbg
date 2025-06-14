@@ -4,6 +4,7 @@ import {
     ASTReader,
     BytesType,
     compileSourceString,
+    ContractDefinition,
     DataLocation,
     InferType,
     MappingType,
@@ -17,6 +18,7 @@ import { hexToBytes } from "ethereum-cryptography/utils";
 import {
     bigEndianBufToBigint,
     ExpStructType,
+    getContractLayoutType,
     ImmMap,
     makeStorageView,
     MapKeys,
@@ -195,7 +197,7 @@ const S = new ExpStructType("S", [
     ["y", bool]
 ]);
 const CLayoutType = new ExpStructType(
-    "C_layout",
+    "C",
     [
         ["a", uint256],
         ["e", new PointerType(new ArrayType(uint8), DataLocation.Storage)],
@@ -683,6 +685,7 @@ const samples: Array<[StorageDesc, number, number, TypeNode | TypeGenerator, Val
 ];
 
 let unit: SourceUnit;
+const infer = new InferType("0.8.21");
 
 beforeAll(async () => {
     const file = fse.readFileSync("test/samples/decoding/storage_views_test.sol", {
@@ -701,7 +704,6 @@ beforeAll(async () => {
 });
 
 describe(`Storage Decoding Tests`, () => {
-    const infer = new InferType("0.8.21");
     for (const [storageDesc, key, offset, typeDesc, expectedValue] of samples) {
         const storage = toStorage(storageDesc);
 
@@ -756,3 +758,22 @@ describe(`Storage Decoding Tests`, () => {
         expect(value.field("f")).toEqual(expected);
     });
 });
+
+const contractLayoutTestSamples: [string, ExpStructType][] = [
+    ["C", CLayoutType]
+]
+describe(`Contract Layout Type Tests`, () => {
+    for (const [name, expectedType] of contractLayoutTestSamples) {
+        it(`Contract ${name}`, () => {
+            const defs = unit.getChildrenByType(ContractDefinition).filter((c) => c.name === name);
+            expect(defs.length === 1).toBeTruthy();
+            const def = single(defs);
+            const [type, complete] = getContractLayoutType(def, infer);
+
+            expect(complete).toBeTruthy();
+            console.error(type);
+            expect(type.pp()).toEqual(expectedType.pp());
+        })
+
+    }
+})
