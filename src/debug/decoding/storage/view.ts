@@ -3,9 +3,6 @@ import {
     ArrayType,
     BoolType,
     BytesType,
-    ContractDefinition,
-    EnumDefinition,
-    enumToIntType,
     FixedBytesType,
     InferType,
     IntType,
@@ -13,11 +10,9 @@ import {
     PointerType,
     StringType,
     TypeNode,
-    UserDefinedType,
-    UserDefinedValueTypeDefinition
 } from "solc-typed-ast";
 import { Struct, Value } from "../value";
-import { View } from "../view";
+import { DecodingError, View } from "../view";
 import { Storage } from "../../types";
 import {
     address,
@@ -43,18 +38,6 @@ function move(loc: StorageLocation, byBytes: number): StorageLocation {
     const [key, endOffsetInWord] = loc;
     assert(endOffsetInWord >= byBytes, ``);
     return endOffsetInWord === byBytes ? [key + 1n, 32] : [key, endOffsetInWord - byBytes];
-}
-
-export function roundLocToType(
-    loc: StorageLocation,
-    typ: TypeNode,
-    infer: InferType
-): StorageLocation {
-    if (typeFitsInLoc(typ, loc, infer)) {
-        return loc;
-    }
-
-    return nextWord(loc);
 }
 
 const defaultInfer = new InferType("0.8.30");
@@ -415,8 +398,12 @@ export class MapStorageView extends BaseStorageView<Map<Value, Value>, MappingTy
                     this.mapKeys
                 );
                 decodedValue = valueView.decode(state);
-            } catch (DecodingError) {
-                continue;
+            } catch (e: unknown) {
+                if (e instanceof DecodingError) {
+                    continue;
+                }
+
+                throw e;
             }
 
             if (decodedKey !== undefined && decodedValue !== undefined) {
@@ -526,22 +513,6 @@ function staticSize(typ: TypeNode, infer: InferType): number {
 
     if (typ instanceof AddressType) {
         return 20;
-    }
-
-    // @todo maybe remove all these in a pre-pass
-    if (typ instanceof UserDefinedType) {
-        if (typ.definition instanceof EnumDefinition) {
-            return enumToIntType(typ.definition).nBits / 8;
-        }
-
-        // @todo remove this in a pre-pass
-        if (typ.definition instanceof UserDefinedValueTypeDefinition) {
-            return staticSize(infer.typeNameToTypeNode(typ.definition.underlyingType), infer);
-        }
-
-        if (typ.definition instanceof ContractDefinition) {
-            return 20;
-        }
     }
 
     if (typ instanceof BytesType || typ instanceof StringType) {

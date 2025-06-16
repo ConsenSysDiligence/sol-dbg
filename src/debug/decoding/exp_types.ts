@@ -3,6 +3,8 @@ import {
     assert,
     ContractDefinition,
     DataLocation,
+    EnumDefinition,
+    enumToIntType,
     InferType,
     MappingType,
     Mutability,
@@ -31,7 +33,7 @@ export class ExpStructType extends TypeNode {
     }
 
     pp(): string {
-        return `<internal struct ${this.name}>`;
+        return `struct ${this.name}{\n${this.fields.map(([name, type]) => `${name}: ${type.pp()}`).join("\n")}\n}`;
     }
 }
 
@@ -82,7 +84,11 @@ export function simplifyType(
             assert(loc !== undefined, `Missing location in struct expansion {0}`, rawT);
             const fields: Array<[string, TypeNode]> = rawT.definition.vMembers.map((decl) => [
                 decl.name,
-                infer.typeNameToSpecializedTypeNode(decl, loc)
+                simplifyType(
+                    infer.typeNameToSpecializedTypeNode(decl.vType as TypeName, loc),
+                    infer,
+                    loc
+                )
             ]);
 
             return new ExpStructType(rawT.name, fields, rawT);
@@ -98,6 +104,10 @@ export function simplifyType(
 
         if (rawT.definition instanceof ContractDefinition) {
             return address;
+        }
+
+        if (rawT.definition instanceof EnumDefinition) {
+            return enumToIntType(rawT.definition);
         }
     }
 
@@ -122,32 +132,36 @@ function isTypeStringStatic32Bytes(t: string): boolean {
  * Given a `ContractDefinition` try and compute an `ExpStructType` struct that
  * describes the layout of the class.  This takes into account all base classes,
  * and simplifies types using `simplifyType`.
- * 
+ *
  * Since we may be missing AST information for some user-defined types, or even
  * entire bases, the layout may be partial. It may be only up to a given base,
- * and it may be missing exact type information for certain fields. 
- * 
+ * and it may be missing exact type information for certain fields.
+ *
  * We return a tuple with the resulting layout, and a boolean specifying whether
  * the layout is complete.
- * 
- * @param def 
- * @param infer 
+ *
+ * @param def
+ * @param infer
  */
-export function getContractLayoutType(contract: ContractDefinition, infer: InferType): [ExpStructType, boolean] {
-    const stateVars: [string, TypeNode][] = [];
+export function getContractLayoutType(
+    contract: ContractDefinition,
+    infer: InferType
+): [ExpStructType, boolean] {
+    const stateVars: Array<[string, TypeNode]> = [];
     let complete = true;
 
     for (const base of [...contract.vLinearizedBaseContracts].reverse()) {
         if (base === null || base === undefined) {
             complete = false;
-            break
+            break;
         }
 
         for (const varDecl of base.vStateVariables) {
             // Not part of layout
             if (
                 varDecl.mutability === Mutability.Constant ||
-                varDecl.mutability === Mutability.Immutable
+                varDecl.mutability === Mutability.Immutable ||
+                varDecl.storageLocation === DataLocation.Transient
             ) {
                 continue;
             }
@@ -167,7 +181,7 @@ export function getContractLayoutType(contract: ContractDefinition, infer: Infer
                  */
                 complete = false;
                 if (isTypeStringStatic32Bytes(varDecl.typeString)) {
-                    typeNode = new MissingType(varDecl.vType)
+                    typeNode = new MissingType(varDecl.vType);
                 } else {
                     break;
                 }
@@ -175,10 +189,9 @@ export function getContractLayoutType(contract: ContractDefinition, infer: Infer
                 continue;
             }
 
-            stateVars.push([varDecl.name, typeNode]);
+            stateVars.push([varDecl.name, simplifyType(typeNode, infer, DataLocation.Storage)]);
         }
     }
-
 
     return [new ExpStructType(contract.name, stateVars), complete];
 }

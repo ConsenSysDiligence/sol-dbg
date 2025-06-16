@@ -1,6 +1,7 @@
 import expect from "expect";
 import {
     ArrayType,
+    assert,
     ASTReader,
     BytesType,
     compileSourceString,
@@ -11,7 +12,8 @@ import {
     PointerType,
     SourceUnit,
     StringType,
-    TypeNode
+    TypeNode,
+    XPath
 } from "solc-typed-ast";
 import { Struct, Value } from "../../src/debug/decoding/value";
 import { hexToBytes } from "ethereum-cryptography/utils";
@@ -138,18 +140,8 @@ const moreStructsStorDesc = {
     "0xf3f7a9fe364faab93b216da50a3214154f22a0a2b415b23a84c8169e8b636ee3": "0xff",
     "0xf652222313e28459528d920b65115c16c04f3efc82aaedc97be59f3f377c0d3f": "0xb26e"
 };
-const bytesStorDesc = {
-    "0x2584db4a68aa8b172f70bc04e2e74541617c003374de6eb4b295e823e5beab01":
-        "0x6161616161616161616161616161616161616161616161616161616161616161",
-    "0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563":
-        "0x0102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e3e",
-    "0x405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5ace":
-        "0x616161616161616161616161616161616161616161616161616161616161613e",
-    "0xb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6": "0x41",
-    "0xb5d9d894133a730aa651ef62d26b0ffa846233c74177a591a4a896adfda97d22":
-        "0x0102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f",
-    "0xc2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85b": "0x41"
-};
+const bytesStorDesc = { '0x1ab0c6948a275349ae45a06aad66a8bd65ac18074615d53676c09b67809099e0': '0x0102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f', '0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563': '0x0102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e3e', '0x2f2149d90beac0570c7f26368e4bc897ca24bba51b1a0f4960d358f764f11f31': '0x0102030405060708090a0b0c0d0e0f00000000000000000000000000000000', '0x405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5ace': '0x61', '0x8a35acfbc15ff81a39ae7d344fd709f28e8600b4aa8c65c6b64bfe7fe36bd19b': '0x41', '0xb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6': '0x41', '0xb5d9d894133a730aa651ef62d26b0ffa846233c74177a591a4a896adfda97d22': '0x0102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f', '0xc167b0e3c82238f4f2d1a50a8b3a44f96311d77b148c30dc0ef863e1a060dcb6': '0x6161616161616161616161616161616161616161616161616161616161616161', '0xc2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85b': '0x616161616161616161616161616161616161616161616161616161616161613e' }
+
 const miscStorDesc = {
     "0x0175b7a638427703f0dbe7bb9bbf987a2551717b34e79f33b5b1008d1fa01db9":
         "0x04000000000000000000000000000003",
@@ -163,6 +155,7 @@ const miscStorDesc = {
     "0x3ad8aa4f87544323a9d1e5dd902f40c356527a7955687113db5f9a85ad579dc1": "0x06",
     "0x405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5ace":
         "0x0200000000000000000000000000000001",
+    "0x50bb669a95c7b50b7e8a6f09454034b2b14cf2b85c730dca9a539ca82cb6e350": "0x65",
     "0x55f448fdea98c4d29eb340757ef0a66cd03dbb9538908a6a81d96026b71ec475": "0x06",
     "0x66de8ffda797e3de9c05e8fc57b3bf0ec28a930d40b0d285d93c06501cf6a090": "0x04",
     "0x6d4407e7be21f808e6509aa9fa9143369579dd7d760fe20a2c09680fc146134f": "0x08",
@@ -190,6 +183,12 @@ const miscStorDesc = {
         "0x02000000000000000000000000000001",
     "0xf652222313e28459528d920b65115c16c04f3efc82aaedc97be59f3f377c0d3f": "0x03"
 };
+const mapWithComplexKeysStorDesc = {
+    "0x134266f27b803cd76c24f211c4457379daae4fac618eaef4ab979796508e0c3e": "0x03",
+    "0x6b561827e89dd864e82f1287442a6f56c5408b1313c5133c7dacd8fed2fbd375": "0x04",
+    "0xcb85c6f413feb024aaf9fe6ef133f21422160ad679b1000921a475400fde1ef5": "0x02",
+    "0xe2fe0e2425d2aed896ad86c3e2c0ea7d679d08e1a849442d22f76adef98bbd97": "0x01"
+};
 
 const uint8x2 = new PointerType(new ArrayType(uint8, 2n), DataLocation.Storage);
 const S = new ExpStructType("S", [
@@ -201,20 +200,26 @@ const CLayoutType = new ExpStructType(
     [
         ["a", uint256],
         ["e", new PointerType(new ArrayType(uint8), DataLocation.Storage)],
-        ["f", new MappingType(uint256, S)],
+        [
+            "f",
+            new PointerType(
+                new MappingType(uint256, new PointerType(S, DataLocation.Storage)),
+                DataLocation.Storage
+            )
+        ],
         ["g", uint16],
         ["h", uint16],
         ["s", new PointerType(S, DataLocation.Storage)],
         ["k", int8],
         ["l", bytes21],
-        ["m", new PointerType(new ArrayType(uint8, 10n), DataLocation.Storage)],
+        ["m", new PointerType(new ArrayType(uint8, 12n), DataLocation.Storage)],
         ["n", new PointerType(new ArrayType(bytes5, 8n), DataLocation.Storage)],
         ["o", bytes5]
     ],
     undefined
 );
 
-const SimpleTypes = new ExpStructType("SimpleTypes", [
+const SimpleTypes = new ExpStructType("MoreStructs.SimpleTypes", [
     ["a", int8],
     ["b", uint16],
     ["c", uint256],
@@ -224,39 +229,45 @@ const SimpleTypes = new ExpStructType("SimpleTypes", [
     ["b2", bytes32],
     ["en", uint8]
 ]);
-const S_static = new ExpStructType("S_static", [
+const S_static = new ExpStructType("MoreStructs.S_static", [
     ["x", int8],
     ["y", uint256],
     ["b", bool],
     ["addrs", address]
 ]);
-const S1 = new ExpStructType("S1", [
+const S1 = new ExpStructType("MoreStructs.S1", [
     ["x", int8],
     ["y", uint256],
     ["b", bool],
     ["addrs", new PointerType(new ArrayType(address), DataLocation.Storage)]
 ]);
-const S_nested_static_static = new ExpStructType("S_nested_static_static", [
+const S_nested_static_static = new ExpStructType("MoreStructs.S_nested_static_static", [
     ["t", int16],
     ["s", new PointerType(S_static, DataLocation.Storage)],
     ["b", bytes3]
 ]);
-const S_nested_dynamic_static = new ExpStructType("S_nested_dynamic_static", [
+const S_nested_dynamic_static = new ExpStructType("MoreStructs.S_nested_dynamic_static", [
     ["t", new PointerType(new ArrayType(int16), DataLocation.Storage)],
     ["s", new PointerType(S_static, DataLocation.Storage)],
     ["b", bytes3]
 ]);
-const S_nested_static_dynamic = new ExpStructType("S_nested_static_dynamic", [
+const S_nested_static_dynamic = new ExpStructType("MoreStructs.S_nested_static_dynamic", [
     ["t", int16],
     ["s", new PointerType(S1, DataLocation.Storage)],
     ["b", bytes3]
 ]);
-const S_struct_arr = new ExpStructType("S_struct_arr", [
+const S_struct_arr = new ExpStructType("MoreStructs.S_struct_arr", [
     ["x", int8],
-    ["sArr", new PointerType(new ArrayType(S1), DataLocation.Storage)]
+    [
+        "sArr",
+        new PointerType(
+            new ArrayType(new PointerType(S1, DataLocation.Storage)),
+            DataLocation.Storage
+        )
+    ]
 ]);
-const ArrTypes = new ExpStructType("ArrTypes", [
-    ["a1", new PointerType(new ArrayType(int16), DataLocation.Storage)],
+const ArrTypes = new ExpStructType("MoreStructs.ArrTypes", [
+    ["a1", new PointerType(new ArrayType(uint16), DataLocation.Storage)],
     ["a2", new PointerType(new ArrayType(int128, 4n), DataLocation.Storage)]
 ]);
 
@@ -273,27 +284,28 @@ const MoreStructsLayoutType = new ExpStructType("MoreStructs", [
 const bytesLayoutType = new ExpStructType("Bytes", [
     ["smallB", new PointerType(new BytesType(), DataLocation.Storage)],
     ["bigB", new PointerType(new BytesType(), DataLocation.Storage)],
+    ["biggerB", new PointerType(new BytesType(), DataLocation.Storage)],
     ["smallS", new PointerType(new StringType(), DataLocation.Storage)],
     ["bigS", new PointerType(new StringType(), DataLocation.Storage)]
 ]);
-const SmallerThanWordType = new ExpStructType("SmallerThanWord", [
+const SmallerThanWordType = new ExpStructType("Misc.SmallerThanWord", [
     ["a", uint120],
     ["b", uint112]
 ]);
-const OneWordType = new ExpStructType("OneWord", [
+const OneWordType = new ExpStructType("Misc.OneWord", [
     ["a", uint120],
     ["b", uint136]
 ]);
-const MoreThanOneWordType = new ExpStructType("MoreThanOneWord", [
+const MoreThanOneWordType = new ExpStructType("Misc.MoreThanOneWord", [
     ["a", uint120],
     ["b", uint144]
 ]);
-const ThreeWordsType = new ExpStructType("ThreeWords", [
+const ThreeWordsType = new ExpStructType("Misc.ThreeWords", [
     ["a", uint120],
     ["c", uint248],
     ["b", uint144]
 ]);
-const FourWordsType = new ExpStructType("FourWords", [
+const FourWordsType = new ExpStructType("Misc.FourWords", [
     ["a", uint120],
     ["c", uint256],
     ["d", uint248],
@@ -356,7 +368,8 @@ const miscLayoutType = new ExpStructType("Misc", [
             new ArrayType(new PointerType(FourWordsType, DataLocation.Storage), 2n),
             DataLocation.Storage
         )
-    ]
+    ],
+    ["v", uint256]
 ]);
 
 const samples: Array<[StorageDesc, number, number, TypeNode | TypeGenerator, Value]> = [
@@ -395,7 +408,7 @@ const samples: Array<[StorageDesc, number, number, TypeNode | TypeGenerator, Val
             ],
             ["k", -127n],
             ["l", hexToBytes("00000000000000000000000000000000000000002a")],
-            ["m", [1n, 2n, 3n, 4n, 5n, 6n, 7n, 8n, 9n, 10n]],
+            ["m", [1n, 2n, 3n, 4n, 5n, 6n, 7n, 8n, 9n, 10n, 0n, 0n]],
             [
                 "n",
                 [
@@ -578,6 +591,10 @@ const samples: Array<[StorageDesc, number, number, TypeNode | TypeGenerator, Val
                 "bigB",
                 hexToBytes("000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f")
             ],
+            [
+                "biggerB",
+                hexToBytes("000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f")
+            ],
             ["smallS", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
             ["bigS", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]
         ])
@@ -660,7 +677,7 @@ const samples: Array<[StorageDesc, number, number, TypeNode | TypeGenerator, Val
                         ["a", 4n],
                         ["c", 5n],
                         ["b", 6n]
-                    ]),
+                    ])
                 ]
             ],
             [
@@ -677,9 +694,10 @@ const samples: Array<[StorageDesc, number, number, TypeNode | TypeGenerator, Val
                         ["c", 6n],
                         ["d", 7n],
                         ["b", 8n]
-                    ]),
+                    ])
                 ]
             ],
+            ["v", 101n]
         ])
     ]
 ];
@@ -715,7 +733,7 @@ describe(`Storage Decoding Tests`, () => {
         });
     }
 
-    it(`Map decoding with keys`, () => {
+    it(`Map decoding with simple keys`, () => {
         const mapKeys: MapKeys = new Map([
             [
                 44n,
@@ -757,23 +775,92 @@ describe(`Storage Decoding Tests`, () => {
         const value = view.decode(toStorage(CStorDesc)) as Struct;
         expect(value.field("f")).toEqual(expected);
     });
+
+    it(`Map decoding with complex keys`, () => {
+        const mapKeys: MapKeys = new Map([
+            [
+                0n,
+                [
+                    [
+                        hexToBytes(
+                            "00000000000000000000000000000000000000000000000000000000000000030102030000000000000000000000000000000000000000000000000000000000"
+                        ),
+                        0xce4edd0c850af0ce44d5c79dd9354de666aa901a00d2111f49bd97f94cb8f6bbn
+                    ],
+                    [
+                        hexToBytes(
+                            "00000000000000000000000000000000000000000000000000000000000000030102040000000000000000000000000000000000000000000000000000000000"
+                        ),
+                        0x8a03f525df54a7cbda74e29f15a3ba86a222d05788f5db224bb729a2a10080f4n
+                    ]
+                ]
+            ],
+            [
+                1n,
+                [
+                    [
+                        hexToBytes(
+                            "00000000000000000000000000000000000000000000000000000000000000036162630000000000000000000000000000000000000000000000000000000000"
+                        ),
+                        0xac85c8cc1ac92e94a731b8df588044cbfd366c5ee08805d198cb1b094f3cacacn
+                    ],
+                    [
+                        hexToBytes(
+                            "00000000000000000000000000000000000000000000000000000000000000036465660000000000000000000000000000000000000000000000000000000000"
+                        ),
+                        0x007190f0fed5dcd60b9b3a23e83c99c86ff19bc3d9b603c39d3faf6b4ed8c5dcn
+                    ]
+                ]
+            ]
+        ]);
+
+        const expected = new Struct([
+            [
+                "m1",
+                new Map([
+                    [hexToBytes("010203"), 1n],
+                    [hexToBytes("010204"), 2n]
+                ])
+            ],
+            [
+                "m2",
+                new Map([
+                    ["abc", 3n],
+                    ["def", 4n]
+                ])
+            ],
+            ["mNoKeys", new Map([])]
+        ]);
+
+        const decl = new XPath(unit).query("//ContractDefinition[@name='MapWithComplexKeys']")[0];
+        const [layout, complete] = getContractLayoutType(decl, infer);
+        assert(complete, `Unexpected incomplete layout of ${decl.name}`);
+
+        const view = makeStorageView(layout, infer, [0n, 32], mapKeys);
+        const value = view.decode(toStorage(mapWithComplexKeysStorDesc)) as Struct;
+        expect(value).toEqual(expected);
+    });
 });
 
-const contractLayoutTestSamples: [string, ExpStructType][] = [
-    ["C", CLayoutType]
-]
+const contractLayoutTestSamples: ExpStructType[] = [
+    CLayoutType,
+    MoreStructsLayoutType,
+    miscLayoutType,
+    bytesLayoutType
+];
+
 describe(`Contract Layout Type Tests`, () => {
-    for (const [name, expectedType] of contractLayoutTestSamples) {
-        it(`Contract ${name}`, () => {
-            const defs = unit.getChildrenByType(ContractDefinition).filter((c) => c.name === name);
+    for (const expectedType of contractLayoutTestSamples) {
+        it(`Contract ${expectedType.name}`, () => {
+            const defs = unit
+                .getChildrenByType(ContractDefinition)
+                .filter((c) => c.name === expectedType.name);
             expect(defs.length === 1).toBeTruthy();
             const def = single(defs);
             const [type, complete] = getContractLayoutType(def, infer);
 
             expect(complete).toBeTruthy();
-            console.error(type);
             expect(type.pp()).toEqual(expectedType.pp());
-        })
-
+        });
     }
-})
+});

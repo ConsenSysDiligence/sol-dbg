@@ -215,6 +215,8 @@ contract MoreStructs {
     function foo() public {}
 }
 
+type MyUint is uint;
+
 contract Misc {
     struct SmallerThanWord {
         uint120 a;
@@ -253,6 +255,35 @@ contract Misc {
     MoreThanOneWord[2] r = [MoreThanOneWord(1, 2), MoreThanOneWord(3, 4)];
     ThreeWords[2] s = [ThreeWords(1, 2, 3), ThreeWords(4, 5, 6)];
     FourWords[2] t = [FourWords(1, 2, 3, 4), FourWords(5, 6, 7, 8)];
+
+    MyUint v = MyUint.wrap(101);
+    function foo() public {}
+}
+
+contract Bytes {
+    bytes smallB = hex"000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e";
+    bytes bigB = hex"000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f";
+    bytes biggerB = hex"000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f";
+    string smallS = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    string bigS = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";    
+    
+    function foo() public {}
+}
+
+contract MapWithComplexKeys {
+    mapping (bytes => uint) m1;
+    mapping (string => uint) m2;
+    mapping (string => uint) mNoKeys;
+
+    constructor() {
+        m1[hex"010203"] = 1;
+        m1[hex"010204"] = 2;
+
+        m2["abc"] = 3;
+        m2["def"] = 4;
+
+        mNoKeys["foo"] = 1;
+    }
 
     function foo() public {}
 }
