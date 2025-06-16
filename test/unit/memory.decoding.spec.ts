@@ -258,8 +258,8 @@ describe(`Memory Decoding Tests`, () => {
         const memory = hexToBytes(memoryStr);
 
         it(`Sample ${ppType(typeDesc)}`, () => {
-            const type = typeDesc instanceof TypeNode ? typeDesc : typeDesc(unit);
-            const view = makeMemoryView(type, infer, BigInt(offset));
+            const type = simplifyType(typeDesc instanceof TypeNode ? typeDesc : typeDesc(unit), infer, DataLocation.Memory);
+            const view = makeMemoryView(type, BigInt(offset));
             const values = view.decode(memory);
             expect(values).toEqual(expectedValue);
         });

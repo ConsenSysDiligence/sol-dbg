@@ -4,7 +4,6 @@ import {
     BoolType,
     BytesType,
     FixedBytesType,
-    InferType,
     IntType,
     MappingType,
     PointerType,
@@ -40,8 +39,6 @@ function move(loc: StorageLocation, byBytes: number): StorageLocation {
     return endOffsetInWord === byBytes ? [key + 1n, 32] : [key, endOffsetInWord - byBytes];
 }
 
-const defaultInfer = new InferType("0.8.30");
-
 export abstract class BaseStorageView<
     Val extends Value,
     Type extends TypeNode = TypeNode
@@ -49,8 +46,8 @@ export abstract class BaseStorageView<
     key: bigint;
     endOffsetInWord: number;
 
-    constructor(type: Type, infer: InferType, loc: [bigint, number]) {
-        super(type, infer, loc);
+    constructor(type: Type, loc: [bigint, number]) {
+        super(type, loc);
         [this.key, this.endOffsetInWord] = loc;
     }
 
@@ -149,10 +146,6 @@ export abstract class BaseStorageView<
 }
 
 export class IntStorageView extends BaseStorageView<bigint, IntType> {
-    constructor(type: IntType, loc: [bigint, number]) {
-        super(type, defaultInfer, loc);
-    }
-
     decode(state: Storage): bigint {
         return this.decodeIntAt(this.key, this.endOffsetInWord, this.type, state);
     }
@@ -163,10 +156,6 @@ export class IntStorageView extends BaseStorageView<bigint, IntType> {
 }
 
 export class BoolStorageView extends BaseStorageView<boolean, BoolType> {
-    constructor(loc: [bigint, number]) {
-        super(bool, defaultInfer, loc);
-    }
-
     decode(state: Storage): boolean {
         return this.decodeIntAt(this.key, this.endOffsetInWord, uint8, state) !== BigInt(0);
     }
@@ -177,10 +166,6 @@ export class BoolStorageView extends BaseStorageView<boolean, BoolType> {
 }
 
 export class AddressStorageView extends BaseStorageView<Address, AddressType> {
-    constructor(loc: [bigint, number]) {
-        super(address, defaultInfer, loc);
-    }
-
     decode(state: Storage): Address {
         const bytes = this.fetchBytes(this.key, this.endOffsetInWord - 20, 20, state);
         return new Address(bytes);
@@ -192,10 +177,6 @@ export class AddressStorageView extends BaseStorageView<Address, AddressType> {
 }
 
 export class FixedBytesStorageView extends BaseStorageView<Uint8Array, FixedBytesType> {
-    constructor(type: FixedBytesType, loc: [bigint, number]) {
-        super(type, defaultInfer, loc);
-    }
-
     decode(state: Storage): Uint8Array {
         if (this.endOffsetInWord < this.type.size) {
             this.fail(
@@ -219,9 +200,9 @@ export class FixedBytesStorageView extends BaseStorageView<Uint8Array, FixedByte
 
 export class PointerStorageView extends BaseStorageView<Value, PointerType> {
     innerView: BaseStorageView<Value, TypeNode>;
-    constructor(type: PointerType, infer: InferType, loc: [bigint, number], mapKeys?: MapKeys) {
-        super(type, infer, loc);
-        this.innerView = makeStorageView(type.to, infer, loc, mapKeys);
+    constructor(type: PointerType, loc: [bigint, number], mapKeys?: MapKeys) {
+        super(type, loc);
+        this.innerView = makeStorageView(type.to, loc, mapKeys);
     }
 
     decode(state: Storage): Value {
@@ -245,11 +226,10 @@ export class ArrayStorageView extends BaseStorageView<Value[], ArrayType> {
 
     constructor(
         type: ArrayType,
-        infer: InferType,
         loc: [bigint, number],
         private readonly mapKeys: MapKeys | undefined = undefined
     ) {
-        super(type, infer, loc);
+        super(type, loc);
 
         if (type.size === undefined) {
             this._nextLoc = nextWord(loc);
@@ -258,9 +238,9 @@ export class ArrayStorageView extends BaseStorageView<Value[], ArrayType> {
             let tmpL: StorageLocation = [0n, 32];
             let nEls = 0n;
 
-            while (typeFitsInLoc(type.elementT, tmpL, infer) && tmpL[0] === 0n) {
+            while (typeFitsInLoc(type.elementT, tmpL) && tmpL[0] === 0n) {
                 nEls++;
-                const elView = makeStorageView(type.elementT, infer, tmpL);
+                const elView = makeStorageView(type.elementT, tmpL);
                 tmpL = elView.nextLoc();
             }
 
@@ -304,7 +284,7 @@ export class ArrayStorageView extends BaseStorageView<Value[], ArrayType> {
         const elT = this.type.elementT;
 
         for (let i = 0; i < size; i++) {
-            const view = makeStorageView(elT, this.infer, elLoc, this.mapKeys);
+            const view = makeStorageView(elT, elLoc, this.mapKeys);
             res.push(view.decode(state));
             elLoc = view.nextLoc();
         }
@@ -317,14 +297,14 @@ export class StructStorageView extends BaseStorageView<Struct, ExpStructType> {
     fieldViews: Array<[string, BaseStorageView<Value, TypeNode>]> = [];
     private _nextLoc: StorageLocation;
 
-    constructor(type: ExpStructType, infer: InferType, loc: StorageLocation, mapKeys?: MapKeys) {
-        super(type, infer, loc);
+    constructor(type: ExpStructType, loc: StorageLocation, mapKeys?: MapKeys) {
+        super(type, loc);
         assert(this.endOffsetInWord === 32, `Structs must start at 32 byte boundaries`);
 
         let fieldLoc = this.loc;
 
         for (const [name, fieldT] of this.type.fields) {
-            const fieldView = makeStorageView(fieldT, this.infer, fieldLoc, mapKeys);
+            const fieldView = makeStorageView(fieldT, fieldLoc, mapKeys);
             this.fieldViews.push([name, fieldView]);
             fieldLoc = fieldView.nextLoc();
         }
@@ -348,11 +328,10 @@ export class StructStorageView extends BaseStorageView<Struct, ExpStructType> {
 export class MapStorageView extends BaseStorageView<Map<Value, Value>, MappingType> {
     constructor(
         type: MappingType,
-        infer: InferType,
         loc: StorageLocation,
         private readonly mapKeys: MapKeys | undefined = undefined
     ) {
-        super(type, infer, loc);
+        super(type, loc);
     }
 
     nextLoc(): StorageLocation {
@@ -380,9 +359,9 @@ export class MapStorageView extends BaseStorageView<Map<Value, Value>, MappingTy
                 `Unexpected mapping key type {0}`,
                 this.type.keyType
             );
-            keyView = makeMemoryView(this.type.keyType.to, this.infer, 0n);
+            keyView = makeMemoryView(this.type.keyType.to, 0n);
         } else {
-            keyView = makeMemoryView(this.type.keyType, this.infer, 0n);
+            keyView = makeMemoryView(this.type.keyType, 0n);
         }
 
         for (const [candidateKey, candidateSlot] of candidateKeys) {
@@ -393,7 +372,6 @@ export class MapStorageView extends BaseStorageView<Map<Value, Value>, MappingTy
                 decodedKey = keyView.decode(candidateKey);
                 const valueView = makeStorageView(
                     this.type.valueType,
-                    this.infer,
                     [candidateSlot, 32],
                     this.mapKeys
                 );
@@ -470,14 +448,14 @@ export class StringStorageView extends PackedArrayStorageView<string, StringType
  * @param infer
  * @returns
  */
-function typeFitsInLoc(typ: TypeNode, loc: StorageLocation, infer: InferType): boolean {
+function typeFitsInLoc(typ: TypeNode, loc: StorageLocation): boolean {
     const [, endOffsetInWord] = loc;
 
     if (typeStartsInNewWord(typ)) {
         return endOffsetInWord == 32;
     }
 
-    return staticSize(typ, infer) <= endOffsetInWord;
+    return staticSize(typ) <= endOffsetInWord;
 }
 
 export function nextWord(loc: StorageLocation): StorageLocation {
@@ -498,7 +476,7 @@ function typeStartsInNewWord(t: TypeNode): boolean {
  * have special layout rules (always start in a new word, next item in layout
  * starts in own word too).
  */
-function staticSize(typ: TypeNode, infer: InferType): number {
+function staticSize(typ: TypeNode): number {
     if (typ instanceof IntType) {
         return typ.nBits / 8;
     }
@@ -520,7 +498,7 @@ function staticSize(typ: TypeNode, infer: InferType): number {
     }
 
     if (typ instanceof PointerType) {
-        return staticSize(typ.to, infer);
+        return staticSize(typ.to);
     }
 
     nyi(`NYI staticSize(${typ.pp()})`);
@@ -528,11 +506,10 @@ function staticSize(typ: TypeNode, infer: InferType): number {
 
 export function makeStorageView(
     type: TypeNode,
-    infer: InferType,
     loc: StorageLocation,
     mapKeys?: MapKeys
 ): BaseStorageView<Value, TypeNode> {
-    if (!typeFitsInLoc(type, loc, infer)) {
+    if (!typeFitsInLoc(type, loc)) {
         loc = nextWord(loc);
     }
 
@@ -541,11 +518,11 @@ export function makeStorageView(
     }
 
     if (type instanceof BoolType) {
-        return new BoolStorageView(loc);
+        return new BoolStorageView(bool, loc);
     }
 
     if (type instanceof AddressType) {
-        return new AddressStorageView(loc);
+        return new AddressStorageView(address, loc);
     }
 
     if (type instanceof FixedBytesType) {
@@ -553,27 +530,27 @@ export function makeStorageView(
     }
 
     if (type instanceof BytesType) {
-        return new BytesStorageView(type, infer, loc);
+        return new BytesStorageView(type, loc);
     }
 
     if (type instanceof StringType) {
-        return new StringStorageView(type, infer, loc);
+        return new StringStorageView(type, loc);
     }
 
     if (type instanceof ArrayType) {
-        return new ArrayStorageView(type, infer, loc, mapKeys);
+        return new ArrayStorageView(type, loc, mapKeys);
     }
 
     if (type instanceof PointerType) {
-        return new PointerStorageView(type, infer, loc, mapKeys);
+        return new PointerStorageView(type, loc, mapKeys);
     }
 
     if (type instanceof ExpStructType) {
-        return new StructStorageView(type, infer, loc, mapKeys);
+        return new StructStorageView(type, loc, mapKeys);
     }
 
     if (type instanceof MappingType) {
-        return new MapStorageView(type, infer, loc, mapKeys);
+        return new MapStorageView(type, loc, mapKeys);
     }
 
     nyi(`makeStoragView(${type.pp()})`);

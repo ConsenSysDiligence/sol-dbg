@@ -727,7 +727,7 @@ describe(`Storage Decoding Tests`, () => {
 
         it(`Sample ${ppType(typeDesc)}`, () => {
             const type = typeDesc instanceof TypeNode ? typeDesc : typeDesc(unit);
-            const view = makeStorageView(type, infer, [BigInt(key), offset]);
+            const view = makeStorageView(type, [BigInt(key), offset]);
             const value = view.decode(storage);
             expect(value).toEqual(expectedValue);
         });
@@ -771,7 +771,7 @@ describe(`Storage Decoding Tests`, () => {
             ]
         ]);
 
-        const view = makeStorageView(CLayoutType, infer, [42n, 32], mapKeys);
+        const view = makeStorageView(CLayoutType, [42n, 32], mapKeys);
         const value = view.decode(toStorage(CStorDesc)) as Struct;
         expect(value.field("f")).toEqual(expected);
     });
@@ -836,7 +836,7 @@ describe(`Storage Decoding Tests`, () => {
         const [layout, complete] = getContractLayoutType(decl, infer);
         assert(complete, `Unexpected incomplete layout of ${decl.name}`);
 
-        const view = makeStorageView(layout, infer, [0n, 32], mapKeys);
+        const view = makeStorageView(layout, [0n, 32], mapKeys);
         const value = view.decode(toStorage(mapWithComplexKeysStorDesc)) as Struct;
         expect(value).toEqual(expected);
     });

@@ -4,17 +4,12 @@ import {
     assert,
     BoolType,
     BytesType,
-    ContractDefinition,
-    EnumDefinition,
-    enumToIntType,
     FixedBytesType,
-    InferType,
     IntType,
     PointerType,
     StringType,
     TupleType,
     TypeNode,
-    UserDefinedType,
 } from "solc-typed-ast";
 import { Memory } from "../../types";
 import { Struct, Value } from "../value";
@@ -122,11 +117,10 @@ export abstract class BaseCalldataView<
 > extends View<Memory, Val, bigint, Type> {
     constructor(
         type: Type,
-        infer: InferType,
         loc: bigint,
         protected base: bigint
     ) {
-        super(type, infer, loc);
+        super(type, loc);
     }
 
     protected readMemAt(off: number | bigint, calldata: Memory, len: bigint | number): Uint8Array {
@@ -185,7 +179,7 @@ export abstract class BaseCalldataView<
 
         for (const t of type.elements) {
             assert(t !== null, `Unexpected null element in tuple type {0}`, type);
-            res.push(makeCalldataView(t, this.infer, loc, base).decode(state));
+            res.push(makeCalldataView(t, loc, base).decode(state));
             loc += BigInt(headSize(t));
         }
 
@@ -233,54 +227,6 @@ export class FixedBytesCalldataView extends BaseCalldataView<Uint8Array, FixedBy
     }
 }
 
-/**
- * View to an Enum in calldata
- */
-export class EnumCalldataView extends BaseCalldataView<number, UserDefinedType> {
-    innnerType: IntType;
-
-    constructor(
-        public readonly type: UserDefinedType,
-        public readonly infer: InferType,
-        loc: bigint,
-        base: bigint
-    ) {
-        super(type, infer, loc, base);
-        assert(
-            type.definition instanceof EnumDefinition,
-            `Building an EnumCalldataView with wrong user defined type {0}`,
-            type.definition
-        );
-        this.innnerType = enumToIntType(this.type.definition as EnumDefinition);
-    }
-
-    decode(state: Memory): number {
-        return Number(this.decodeIntAt(this.loc, this.innnerType, state));
-    }
-}
-
-/**
- * View to a Contract in calldata (just an address)
- */
-export class ContractCalldataView extends BaseCalldataView<Address, UserDefinedType> {
-    constructor(
-        public readonly type: UserDefinedType,
-        public readonly infer: InferType,
-        loc: bigint,
-        base: bigint
-    ) {
-        super(type, infer, loc, base);
-        assert(
-            type.definition instanceof ContractDefinition,
-            `Building an ContractCalldataView with wrong user defined type {0}`,
-            type.definition
-        );
-    }
-
-    decode(state: Memory): Address {
-        return new Address(this.readMemAt(this.loc, state, 32).slice(12));
-    }
-}
 
 export class BytesCalldataView extends BaseCalldataView<Uint8Array, BytesType> {
     decode(state: Memory): Uint8Array {
@@ -333,7 +279,7 @@ export class ArrayCalldataView extends BaseCalldataView<Value[], ArrayType> {
         const elSize = BigInt(headSize(this.type.elementT));
 
         for (let i = 0; i < size; i++) {
-            const elView = makeCalldataView(this.type.elementT, this.infer, off, newBase);
+            const elView = makeCalldataView(this.type.elementT, off, newBase);
             res.push(elView.decode(state));
             off += elSize;
         }
@@ -368,59 +314,58 @@ export class PointerCalldataView extends BaseCalldataView<Value, PointerType> {
             off = this.decodeIntAt(off, uint256, state);
         }
 
-        const innerView = makeCalldataView(this.type.to, this.infer, off, this.base)
+        const innerView = makeCalldataView(this.type.to, off, this.base)
         return innerView.decode(state);
     }
 }
 
 export function makeCalldataView(
     type: TypeNode,
-    infer: InferType,
     loc: bigint,
     base: bigint
 ): BaseCalldataView<Value, TypeNode> {
     if (type instanceof IntType) {
-        return new IntCalldataView(type, infer, loc, base);
+        return new IntCalldataView(type, loc, base);
     }
 
     if (type instanceof BoolType) {
-        return new BoolCalldataView(type, infer, loc, base);
+        return new BoolCalldataView(type, loc, base);
     }
 
     if (type instanceof AddressType) {
-        return new AddressCalldataView(type, infer, loc, base);
+        return new AddressCalldataView(type, loc, base);
     }
 
     if (type instanceof FixedBytesType) {
-        return new FixedBytesCalldataView(type, infer, loc, base);
+        return new FixedBytesCalldataView(type, loc, base);
     }
 
     if (type instanceof TupleType) {
-        return new TupleCalldataView(type, infer, loc, base);
+        return new TupleCalldataView(type, loc, base);
     }
 
     if (type instanceof BytesType) {
-        return new BytesCalldataView(type, infer, loc, base);
+        return new BytesCalldataView(type, loc, base);
     }
 
     if (type instanceof StringType) {
-        return new StringCalldataView(type, infer, loc, base);
+        return new StringCalldataView(type, loc, base);
     }
 
     if (type instanceof ArrayType) {
-        return new ArrayCalldataView(type, infer, loc, base);
+        return new ArrayCalldataView(type, loc, base);
     }
 
     if (type instanceof ExpStructType) {
-        return new StructCalldataView(type, infer, loc, base);
+        return new StructCalldataView(type, loc, base);
     }
 
     if (type instanceof TupleType) {
-        return new TupleCalldataView(type, infer, loc, base);
+        return new TupleCalldataView(type, loc, base);
     }
 
     if (type instanceof PointerType) {
-        return new PointerCalldataView(type, infer, loc, base)
+        return new PointerCalldataView(type, loc, base)
     }
 
     nyi(`makeCalldataView(${type.pp()})`);
@@ -428,14 +373,13 @@ export function makeCalldataView(
 
 export function makeCalldataViews(
     types: TypeNode[],
-    infer: InferType,
     base: bigint
 ): Array<BaseCalldataView<Value, TypeNode>> {
     let off = 0n;
     const res: Array<BaseCalldataView<Value, TypeNode>> = [];
 
     for (const t of types) {
-        const view = makeCalldataView(t, infer, off, base);
+        const view = makeCalldataView(t, off, base);
         res.push(view);
         off += BigInt(headSize(t));
     }

@@ -4,7 +4,6 @@ import {
     BoolType,
     BytesType,
     FixedBytesType,
-    InferType,
     IntType,
     PointerType,
     StringType,
@@ -136,7 +135,7 @@ export class ArrayMemView extends BaseMemoryView<Value[], ArrayType> {
         const res: Value[] = [];
 
         for (let i = 0; i < size; i++) {
-            const view = makeMemoryView(this.type.elementT, this.infer, addr);
+            const view = makeMemoryView(this.type.elementT, addr);
             res.push(view.decode(state));
             addr += 32n;
         }
@@ -152,7 +151,7 @@ export class StructMemView extends BaseMemoryView<Struct, ExpStructType> {
         let offset = this.loc;
 
         for (const [name, type] of this.type.fields) {
-            const view = makeMemoryView(type, this.infer, offset);
+            const view = makeMemoryView(type, offset);
             entries.push([name, view.decode(state)]);
             offset += 32n;
         }
@@ -164,50 +163,49 @@ export class StructMemView extends BaseMemoryView<Struct, ExpStructType> {
 export class PointerMemView extends BaseMemoryView<Value, PointerType> {
     decode(state: Memory): Value {
         const offset = this.decodeIntAt(this.loc, uint256, state);
-        const view = makeMemoryView(this.type.to, this.infer, offset);
+        const view = makeMemoryView(this.type.to, offset);
         return view.decode(state);
     }
 }
 
 export function makeMemoryView(
     type: TypeNode,
-    infer: InferType,
     loc: bigint
 ): BaseMemoryView<Value, TypeNode> {
     if (type instanceof IntType) {
-        return new IntMemView(type, infer, loc);
+        return new IntMemView(type, loc);
     }
 
     if (type instanceof BoolType) {
-        return new BoolMemView(type, infer, loc);
+        return new BoolMemView(type, loc);
     }
 
     if (type instanceof AddressType) {
-        return new AddressMemView(type, infer, loc);
+        return new AddressMemView(type, loc);
     }
 
     if (type instanceof FixedBytesType) {
-        return new FixedBytesMemView(type, infer, loc);
+        return new FixedBytesMemView(type, loc);
     }
 
     if (type instanceof ExpStructType) {
-        return new StructMemView(type, infer, loc);
+        return new StructMemView(type, loc);
     }
 
     if (type instanceof BytesType) {
-        return new BytesMemView(type, infer, loc);
+        return new BytesMemView(type, loc);
     }
 
     if (type instanceof StringType) {
-        return new StringMemView(type, infer, loc);
+        return new StringMemView(type, loc);
     }
 
     if (type instanceof ArrayType) {
-        return new ArrayMemView(type, infer, loc);
+        return new ArrayMemView(type, loc);
     }
 
     if (type instanceof PointerType) {
-        return new PointerMemView(type, infer, loc);
+        return new PointerMemView(type, loc);
     }
 
     nyi(`makeMemoryView(${type.pp()})`);

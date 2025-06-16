@@ -420,7 +420,7 @@ describe(`Calldata Decoding Tests`, () => {
 
         it(`Sample [${typeDesc.map(ppType).join(", ")}]`, () => {
             const types = typeDesc.map((t) => simplifyType((t instanceof TypeNode ? t : t(unit)), infer, DataLocation.CallData));
-            const views = makeCalldataViews(types, infer, 4n);
+            const views = makeCalldataViews(types, 4n);
             const values = views.map((v) => v.decode(calldata));
 
             expect(values).toEqual(expectedValues);

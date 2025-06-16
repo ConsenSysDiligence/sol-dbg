@@ -1,4 +1,4 @@
-import { InferType, TypeNode } from "solc-typed-ast";
+import { TypeNode } from "solc-typed-ast";
 import { Value } from "./value";
 
 export class DecodingError<State> extends Error {
@@ -17,9 +17,8 @@ export class DecodingError<State> extends Error {
 export abstract class View<State, Val extends Value, Loc, Type extends TypeNode = TypeNode> {
     constructor(
         public readonly type: Type,
-        public readonly infer: InferType,
         protected loc: Loc
-    ) {}
+    ) { }
 
     /**
      * Decode a value from the given State
