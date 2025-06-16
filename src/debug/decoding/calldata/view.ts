@@ -9,7 +9,7 @@ import {
     PointerType,
     StringType,
     TupleType,
-    TypeNode,
+    TypeNode
 } from "solc-typed-ast";
 import { Memory } from "../../types";
 import { Struct, Value } from "../value";
@@ -88,11 +88,7 @@ function headSize(t: TypeNode): number {
     }
 
     if (t instanceof ExpStructType) {
-        return sum(
-            ...t.fields.map(([, fieldT]) =>
-                headSize(fieldT)
-            )
-        );
+        return sum(...t.fields.map(([, fieldT]) => headSize(fieldT)));
     }
 
     if (
@@ -227,7 +223,6 @@ export class FixedBytesCalldataView extends BaseCalldataView<Uint8Array, FixedBy
     }
 }
 
-
 export class BytesCalldataView extends BaseCalldataView<Uint8Array, BytesType> {
     decode(state: Memory): Uint8Array {
         return this.decodeBytesAt(this.loc, state);
@@ -288,9 +283,27 @@ export class ArrayCalldataView extends BaseCalldataView<Value[], ArrayType> {
     }
 }
 
+/**
+ * An ArraySliceView is only created from stack locations. It should not be created in makeCalldataView.
+ */
+export class ArraySliceCalldataView extends BaseCalldataView<Value[], ArrayType> {
+    constructor(
+        type: ArrayType,
+        loc: bigint,
+        protected len: bigint
+    ) {
+        super(type, loc, 0n);
+    }
+
+    decode(state: Memory): Value[] {
+        // @todo finish array slices
+        nyi(`Decoding array slices`);
+    }
+}
+
 export class StructCalldataView extends BaseCalldataView<Struct, ExpStructType> {
     decode(state: Memory): Struct {
-        let offset = this.loc;
+        const offset = this.loc;
         const values = this.decodeTupleAt(
             offset,
             this.base,
@@ -314,7 +327,7 @@ export class PointerCalldataView extends BaseCalldataView<Value, PointerType> {
             off = this.decodeIntAt(off, uint256, state);
         }
 
-        const innerView = makeCalldataView(this.type.to, off, this.base)
+        const innerView = makeCalldataView(this.type.to, off, this.base);
         return innerView.decode(state);
     }
 }
@@ -365,7 +378,7 @@ export function makeCalldataView(
     }
 
     if (type instanceof PointerType) {
-        return new PointerCalldataView(type, loc, base)
+        return new PointerCalldataView(type, loc, base);
     }
 
     nyi(`makeCalldataView(${type.pp()})`);

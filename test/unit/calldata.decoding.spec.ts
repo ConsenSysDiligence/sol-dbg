@@ -62,10 +62,7 @@ const tupleS_nested_static_dynamic = new TupleType([int16, tupleS1, bytes3]);
 
 const tupleS_struct_arr = new TupleType([
     int8,
-    new PointerType(
-        new ArrayType(tupleS1),
-        DataLocation.CallData
-    )
+    new PointerType(new ArrayType(tupleS1), DataLocation.CallData)
 ]);
 
 type TypeGenerator = (unit: SourceUnit) => TypeNode;
@@ -247,12 +244,7 @@ const samples: Array<[string, Array<TypeNode | TypeGenerator>, Value[]]> = [
     ],
     [
         "0x998697b7000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000020ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000100ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000010000000000000000000000005b38da6a701c568545dcfcb03fcb875f56beddc4fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000001000000000000000000000000ae036c65c649172b43ef7156b009c6221b596b8b",
-        [
-            new PointerType(
-                new ArrayType(tupleS_struct_arr),
-                DataLocation.CallData
-            )
-        ],
+        [new PointerType(new ArrayType(tupleS_struct_arr), DataLocation.CallData)],
         [
             [
                 [
@@ -365,11 +357,18 @@ const samples: Array<[string, Array<TypeNode | TypeGenerator>, Value[]]> = [
                     "//ContractDefinition/StructDefinition[@name='S1']"
                 )[0];
 
-                const t = new PointerType(new ArrayType(new PointerType(new UserDefinedType("S1", decl), DataLocation.CallData), 3n), DataLocation.CallData);
+                const t = new PointerType(
+                    new ArrayType(
+                        new PointerType(new UserDefinedType("S1", decl), DataLocation.CallData),
+                        3n
+                    ),
+                    DataLocation.CallData
+                );
                 return t;
             }
         ],
-        [123n,
+        [
+            123n,
             [
                 new Struct([
                     ["x", 2n],
@@ -381,14 +380,20 @@ const samples: Array<[string, Array<TypeNode | TypeGenerator>, Value[]]> = [
                     ["x", 3n],
                     ["y", 14n],
                     ["b", false],
-                    ["addrs", [Address.fromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4"), Address.fromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")]]
+                    [
+                        "addrs",
+                        [
+                            Address.fromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4"),
+                            Address.fromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")
+                        ]
+                    ]
                 ]),
                 new Struct([
                     ["x", 2n],
                     ["y", 13n],
                     ["b", false],
                     ["addrs", []]
-                ]),
+                ])
             ]
         ]
     ]
@@ -419,7 +424,9 @@ describe(`Calldata Decoding Tests`, () => {
         const calldata = hexToBytes(calldataStr.slice(2));
 
         it(`Sample [${typeDesc.map(ppType).join(", ")}]`, () => {
-            const types = typeDesc.map((t) => simplifyType((t instanceof TypeNode ? t : t(unit)), infer, DataLocation.CallData));
+            const types = typeDesc.map((t) =>
+                simplifyType(t instanceof TypeNode ? t : t(unit), infer, DataLocation.CallData)
+            );
             const views = makeCalldataViews(types, 4n);
             const values = views.map((v) => v.decode(calldata));
 

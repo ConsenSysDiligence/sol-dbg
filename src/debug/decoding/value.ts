@@ -1,5 +1,6 @@
 import { Address } from "@ethereumjs/util";
-import { assert, FunctionDefinition } from "solc-typed-ast";
+import { assert, FunctionDefinition, TypeNode } from "solc-typed-ast";
+import { View } from "./view";
 
 export class ExternalFunRef {
     constructor(
@@ -52,4 +53,7 @@ export type Value =
     | Value[] // sized and unsized arrays
     | Slice // array slices
     | Struct // Structs
-    | Map<Value, Value>; // Mappings
+    | Map<Value, Value> // Mappings
+    // Stack is the only state type that may have pointers into other areas.
+    // Therefore decoding stack data may return a data view into another area
+    | View<any, Value, any, TypeNode>;

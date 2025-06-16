@@ -158,6 +158,7 @@ export interface DataView {
 export type Memory = Uint8Array;
 export type Stack = Uint8Array[];
 export type Storage = ImmMap<bigint, Uint8Array>;
+export type StateArea = Memory | Stack | Storage;
 export interface EventDesc {
     payload: Uint8Array;
     topics: Uint8Array[];

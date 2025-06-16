@@ -19,7 +19,7 @@ import { makeMemoryView, simplifyType } from "../../src/debug/decoding/";
 import fse from "fs-extra";
 import { Address } from "@ethereumjs/util";
 
-const infer = new InferType("0.8.29")
+const infer = new InferType("0.8.29");
 type TypeGenerator = (unit: SourceUnit) => TypeNode;
 const samples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
     ["ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 0, int8, -1n],
@@ -64,7 +64,11 @@ const samples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
                 "//ContractDefinition/StructDefinition[@name='SimpleTypes']"
             )[0];
 
-            const t = simplifyType(new UserDefinedType("SimpleTypes", decl), infer, DataLocation.Memory)
+            const t = simplifyType(
+                new UserDefinedType("SimpleTypes", decl),
+                infer,
+                DataLocation.Memory
+            );
             return t;
         },
         new Struct([
@@ -86,7 +90,11 @@ const samples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
                 "//ContractDefinition/StructDefinition[@name='ArrTypes']"
             )[0];
 
-            const t = simplifyType(new UserDefinedType("ArrTypes", decl), infer, DataLocation.Memory)
+            const t = simplifyType(
+                new UserDefinedType("ArrTypes", decl),
+                infer,
+                DataLocation.Memory
+            );
             return t;
         },
         new Struct([
@@ -102,7 +110,11 @@ const samples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
                 "//ContractDefinition/StructDefinition[@name='S_nested_dynamic_static']"
             )[0];
 
-            const t = simplifyType(new UserDefinedType("S_nested_dynamic_static", decl), infer, DataLocation.Memory);
+            const t = simplifyType(
+                new UserDefinedType("S_nested_dynamic_static", decl),
+                infer,
+                DataLocation.Memory
+            );
             return t;
         },
         new Struct([
@@ -127,7 +139,11 @@ const samples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
                 "//ContractDefinition/StructDefinition[@name='S_nested_static_dynamic']"
             )[0];
 
-            const t = simplifyType(new UserDefinedType("S_nested_static_dynamic", decl), infer, DataLocation.Memory);
+            const t = simplifyType(
+                new UserDefinedType("S_nested_static_dynamic", decl),
+                infer,
+                DataLocation.Memory
+            );
             return t;
         },
         new Struct([
@@ -158,7 +174,11 @@ const samples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
                 "//ContractDefinition/StructDefinition[@name='S_nested_static_static']"
             )[0];
 
-            const t = simplifyType(new UserDefinedType("S_nested_static_static", decl), infer, DataLocation.Memory);
+            const t = simplifyType(
+                new UserDefinedType("S_nested_static_static", decl),
+                infer,
+                DataLocation.Memory
+            );
             return t;
         },
         new Struct([
@@ -183,7 +203,11 @@ const samples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
                 "//ContractDefinition/StructDefinition[@name='S_static']"
             )[0];
 
-            const t = simplifyType(new UserDefinedType("S_static", decl), infer, DataLocation.Memory);
+            const t = simplifyType(
+                new UserDefinedType("S_static", decl),
+                infer,
+                DataLocation.Memory
+            );
             return t;
         },
         new Struct([
@@ -201,7 +225,11 @@ const samples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
                 "//ContractDefinition/StructDefinition[@name='S_struct_arr']"
             )[0];
 
-            const t = simplifyType(new UserDefinedType("S_struct_arr", decl), infer, DataLocation.Memory);
+            const t = simplifyType(
+                new UserDefinedType("S_struct_arr", decl),
+                infer,
+                DataLocation.Memory
+            );
             return t;
         },
         new Struct([
@@ -253,12 +281,15 @@ function ppType(t: TypeNode | TypeGenerator): string {
 }
 
 describe(`Memory Decoding Tests`, () => {
-    const infer = new InferType("0.8.21");
     for (const [memoryStr, offset, typeDesc, expectedValue] of samples) {
         const memory = hexToBytes(memoryStr);
 
         it(`Sample ${ppType(typeDesc)}`, () => {
-            const type = simplifyType(typeDesc instanceof TypeNode ? typeDesc : typeDesc(unit), infer, DataLocation.Memory);
+            const type = simplifyType(
+                typeDesc instanceof TypeNode ? typeDesc : typeDesc(unit),
+                infer,
+                DataLocation.Memory
+            );
             const view = makeMemoryView(type, BigInt(offset));
             const values = view.decode(memory);
             expect(values).toEqual(expectedValue);

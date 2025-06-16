@@ -7,7 +7,7 @@ import {
     IntType,
     PointerType,
     StringType,
-    TypeNode,
+    TypeNode
 } from "solc-typed-ast";
 import { Memory } from "../../types";
 import { View } from "../view";
@@ -168,10 +168,7 @@ export class PointerMemView extends BaseMemoryView<Value, PointerType> {
     }
 }
 
-export function makeMemoryView(
-    type: TypeNode,
-    loc: bigint
-): BaseMemoryView<Value, TypeNode> {
+export function makeMemoryView(type: TypeNode, loc: bigint): BaseMemoryView<Value, TypeNode> {
     if (type instanceof IntType) {
         return new IntMemView(type, loc);
     }

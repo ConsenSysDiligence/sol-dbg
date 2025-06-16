@@ -18,7 +18,7 @@ export abstract class View<State, Val extends Value, Loc, Type extends TypeNode 
     constructor(
         public readonly type: Type,
         protected loc: Loc
-    ) { }
+    ) {}
 
     /**
      * Decode a value from the given State

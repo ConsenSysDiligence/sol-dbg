@@ -8,7 +8,7 @@ import {
     MappingType,
     PointerType,
     StringType,
-    TypeNode,
+    TypeNode
 } from "solc-typed-ast";
 import { Struct, Value } from "../value";
 import { DecodingError, View } from "../view";
