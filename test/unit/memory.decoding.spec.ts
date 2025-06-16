@@ -15,10 +15,11 @@ import { Struct, Value } from "../../src/debug/decoding/value";
 import { hexToBytes } from "ethereum-cryptography/utils";
 import { single } from "../../src";
 import { address, bool, bytes2, bytes32, int128, int8, uint16 } from "../utils";
-import { makeMemoryView } from "../../src/debug/decoding/";
+import { makeMemoryView, simplifyType } from "../../src/debug/decoding/";
 import fse from "fs-extra";
 import { Address } from "@ethereumjs/util";
 
+const infer = new InferType("0.8.29")
 type TypeGenerator = (unit: SourceUnit) => TypeNode;
 const samples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
     ["ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 0, int8, -1n],
@@ -63,7 +64,7 @@ const samples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
                 "//ContractDefinition/StructDefinition[@name='SimpleTypes']"
             )[0];
 
-            const t = new UserDefinedType("SimpleTypes", decl);
+            const t = simplifyType(new UserDefinedType("SimpleTypes", decl), infer, DataLocation.Memory)
             return t;
         },
         new Struct([
@@ -74,7 +75,7 @@ const samples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
             ["e", Address.fromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")],
             ["b1", hexToBytes("0102")],
             ["b2", hexToBytes("0000000000000000000000000000000000000000000000000000000000abcdef")],
-            ["en", 1]
+            ["en", 1n]
         ])
     ],
     [
@@ -85,7 +86,7 @@ const samples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
                 "//ContractDefinition/StructDefinition[@name='ArrTypes']"
             )[0];
 
-            const t = new UserDefinedType("ArrTypes", decl);
+            const t = simplifyType(new UserDefinedType("ArrTypes", decl), infer, DataLocation.Memory)
             return t;
         },
         new Struct([
@@ -101,7 +102,7 @@ const samples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
                 "//ContractDefinition/StructDefinition[@name='S_nested_dynamic_static']"
             )[0];
 
-            const t = new UserDefinedType("S_nested_dynamic_static", decl);
+            const t = simplifyType(new UserDefinedType("S_nested_dynamic_static", decl), infer, DataLocation.Memory);
             return t;
         },
         new Struct([
@@ -126,7 +127,7 @@ const samples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
                 "//ContractDefinition/StructDefinition[@name='S_nested_static_dynamic']"
             )[0];
 
-            const t = new UserDefinedType("S_nested_static_dynamic", decl);
+            const t = simplifyType(new UserDefinedType("S_nested_static_dynamic", decl), infer, DataLocation.Memory);
             return t;
         },
         new Struct([
@@ -157,7 +158,7 @@ const samples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
                 "//ContractDefinition/StructDefinition[@name='S_nested_static_static']"
             )[0];
 
-            const t = new UserDefinedType("S_nested_static_static", decl);
+            const t = simplifyType(new UserDefinedType("S_nested_static_static", decl), infer, DataLocation.Memory);
             return t;
         },
         new Struct([
@@ -182,7 +183,7 @@ const samples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
                 "//ContractDefinition/StructDefinition[@name='S_static']"
             )[0];
 
-            const t = new UserDefinedType("S_static", decl);
+            const t = simplifyType(new UserDefinedType("S_static", decl), infer, DataLocation.Memory);
             return t;
         },
         new Struct([
@@ -200,7 +201,7 @@ const samples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
                 "//ContractDefinition/StructDefinition[@name='S_struct_arr']"
             )[0];
 
-            const t = new UserDefinedType("S_struct_arr", decl);
+            const t = simplifyType(new UserDefinedType("S_struct_arr", decl), infer, DataLocation.Memory);
             return t;
         },
         new Struct([

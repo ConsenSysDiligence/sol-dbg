@@ -3,20 +3,12 @@ import {
     ArrayType,
     BoolType,
     BytesType,
-    ContractDefinition,
-    DataLocation,
-    EnumDefinition,
-    enumToIntType,
     FixedBytesType,
     InferType,
     IntType,
     PointerType,
     StringType,
-    StructDefinition,
-    TypeName,
     TypeNode,
-    UserDefinedType,
-    UserDefinedValueTypeDefinition
 } from "solc-typed-ast";
 import { Memory } from "../../types";
 import { View } from "../view";
@@ -30,6 +22,7 @@ import {
     uint256
 } from "../../../utils";
 import { Address, bytesToUtf8 } from "@ethereumjs/util";
+import { ExpStructType } from "../exp_types";
 
 export abstract class BaseMemoryView<
     Val extends Value,
@@ -110,35 +103,6 @@ export class FixedBytesMemView extends BaseMemoryView<Uint8Array, FixedBytesType
     }
 }
 
-export class EnumMemView extends BaseMemoryView<number, UserDefinedType> {
-    innerType: IntType;
-    constructor(type: UserDefinedType, infer: InferType, loc: bigint) {
-        super(type, infer, loc);
-        if (!(type.definition instanceof EnumDefinition)) {
-            this.fail(new Uint8Array(), `Invalid type ${type.pp()} for EnumMemView`);
-        }
-
-        this.innerType = enumToIntType(type.definition);
-    }
-
-    decode(state: Memory): number {
-        return Number(this.decodeIntAt(this.loc, this.innerType, state));
-    }
-}
-
-export class ContractMemView extends BaseMemoryView<Address, UserDefinedType> {
-    constructor(type: UserDefinedType, infer: InferType, loc: bigint) {
-        super(type, infer, loc);
-        if (!(type.definition instanceof ContractDefinition)) {
-            this.fail(new Uint8Array(), `Invalid type ${type.pp()} for ContractMemView`);
-        }
-    }
-
-    decode(state: Memory): Address {
-        return this.decodeAddressAt(this.loc, state);
-    }
-}
-
 export class BytesMemView extends BaseMemoryView<Uint8Array, BytesType> {
     decode(state: Memory): Uint8Array {
         return this.decodeBytesAt(this.loc, state);
@@ -181,30 +145,13 @@ export class ArrayMemView extends BaseMemoryView<Value[], ArrayType> {
     }
 }
 
-export class StructMemView extends BaseMemoryView<Struct, UserDefinedType> {
-    fields: Array<[string, TypeNode]>;
-
-    constructor(type: UserDefinedType, infer: InferType, loc: bigint) {
-        super(type, infer, loc);
-
-        if (!(type instanceof UserDefinedType && type.definition instanceof StructDefinition)) {
-            this.fail(new Uint8Array(), `Invalid type ${type.pp()} for StructMemView`);
-        }
-
-        this.fields = type.definition.vMembers.map((decl) => {
-            return [
-                decl.name,
-                infer.typeNameToSpecializedTypeNode(decl.vType as TypeName, DataLocation.Memory)
-            ];
-        });
-    }
-
+export class StructMemView extends BaseMemoryView<Struct, ExpStructType> {
     decode(state: Memory): Struct {
         const entries: Array<[string, Value]> = [];
 
         let offset = this.loc;
 
-        for (const [name, type] of this.fields) {
+        for (const [name, type] of this.type.fields) {
             const view = makeMemoryView(type, this.infer, offset);
             entries.push([name, view.decode(state)]);
             offset += 32n;
@@ -243,24 +190,8 @@ export function makeMemoryView(
         return new FixedBytesMemView(type, infer, loc);
     }
 
-    if (type instanceof UserDefinedType) {
-        const def = type.definition;
-        if (def instanceof EnumDefinition) {
-            return new EnumMemView(type, infer, loc);
-        }
-
-        if (def instanceof ContractDefinition) {
-            return new ContractMemView(type, infer, loc);
-        }
-
-        if (def instanceof UserDefinedValueTypeDefinition) {
-            const innerT = infer.typeNameToTypeNode(def.underlyingType);
-            return makeMemoryView(innerT, infer, loc);
-        }
-
-        if (def instanceof StructDefinition) {
-            return new StructMemView(type, infer, loc);
-        }
+    if (type instanceof ExpStructType) {
+        return new StructMemView(type, infer, loc);
     }
 
     if (type instanceof BytesType) {

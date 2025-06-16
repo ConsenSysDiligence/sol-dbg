@@ -5,7 +5,6 @@ import {
     BoolType,
     BytesType,
     ContractDefinition,
-    DataLocation,
     EnumDefinition,
     enumToIntType,
     FixedBytesType,
@@ -13,12 +12,9 @@ import {
     IntType,
     PointerType,
     StringType,
-    StructDefinition,
     TupleType,
-    TypeName,
     TypeNode,
     UserDefinedType,
-    UserDefinedValueTypeDefinition
 } from "solc-typed-ast";
 import { Memory } from "../../types";
 import { Struct, Value } from "../value";
@@ -34,6 +30,7 @@ import {
 } from "../../../utils";
 import { Address, bytesToUtf8 } from "@ethereumjs/util";
 import { inRange, sum } from "../utils";
+import { ExpStructType } from "../exp_types";
 
 /**
  * Return true IFF the given type is "dynamic". I,e. its size is not statically known.
@@ -41,33 +38,33 @@ import { inRange, sum } from "../utils";
  * @param infer
  * @returns
  */
-function isTypeDynamic(t: TypeNode, infer: InferType): boolean {
+function isTypeDynamic(t: TypeNode): boolean {
     if (t instanceof BytesType || t instanceof StringType) {
         return true;
     }
 
     if (t instanceof ArrayType) {
-        return t.size === undefined || isTypeDynamic(t.elementT, infer);
+        return t.size === undefined || isTypeDynamic(t.elementT);
     }
 
     if (t instanceof TupleType) {
         for (const elementT of t.elements) {
-            if (elementT && isTypeDynamic(elementT, infer)) {
+            if (elementT && isTypeDynamic(elementT)) {
                 return true;
             }
         }
     }
 
-    if (t instanceof UserDefinedType && t.definition instanceof StructDefinition) {
-        for (const member of t.definition.vMembers) {
-            if (isTypeDynamic(infer.variableDeclarationToTypeNode(member), infer)) {
+    if (t instanceof ExpStructType) {
+        for (const [, fieldT] of t.fields) {
+            if (isTypeDynamic(fieldT)) {
                 return true;
             }
         }
     }
 
     if (t instanceof PointerType) {
-        return isTypeDynamic(t.to, infer);
+        return isTypeDynamic(t.to);
     }
 
     return false;
@@ -81,24 +78,24 @@ function isTypeDynamic(t: TypeNode, infer: InferType): boolean {
  * @param infer
  * @returns
  */
-function headSize(t: TypeNode, infer: InferType): number {
-    if (isTypeDynamic(t, infer)) {
+function headSize(t: TypeNode): number {
+    if (isTypeDynamic(t)) {
         return 32;
     }
 
     if (t instanceof TupleType) {
-        return sum(...t.elements.map((elT) => headSize(elT as TypeNode, infer)));
+        return sum(...t.elements.map((elT) => headSize(elT as TypeNode)));
     }
 
     if (t instanceof ArrayType) {
         assert(t.size !== undefined, `Statically sized array types must have a size`);
-        return headSize(t.elementT, infer) * Number(t.size);
+        return headSize(t.elementT) * Number(t.size);
     }
 
-    if (t instanceof UserDefinedType && t.definition instanceof StructDefinition) {
+    if (t instanceof ExpStructType) {
         return sum(
-            ...t.definition.vMembers.map((memDecl) =>
-                headSize(infer.variableDeclarationToTypeNode(memDecl), infer)
+            ...t.fields.map(([, fieldT]) =>
+                headSize(fieldT)
             )
         );
     }
@@ -112,17 +109,8 @@ function headSize(t: TypeNode, infer: InferType): number {
         return 32;
     }
 
-    if (
-        t instanceof UserDefinedType &&
-        (t.definition instanceof EnumDefinition ||
-            t.definition instanceof UserDefinedValueTypeDefinition ||
-            t.definition instanceof ContractDefinition)
-    ) {
-        return 32;
-    }
-
     if (t instanceof PointerType) {
-        return headSize(t.to, infer);
+        return headSize(t.to);
     }
 
     nyi(`Statically sized type ${t.pp()}`);
@@ -176,36 +164,29 @@ export abstract class BaseCalldataView<
     }
 
     decodeBytesAt(loc: bigint, state: Memory): Uint8Array {
-        const bytesOffset = this.decodeIntAt(loc, uint256, state);
-        const len = this.decodeIntAt(bytesOffset, uint256, state);
+        const len = this.decodeIntAt(loc, uint256, state);
 
         if (len >= MAX_ARR_DECODE_LIMIT) {
             this.fail(state, `Bytes to decode too large - ${len}`);
         }
 
-        return this.readMemAt(bytesOffset + 32n, state, len);
+        return this.readMemAt(loc + 32n, state, len);
     }
 
-    decodeTupleAt(loc: bigint, type: TupleType, state: Memory): Value[] {
-        let offset;
-        let base;
+    decodeTupleAt(loc: bigint, curBase: bigint, type: TupleType, state: Memory): Value[] {
+        let base = curBase;
 
-        // For tuples with a "dynamic" element, solidity just store a pointer at loc
-        // Static tuples are laid out directly loc.
-        if (isTypeDynamic(type, this.infer)) {
-            offset = 0n;
-            base = this.decodeIntAt(loc, uint256, state) + this.base;
-        } else {
-            offset = loc;
-            base = this.base;
+        if (isTypeDynamic(type)) {
+            base = loc + curBase;
+            loc = 0n;
         }
 
         const res: Value[] = [];
 
         for (const t of type.elements) {
             assert(t !== null, `Unexpected null element in tuple type {0}`, type);
-            res.push(makeCalldataView(t, this.infer, offset, base).decode(state));
-            offset += BigInt(headSize(t, this.infer));
+            res.push(makeCalldataView(t, this.infer, loc, base).decode(state));
+            loc += BigInt(headSize(t));
         }
 
         return res;
@@ -301,41 +282,13 @@ export class ContractCalldataView extends BaseCalldataView<Address, UserDefinedT
     }
 }
 
-export class BytesCalldataView extends BaseCalldataView<Uint8Array, PointerType> {
-    constructor(
-        public readonly type: PointerType,
-        public readonly infer: InferType,
-        loc: bigint,
-        base: bigint
-    ) {
-        super(type, infer, loc, base);
-        assert(
-            type.to instanceof BytesType,
-            `Building a BytesCalldataView with invalid type {0}`,
-            type
-        );
-    }
-
+export class BytesCalldataView extends BaseCalldataView<Uint8Array, BytesType> {
     decode(state: Memory): Uint8Array {
         return this.decodeBytesAt(this.loc, state);
     }
 }
 
-export class StringCalldataView extends BaseCalldataView<string, PointerType> {
-    constructor(
-        public readonly type: PointerType,
-        public readonly infer: InferType,
-        loc: bigint,
-        base: bigint
-    ) {
-        super(type, infer, loc, base);
-        assert(
-            type.to instanceof StringType,
-            `Building a StringCalldataView with invalid type {0}`,
-            type
-        );
-    }
-
+export class StringCalldataView extends BaseCalldataView<string, BytesType> {
     decode(state: Memory): string {
         const bytes = this.decodeBytesAt(this.loc, state);
         return bytesToUtf8(bytes);
@@ -344,47 +297,25 @@ export class StringCalldataView extends BaseCalldataView<string, PointerType> {
 
 export class TupleCalldataView extends BaseCalldataView<Value[], TupleType> {
     decode(state: Memory): Value[] {
-        return this.decodeTupleAt(this.loc, this.type, state);
+        let offset = this.loc;
+
+        if (isTypeDynamic(this.type)) {
+            offset = this.decodeIntAt(offset, uint256, state);
+        }
+
+        return this.decodeTupleAt(offset, this.base, this.type, state);
     }
 }
 
-export class ArrayCalldataView extends BaseCalldataView<Value[], PointerType> {
-    /**
-     * Array type
-     */
-    arrT: ArrayType;
-
-    constructor(
-        public readonly type: PointerType,
-        public readonly infer: InferType,
-        loc: bigint,
-        base: bigint
-    ) {
-        super(type, infer, loc, base);
-        assert(
-            type.to instanceof ArrayType,
-            `Building a ArrayCalldataView with invalid type {0}`,
-            type
-        );
-        this.arrT = type.to;
-    }
-
+export class ArrayCalldataView extends BaseCalldataView<Value[], ArrayType> {
     decode(state: Memory): Value[] {
-        let baseOff: bigint;
+        let baseOff: bigint = this.loc;
 
-        // Fixed-sized arrays with static element types are laid out directly as tuples.
-        // For dynamic arrays we instead store a pointer at the head
-        if (isTypeDynamic(this.type, this.infer)) {
-            baseOff = this.decodeIntAt(this.loc, uint256, state);
-        } else {
-            baseOff = this.loc;
-        }
-
-        // Dynamic sized arrays have length at the statr. Fixed sized arrays do
+        // Dynamic sized arrays have length at the start. Fixed sized arrays do
         // not.
         let bigintSize: bigint;
-        if (this.arrT.size !== undefined) {
-            bigintSize = this.arrT.size;
+        if (this.type.size !== undefined) {
+            bigintSize = this.type.size;
         } else {
             bigintSize = this.decodeIntAt(baseOff, uint256, state);
             baseOff += 32n;
@@ -399,10 +330,10 @@ export class ArrayCalldataView extends BaseCalldataView<Value[], PointerType> {
 
         let off: bigint = 0n;
         const newBase = baseOff + this.base;
-        const elSize = BigInt(headSize(this.arrT.elementT, this.infer));
+        const elSize = BigInt(headSize(this.type.elementT));
 
         for (let i = 0; i < size; i++) {
-            const elView = makeCalldataView(this.arrT.elementT, this.infer, off, newBase);
+            const elView = makeCalldataView(this.type.elementT, this.infer, off, newBase);
             res.push(elView.decode(state));
             off += elSize;
         }
@@ -411,45 +342,34 @@ export class ArrayCalldataView extends BaseCalldataView<Value[], PointerType> {
     }
 }
 
-export class StructCalldataView extends BaseCalldataView<Struct, PointerType> {
-    members: Array<[string, TypeNode]>;
-
-    constructor(
-        public readonly type: PointerType,
-        public readonly infer: InferType,
-        loc: bigint,
-        base: bigint
-    ) {
-        super(type, infer, loc, base);
-
-        assert(
-            type.to instanceof UserDefinedType && type.to.definition instanceof StructDefinition,
-            `Building an StructCalldataView with invalid type {0}`,
-            type
-        );
-
-        const def = type.to.definition;
-
-        this.members = def.vMembers.map((mem) => {
-            return [
-                mem.name,
-                infer.typeNameToSpecializedTypeNode(mem.vType as TypeName, DataLocation.CallData)
-            ];
-        });
-    }
-
+export class StructCalldataView extends BaseCalldataView<Struct, ExpStructType> {
     decode(state: Memory): Struct {
+        let offset = this.loc;
         const values = this.decodeTupleAt(
-            this.loc,
-            new TupleType(this.members.map(([, type]) => type)),
+            offset,
+            this.base,
+            new TupleType(this.type.fields.map(([, type]) => type)),
             state
         );
         return new Struct(
             zip(
-                this.members.map(([name]) => name),
+                this.type.fields.map(([name]) => name),
                 values
             )
         );
+    }
+}
+
+export class PointerCalldataView extends BaseCalldataView<Value, PointerType> {
+    decode(state: Memory): Value {
+        let off = this.loc;
+
+        if (isTypeDynamic(this.type.to)) {
+            off = this.decodeIntAt(off, uint256, state);
+        }
+
+        const innerView = makeCalldataView(this.type.to, this.infer, off, this.base)
+        return innerView.decode(state);
     }
 }
 
@@ -475,20 +395,24 @@ export function makeCalldataView(
         return new FixedBytesCalldataView(type, infer, loc, base);
     }
 
-    if (type instanceof UserDefinedType) {
-        const def = type.definition;
-        if (def instanceof EnumDefinition) {
-            return new EnumCalldataView(type, infer, loc, base);
-        }
+    if (type instanceof TupleType) {
+        return new TupleCalldataView(type, infer, loc, base);
+    }
 
-        if (def instanceof ContractDefinition) {
-            return new ContractCalldataView(type, infer, loc, base);
-        }
+    if (type instanceof BytesType) {
+        return new BytesCalldataView(type, infer, loc, base);
+    }
 
-        if (def instanceof UserDefinedValueTypeDefinition) {
-            const innerT = infer.typeNameToTypeNode(def.underlyingType);
-            return makeCalldataView(innerT, infer, loc, base);
-        }
+    if (type instanceof StringType) {
+        return new StringCalldataView(type, infer, loc, base);
+    }
+
+    if (type instanceof ArrayType) {
+        return new ArrayCalldataView(type, infer, loc, base);
+    }
+
+    if (type instanceof ExpStructType) {
+        return new StructCalldataView(type, infer, loc, base);
     }
 
     if (type instanceof TupleType) {
@@ -496,29 +420,7 @@ export function makeCalldataView(
     }
 
     if (type instanceof PointerType) {
-        if (type.to instanceof BytesType) {
-            return new BytesCalldataView(type, infer, loc, base);
-        }
-
-        if (type.to instanceof StringType) {
-            return new StringCalldataView(type, infer, loc, base);
-        }
-
-        if (type.to instanceof ArrayType) {
-            return new ArrayCalldataView(type, infer, loc, base);
-        }
-
-        if (type.to instanceof UserDefinedType) {
-            const def = type.to.definition;
-
-            if (def instanceof StructDefinition) {
-                return new StructCalldataView(type, infer, loc, base);
-            }
-        }
-
-        if (type.to instanceof TupleType) {
-            return new TupleCalldataView(type.to, infer, loc, base);
-        }
+        return new PointerCalldataView(type, infer, loc, base)
     }
 
     nyi(`makeCalldataView(${type.pp()})`);
@@ -535,7 +437,7 @@ export function makeCalldataViews(
     for (const t of types) {
         const view = makeCalldataView(t, infer, off, base);
         res.push(view);
-        off += BigInt(headSize(t, infer));
+        off += BigInt(headSize(t));
     }
 
     return res;

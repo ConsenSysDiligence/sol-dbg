@@ -68,4 +68,5 @@ contract Foo {
     function takeStructStructArr(S_struct_arr[] calldata s) public {}
     function takeEnum(E s) public {}
     function takeContract(Foo f) public {}
+    function takeMore(uint x, S1[3] calldata s) public {}
 }
