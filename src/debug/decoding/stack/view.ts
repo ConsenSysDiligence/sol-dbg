@@ -8,7 +8,7 @@ import {
     PointerType,
     TypeNode
 } from "solc-typed-ast";
-import { Stack, StateArea } from "../../types";
+import { Stack } from "../../types";
 import { Value } from "../value";
 import { View } from "../view";
 import { bigEndianBufToBigint, fits, nyi, uint256, wordToAddress } from "../../../utils";
@@ -84,7 +84,8 @@ export class FixedBytesStackView extends BaseStackView<Uint8Array, FixedBytesTyp
     }
 }
 
-type PointerValue = View<StateArea, Value, any, TypeNode>;
+type PointerValue = View<any, Value, any, TypeNode>;
+
 export class PointerStackView extends BaseStackView<PointerValue, PointerType> {
     decode(state: Stack): PointerValue {
         const off = this.decodeIntAt(this.loc, uint256, state);
