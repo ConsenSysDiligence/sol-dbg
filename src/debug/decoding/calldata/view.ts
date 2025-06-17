@@ -295,7 +295,7 @@ export class ArraySliceCalldataView extends BaseCalldataView<Value[], ArrayType>
         super(type, loc, 0n);
     }
 
-    decode(state: Memory): Value[] {
+    decode(): Value[] {
         // @todo finish array slices
         nyi(`Decoding array slices`);
     }

@@ -113,19 +113,22 @@ export function fits(val: bigint, typ: IntType): boolean {
 
 /* istanbul ignore next */
 export function ppLoc(loc: DataLocation): string {
-    return `{kind: ${loc.kind}, ${loc.kind === DataLocationKind.Stack ? "offsetFromTop" : "address"
-        }: ${loc.kind === DataLocationKind.Stack ? loc.offsetFromTop : loc.address.toString(16)}${loc.kind === DataLocationKind.Storage
+    return `{kind: ${loc.kind}, ${
+        loc.kind === DataLocationKind.Stack ? "offsetFromTop" : "address"
+    }: ${loc.kind === DataLocationKind.Stack ? loc.offsetFromTop : loc.address.toString(16)}${
+        loc.kind === DataLocationKind.Storage
             ? `, offsetInWord: ${loc.endOffsetInWord}`
             : loc.kind === DataLocationKind.CallData
-                ? `, base: ${loc.base}`
-                : ""
-        }}`;
+              ? `, base: ${loc.base}`
+              : ""
+    }}`;
 }
 
 /* istanbul ignore next */
 export function ppView(view: DataView): string {
-    return `{type: ${view.type.pp()}, abiType: ${view.abiType ? view.abiType.pp() : "undefined"
-        }, loc: ${ppLoc(view.loc)}}`;
+    return `{type: ${view.type.pp()}, abiType: ${
+        view.abiType ? view.abiType.pp() : "undefined"
+    }, loc: ${ppLoc(view.loc)}}`;
 }
 
 /* istanbul ignore next */
@@ -276,16 +279,16 @@ export function zip<T1, T2>(a: T1[], b: T2[]): Array<[T1, T2]> {
 
 /**
  * Split a list into two lists based on a user-provided predicate.
- * 
- * @param a 
- * @param pred 
- * @returns 
+ *
+ * @param a
+ * @param pred
+ * @returns
  */
 export function split<T>(a: T[], pred: (x: T) => boolean): [T[], T[]] {
     const trueA: T[] = [];
     const falseA: T[] = [];
 
-    for (let x of a) {
+    for (const x of a) {
         (pred(x) ? trueA : falseA).push(x);
     }
 

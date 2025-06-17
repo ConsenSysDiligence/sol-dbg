@@ -1,7 +1,7 @@
 import { InterpreterStep } from "@ethereumjs/evm";
 import { VM } from "@ethereumjs/vm";
 import { mustReadMem, stackInd, stackTop } from "../../../utils/misc";
-import { decodeEvent } from "../../abi";
+import { decodeEvent } from "../../abi_new";
 import { IArtifactManager } from "../../artifact_manager";
 import { DecodedEventDesc, EventDesc } from "../../types";
 import { BasicStepInfo } from "./basic_info";
