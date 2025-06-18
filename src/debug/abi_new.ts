@@ -14,7 +14,7 @@ import { View } from "./decoding/view";
 import { DecodedEventDesc, EventDefInfo, EventDesc, Memory } from "./types";
 import { bytes4, split, zip } from "../utils";
 import { BaseCalldataView, makeCalldataView, makeCalldataViews } from "./decoding/calldata/view";
-import { DecodingFailure, Value } from "./decoding/value";
+import { DecodingFailure, Poison, Value } from "./decoding/value";
 import { simplifyType } from "./decoding";
 import { IArtifactManager } from "./artifact_manager";
 
@@ -99,7 +99,7 @@ class EventPayloadView<V extends Value, T extends TypeNode> extends BaseEventVie
     BaseCalldataView<V, T>,
     T
 > {
-    decode(state: EventDesc): V {
+    decode(state: EventDesc): V | Poison {
         return this.loc.decode(state.payload);
     }
 
@@ -109,7 +109,7 @@ class EventPayloadView<V extends Value, T extends TypeNode> extends BaseEventVie
 }
 
 class TopicPayloadView<T extends TypeNode> extends BaseEventView<Value, number, T> {
-    decode(state: EventDesc): Value {
+    decode(state: EventDesc): Value | Poison {
         if (this.type instanceof PointerType) {
             return new DecodingFailure(`Cannot decode indexed complex type ${this.type.pp()}`);
         }

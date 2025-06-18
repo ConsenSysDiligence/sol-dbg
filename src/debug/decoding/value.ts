@@ -1,22 +1,22 @@
 import { Address } from "@ethereumjs/util";
-import { assert, FunctionDefinition, TypeNode, UserDefinedType } from "solc-typed-ast";
+import { assert, FunctionDefinition, TypeNode } from "solc-typed-ast";
 import { View } from "./view";
 
 export class ExternalFunRef {
     constructor(
         public readonly address: Address,
         public readonly selector: Uint8Array
-    ) {}
+    ) { }
 }
 
 export class InternalFunRef {
-    constructor(public readonly fun: FunctionDefinition) {}
+    constructor(public readonly fun: FunctionDefinition) { }
 }
 
 export type FunctionValue = ExternalFunRef | InternalFunRef;
 
 export class Struct {
-    constructor(public readonly entries: Array<[string, Value]>) {}
+    constructor(public readonly entries: Array<[string, Value]>) { }
     field(name: string): Value {
         // @todo optimize if we end up using this more
         for (const [fieldName, val] of this.entries) {
@@ -34,20 +34,20 @@ export class Slice {
         public readonly array: Value[],
         public readonly start: number,
         public readonly end: number
-    ) {}
+    ) { }
 }
 
 export abstract class Poison {
     abstract pp(): string;
 }
 
-export class MissingTypeInfo extends Poison {
-    constructor(public readonly missingType: UserDefinedType) {
+export class MissingTypeFailure extends Poison {
+    constructor(public readonly reason: string) {
         super();
     }
 
     pp(): string {
-        return `<missing info for ${this.missingType.name}>`;
+        return `<missing info: ${this.reason}>`;
     }
 }
 

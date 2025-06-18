@@ -12,7 +12,7 @@ import {
     TypeNode
 } from "solc-typed-ast";
 import { Memory } from "../../types";
-import { Struct, Value } from "../value";
+import { DecodingFailure, MissingTypeFailure, Poison, Struct, Value } from "../value";
 import { View } from "../view";
 import {
     bigEndianBufToBigint,
@@ -24,8 +24,8 @@ import {
     zip
 } from "../../../utils";
 import { Address, bytesToUtf8 } from "@ethereumjs/util";
-import { inRange, sum } from "../utils";
-import { ExpStructType } from "../exp_types";
+import { inRange, isFailure, isTypeStringDynamicArray } from "../utils";
+import { ExpStructType, MissingType } from "../exp_types";
 
 /**
  * Return true IFF the given type is "dynamic". I,e. its size is not statically known.
@@ -73,22 +73,51 @@ function isTypeDynamic(t: TypeNode): boolean {
  * @param infer
  * @returns
  */
-function headSize(t: TypeNode): number {
+function headSize(t: TypeNode): number | undefined {
     if (isTypeDynamic(t)) {
         return 32;
     }
 
     if (t instanceof TupleType) {
-        return sum(...t.elements.map((elT) => headSize(elT as TypeNode)));
+        let size = 0;
+
+        for (const elT of t.elements) {
+            const elSize = headSize(elT as TypeNode);
+
+            if (elSize === undefined) {
+                return undefined;
+            }
+
+            size += elSize;
+        }
+
+        return size;
     }
 
     if (t instanceof ArrayType) {
         assert(t.size !== undefined, `Statically sized array types must have a size`);
-        return headSize(t.elementT) * Number(t.size);
+        const elSize = headSize(t.elementT);
+
+        if (elSize === undefined) {
+            return undefined;
+        }
+
+        return elSize * Number(t.size);
     }
 
     if (t instanceof ExpStructType) {
-        return sum(...t.fields.map(([, fieldT]) => headSize(fieldT)));
+        let size = 0;
+        for (const [, fieldT] of t.fields) {
+            const fieldSize = headSize(fieldT);
+
+            if (fieldSize === undefined) {
+                return undefined;
+            }
+
+            size += fieldSize;
+        }
+
+        return size;
     }
 
     if (
@@ -102,6 +131,18 @@ function headSize(t: TypeNode): number {
 
     if (t instanceof PointerType) {
         return headSize(t.to);
+    }
+
+    if (t instanceof MissingType) {
+        if (t.rawTypeName === undefined) {
+            return undefined;
+        }
+
+        // Small optimization - if we can guess this is a dynamic array of an unknown
+        // element type, we still know the head size is 32.
+        if (isTypeStringDynamicArray(t.rawTypeName.typeString)) {
+            return 32;
+        }
     }
 
     nyi(`Statically sized type ${t.pp()}`);
@@ -119,14 +160,17 @@ export abstract class BaseCalldataView<
         super(type, loc);
     }
 
-    protected readMemAt(off: number | bigint, calldata: Memory, len: bigint | number): Uint8Array {
+    protected readMemAt(
+        off: number | bigint,
+        calldata: Memory,
+        len: bigint | number
+    ): Uint8Array | DecodingFailure {
         const actualOffset = this.base + BigInt(off);
         const res = readMem(actualOffset, len, calldata);
 
         if (!res) {
             // OoB access
-            this.fail(
-                calldata,
+            return new DecodingFailure(
                 `OoB access at ${actualOffset}:${actualOffset + BigInt(len)} in memory of size ${calldata.length}`
             );
         }
@@ -134,8 +178,16 @@ export abstract class BaseCalldataView<
         return res;
     }
 
-    protected decodeIntAt(offset: bigint, typ: IntType, calldata: Memory): bigint {
+    protected decodeIntAt(
+        offset: bigint,
+        typ: IntType,
+        calldata: Memory
+    ): bigint | DecodingFailure {
         const bytes = this.readMemAt(offset, calldata, 32);
+
+        if (isFailure(bytes)) {
+            return bytes;
+        }
 
         let res = bigEndianBufToBigint(bytes);
 
@@ -147,17 +199,21 @@ export abstract class BaseCalldataView<
         }
 
         if (!fits(res, typ)) {
-            this.fail(calldata, `Decoded value ${res} doesnt fit in type ${this.type.pp()}`);
+            return new DecodingFailure(`Decoded value ${res} doesnt fit in type ${this.type.pp()}`);
         }
 
         return res;
     }
 
-    decodeBytesAt(loc: bigint, state: Memory): Uint8Array {
+    decodeBytesAt(loc: bigint, state: Memory): Uint8Array | DecodingFailure {
         const len = this.decodeIntAt(loc, uint256, state);
 
+        if (isFailure(len)) {
+            return len;
+        }
+
         if (len >= MAX_ARR_DECODE_LIMIT) {
-            this.fail(state, `Bytes to decode too large - ${len}`);
+            return new DecodingFailure(`Bytes to decode too large - ${len}`);
         }
 
         return this.readMemAt(loc + 32n, state, len);
@@ -172,11 +228,22 @@ export abstract class BaseCalldataView<
         }
 
         const res: Value[] = [];
+        let failRemaining = false;
 
         for (const t of type.elements) {
+            if (failRemaining) {
+                res.push(new MissingTypeFailure(`Failed due to earlier failure.`));
+            }
+
             assert(t !== null, `Unexpected null element in tuple type {0}`, type);
             res.push(makeCalldataView(t, loc, base).decode(state));
-            loc += BigInt(headSize(t));
+            const tSize = headSize(t);
+
+            if (tSize === undefined) {
+                failRemaining = true;
+            } else {
+                loc += BigInt(tSize);
+            }
         }
 
         return res;
@@ -191,7 +258,7 @@ export abstract class BaseCalldataView<
  * View to an IntType in calldata
  */
 export class IntCalldataView extends BaseCalldataView<bigint, IntType> {
-    decode(state: Memory): bigint {
+    decode(state: Memory): bigint | DecodingFailure {
         return this.decodeIntAt(this.loc, this.type, state);
     }
 }
@@ -200,8 +267,14 @@ export class IntCalldataView extends BaseCalldataView<bigint, IntType> {
  * View to a BoolType in calldata
  */
 export class BoolCalldataView extends BaseCalldataView<boolean, BoolType> {
-    decode(state: Memory): boolean {
-        return this.decodeIntAt(this.loc, uint256, state) !== 0n;
+    decode(state: Memory): boolean | DecodingFailure {
+        const intV = this.decodeIntAt(this.loc, uint256, state);
+
+        if (isFailure(intV)) {
+            return intV;
+        }
+
+        return intV !== 0n;
     }
 }
 
@@ -209,8 +282,14 @@ export class BoolCalldataView extends BaseCalldataView<boolean, BoolType> {
  * View to an Address in calldata
  */
 export class AddressCalldataView extends BaseCalldataView<Address, AddressType> {
-    decode(state: Memory): Address {
-        return new Address(this.readMemAt(this.loc, state, 32).slice(12));
+    decode(state: Memory): Address | DecodingFailure {
+        const m = this.readMemAt(this.loc, state, 32);
+
+        if (isFailure(m)) {
+            return m;
+        }
+
+        return new Address(m.slice(12));
     }
 }
 
@@ -218,30 +297,38 @@ export class AddressCalldataView extends BaseCalldataView<Address, AddressType> 
  * View to an FixedBytes in calldata
  */
 export class FixedBytesCalldataView extends BaseCalldataView<Uint8Array, FixedBytesType> {
-    decode(state: Memory): Uint8Array {
+    decode(state: Memory): Uint8Array | DecodingFailure {
         return this.readMemAt(this.loc, state, this.type.size);
     }
 }
 
 export class BytesCalldataView extends BaseCalldataView<Uint8Array, BytesType> {
-    decode(state: Memory): Uint8Array {
+    decode(state: Memory): Uint8Array | DecodingFailure {
         return this.decodeBytesAt(this.loc, state);
     }
 }
 
 export class StringCalldataView extends BaseCalldataView<string, BytesType> {
-    decode(state: Memory): string {
+    decode(state: Memory): string | DecodingFailure {
         const bytes = this.decodeBytesAt(this.loc, state);
+
+        if (isFailure(bytes)) {
+            return bytes;
+        }
+
         return bytesToUtf8(bytes);
     }
 }
 
 export class TupleCalldataView extends BaseCalldataView<Value[], TupleType> {
-    decode(state: Memory): Value[] {
-        let offset = this.loc;
+    decode(state: Memory): Value[] | DecodingFailure {
+        let offset: bigint | DecodingFailure = this.loc;
 
         if (isTypeDynamic(this.type)) {
             offset = this.decodeIntAt(offset, uint256, state);
+            if (isFailure(offset)) {
+                return offset;
+            }
         }
 
         return this.decodeTupleAt(offset, this.base, this.type, state);
@@ -249,21 +336,26 @@ export class TupleCalldataView extends BaseCalldataView<Value[], TupleType> {
 }
 
 export class ArrayCalldataView extends BaseCalldataView<Value[], ArrayType> {
-    decode(state: Memory): Value[] {
+    decode(state: Memory): Value[] | Poison {
         let baseOff: bigint = this.loc;
 
         // Dynamic sized arrays have length at the start. Fixed sized arrays do
         // not.
-        let bigintSize: bigint;
+        let bigintSize: bigint | DecodingFailure;
         if (this.type.size !== undefined) {
             bigintSize = this.type.size;
         } else {
             bigintSize = this.decodeIntAt(baseOff, uint256, state);
+
+            if (isFailure(bigintSize)) {
+                return bigintSize;
+            }
+
             baseOff += 32n;
         }
 
         if (!inRange(bigintSize, 0, MAX_ARR_DECODE_LIMIT)) {
-            this.fail(state, `Array too large ${bigintSize}`);
+            return new DecodingFailure(`Array too large ${bigintSize}`);
         }
 
         const size = Number(bigintSize);
@@ -271,7 +363,13 @@ export class ArrayCalldataView extends BaseCalldataView<Value[], ArrayType> {
 
         let off: bigint = 0n;
         const newBase = baseOff + this.base;
-        const elSize = BigInt(headSize(this.type.elementT));
+        const hs = headSize(this.type.elementT);
+
+        if (hs === undefined) {
+            return new MissingTypeFailure(`Can't compute head size of ${this.type.elementT.pp()}`);
+        }
+
+        const elSize = BigInt(hs);
 
         for (let i = 0; i < size; i++) {
             const elView = makeCalldataView(this.type.elementT, off, newBase);
@@ -320,15 +418,27 @@ export class StructCalldataView extends BaseCalldataView<Struct, ExpStructType> 
 }
 
 export class PointerCalldataView extends BaseCalldataView<Value, PointerType> {
-    decode(state: Memory): Value {
-        let off = this.loc;
+    decode(state: Memory): Value | DecodingFailure {
+        let off: bigint | DecodingFailure = this.loc;
 
         if (isTypeDynamic(this.type.to)) {
             off = this.decodeIntAt(off, uint256, state);
+
+            if (isFailure(off)) {
+                return off;
+            }
         }
 
         const innerView = makeCalldataView(this.type.to, off, this.base);
         return innerView.decode(state);
+    }
+}
+
+export class MissingCalldataView extends BaseCalldataView<Value, MissingType> {
+    decode(): Value | Poison {
+        return new MissingTypeFailure(
+            `${this.type.rawTypeName ? this.type.rawTypeName.type : "<unknown>"}`
+        );
     }
 }
 
@@ -381,6 +491,10 @@ export function makeCalldataView(
         return new PointerCalldataView(type, loc, base);
     }
 
+    if (type instanceof MissingType) {
+        return new MissingCalldataView(type, loc, base);
+    }
+
     nyi(`makeCalldataView(${type.pp()})`);
 }
 
@@ -390,11 +504,26 @@ export function makeCalldataViews(
 ): Array<BaseCalldataView<Value, TypeNode>> {
     let off = 0n;
     const res: Array<BaseCalldataView<Value, TypeNode>> = [];
+    let failRemaining = false;
 
     for (const t of types) {
+        // If we have missing type info at an earlier type, and we can't compute its head size,
+        // we make all remaining views "missing"
+        if (failRemaining) {
+            res.push(new MissingCalldataView(new MissingType(undefined), off, base));
+            continue;
+        }
+
         const view = makeCalldataView(t, off, base);
         res.push(view);
-        off += BigInt(headSize(t));
+
+        const hs = headSize(t);
+
+        if (hs === undefined) {
+            failRemaining = true;
+        } else {
+            off += BigInt(hs);
+        }
     }
 
     return res;

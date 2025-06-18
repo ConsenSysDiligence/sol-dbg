@@ -1,5 +1,5 @@
 import { TypeNode } from "solc-typed-ast";
-import { Value } from "./value";
+import { Poison, Value } from "./value";
 import { Memory, Stack } from "../types";
 
 export class DecodingError<State> extends Error {
@@ -33,7 +33,7 @@ export abstract class View<
      * Decode a value from the given State
      * @param state
      */
-    abstract decode(state: State): Val;
+    abstract decode(state: State): Val | Poison;
     abstract pp(): string;
 
     protected fail(state: State | undefined, msg: string = ""): never {

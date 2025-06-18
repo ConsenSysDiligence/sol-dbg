@@ -10,8 +10,8 @@ import {
     StringType,
     TypeNode
 } from "solc-typed-ast";
-import { Struct, Value } from "../value";
-import { DecodingError, View } from "../view";
+import { DecodingFailure, MissingTypeFailure, Poison, Struct, Value } from "../value";
+import { View } from "../view";
 import { Storage } from "../../types";
 import {
     address,
@@ -26,10 +26,11 @@ import {
 } from "../../../utils";
 import { keccak256 } from "ethereum-cryptography/keccak";
 import { Address, bytesToUtf8 } from "@ethereumjs/util";
-import { ExpStructType } from "../exp_types";
+import { ExpStructType, MissingType } from "../exp_types";
 import { assert } from "console";
 import { MapKeys } from "../../tracers";
 import { makeMemoryView } from "../memory";
+import { isFailure, isTypeStringDynamicArray, isTypeStringMapping } from "../utils";
 
 type StorageLocation = [bigint, number];
 
@@ -104,12 +105,11 @@ export abstract class BaseStorageView<
         endOffsetInWord: number,
         type: IntType,
         state: Storage
-    ): bigint {
+    ): bigint | DecodingFailure {
         const size = type.nBits / 8;
 
         if (endOffsetInWord < size) {
-            this.fail(
-                state,
+            return new DecodingFailure(
                 `Internal Error: Can't decode ${type.pp()} starting at offset ${endOffsetInWord} in word ${key}`
             );
         }
@@ -126,8 +126,7 @@ export abstract class BaseStorageView<
         }
 
         if (!fits(res, type)) {
-            this.fail(
-                state,
+            return new DecodingFailure(
                 `Decoded value ${res} from ${[key, endOffsetInWord]} doesn't fit in expected typee ${type.pp()}`
             );
         }
@@ -142,11 +141,11 @@ export abstract class BaseStorageView<
     /**
      * The first location after the end of this view
      */
-    abstract nextLoc(): StorageLocation;
+    abstract nextLoc(): StorageLocation | undefined;
 }
 
 export class IntStorageView extends BaseStorageView<bigint, IntType> {
-    decode(state: Storage): bigint {
+    decode(state: Storage): bigint | DecodingFailure {
         return this.decodeIntAt(this.key, this.endOffsetInWord, this.type, state);
     }
 
@@ -156,8 +155,14 @@ export class IntStorageView extends BaseStorageView<bigint, IntType> {
 }
 
 export class BoolStorageView extends BaseStorageView<boolean, BoolType> {
-    decode(state: Storage): boolean {
-        return this.decodeIntAt(this.key, this.endOffsetInWord, uint8, state) !== BigInt(0);
+    decode(state: Storage): boolean | DecodingFailure {
+        const byte = this.decodeIntAt(this.key, this.endOffsetInWord, uint8, state);
+
+        if (isFailure(byte)) {
+            return byte;
+        }
+
+        return byte !== BigInt(0);
     }
 
     nextLoc(): StorageLocation {
@@ -166,7 +171,13 @@ export class BoolStorageView extends BaseStorageView<boolean, BoolType> {
 }
 
 export class AddressStorageView extends BaseStorageView<Address, AddressType> {
-    decode(state: Storage): Address {
+    decode(state: Storage): Address | DecodingFailure {
+        if (this.endOffsetInWord < 20) {
+            return new DecodingFailure(
+                `Unalighed read: Can't decode ${this.type.pp()} starting at offset ${this.endOffsetInWord} in word ${this.key}`
+            );
+        }
+
         const bytes = this.fetchBytes(this.key, this.endOffsetInWord - 20, 20, state);
         return new Address(bytes);
     }
@@ -177,11 +188,10 @@ export class AddressStorageView extends BaseStorageView<Address, AddressType> {
 }
 
 export class FixedBytesStorageView extends BaseStorageView<Uint8Array, FixedBytesType> {
-    decode(state: Storage): Uint8Array {
+    decode(state: Storage): Uint8Array | DecodingFailure {
         if (this.endOffsetInWord < this.type.size) {
-            this.fail(
-                undefined,
-                `Internal Error: Can't decode ${this.type.pp()} starting at offset ${this.endOffsetInWord} in word ${this.key}`
+            return new DecodingFailure(
+                `Unalighed Read: Can't decode ${this.type.pp()} starting at offset ${this.endOffsetInWord} in word ${this.key}`
             );
         }
 
@@ -209,7 +219,7 @@ export class PointerStorageView extends BaseStorageView<Value, PointerType> {
         return this.innerView.decode(state);
     }
 
-    nextLoc(): StorageLocation {
+    nextLoc(): StorageLocation | undefined {
         return this.innerView.nextLoc();
     }
 }
@@ -222,7 +232,7 @@ function keccakOfAddr(addr: bigint): bigint {
 }
 
 export class ArrayStorageView extends BaseStorageView<Value[], ArrayType> {
-    private _nextLoc: StorageLocation;
+    private _nextLoc: StorageLocation | undefined;
 
     constructor(
         type: ArrayType,
@@ -235,34 +245,42 @@ export class ArrayStorageView extends BaseStorageView<Value[], ArrayType> {
             this._nextLoc = nextWord(loc);
         } else {
             // Dirty way to compute how many elements fit in how many words
-            let tmpL: StorageLocation = [0n, 32];
+            let tmpL: StorageLocation | undefined = [0n, 32];
             let nEls = 0n;
 
             while (typeFitsInLoc(type.elementT, tmpL) && tmpL[0] === 0n) {
                 nEls++;
                 const elView = makeStorageView(type.elementT, tmpL);
                 tmpL = elView.nextLoc();
+
+                if (tmpL === undefined) {
+                    break;
+                }
             }
 
-            // Number of words needed for nEls elements
-            const nWords = tmpL[0] + (tmpL[1] === 32 ? 0n : 1n);
-            // Number of groups of "nEls" needed to fit in size
-            const nGroups = type.size / nEls + (type.size % nEls === 0n ? 0n : 1n);
-            // Number of words for the entire fixed sized array.
-            // Note that the last groups may have fewer than nEls elements.
-            // But it will still consume the same number of words. Its either 1 word,
-            // Or its a 1-element group that takes multiple words.
-            const nWordsPerArray = nGroups * nWords;
-            this._nextLoc = [this.loc[0] + nWordsPerArray, 32];
+            if (tmpL === undefined) {
+                this._nextLoc = undefined;
+            } else {
+                // Number of words needed for nEls elementsgmai
+                const nWords = tmpL[0] + (tmpL[1] === 32 ? 0n : 1n);
+                // Number of groups of "nEls" needed to fit in size
+                const nGroups = type.size / nEls + (type.size % nEls === 0n ? 0n : 1n);
+                // Number of words for the entire fixed sized array.
+                // Note that the last groups may have fewer than nEls elements.
+                // But it will still consume the same number of words. Its either 1 word,
+                // Or its a 1-element group that takes multiple words.
+                const nWordsPerArray = nGroups * nWords;
+                this._nextLoc = [this.loc[0] + nWordsPerArray, 32];
+            }
         }
     }
 
-    nextLoc(): StorageLocation {
+    nextLoc(): StorageLocation | undefined {
         return this._nextLoc;
     }
 
-    decode(state: Storage): Value[] {
-        let sizeBigint: bigint;
+    decode(state: Storage): Value[] | DecodingFailure {
+        let sizeBigint: bigint | DecodingFailure;
         let contentsKey: bigint;
         const contentsOff: number = 32;
 
@@ -271,22 +289,31 @@ export class ArrayStorageView extends BaseStorageView<Value[], ArrayType> {
             contentsKey = this.key;
         } else {
             sizeBigint = this.decodeIntAt(this.key, this.endOffsetInWord, uint256, state);
+
+            if (isFailure(sizeBigint)) {
+                return sizeBigint;
+            }
+
             contentsKey = keccakOfAddr(this.key);
         }
 
         if (sizeBigint > MAX_ARR_DECODE_LIMIT) {
-            this.fail(state, `Array too large to decode ${sizeBigint}`);
+            return new DecodingFailure(`Array too large to decode ${sizeBigint}`);
         }
 
         const size = Number(sizeBigint);
         const res: Value[] = [];
-        let elLoc: StorageLocation = [contentsKey, contentsOff];
+        let elLoc: StorageLocation | undefined = [contentsKey, contentsOff];
         const elT = this.type.elementT;
 
         for (let i = 0; i < size; i++) {
-            const view = makeStorageView(elT, elLoc, this.mapKeys);
-            res.push(view.decode(state));
-            elLoc = view.nextLoc();
+            if (elLoc === undefined) {
+                res.push(new DecodingFailure(`Failed earlier in array`));
+            } else {
+                const view = makeStorageView(elT, elLoc, this.mapKeys);
+                res.push(view.decode(state));
+                elLoc = view.nextLoc();
+            }
         }
 
         return res;
@@ -295,24 +322,28 @@ export class ArrayStorageView extends BaseStorageView<Value[], ArrayType> {
 
 export class StructStorageView extends BaseStorageView<Struct, ExpStructType> {
     fieldViews: Array<[string, BaseStorageView<Value, TypeNode>]> = [];
-    private _nextLoc: StorageLocation;
+    private _nextLoc: StorageLocation | undefined;
 
     constructor(type: ExpStructType, loc: StorageLocation, mapKeys?: MapKeys) {
         super(type, loc);
         assert(this.endOffsetInWord === 32, `Structs must start at 32 byte boundaries`);
 
-        let fieldLoc = this.loc;
+        let fieldLoc: StorageLocation | undefined = this.loc;
 
         for (const [name, fieldT] of this.type.fields) {
-            const fieldView = makeStorageView(fieldT, fieldLoc, mapKeys);
+            const fieldView: BaseStorageView<Value, TypeNode> =
+                fieldLoc === undefined
+                    ? new MissingStorageView(new MissingType(undefined), [-1n, 32])
+                    : makeStorageView(fieldT, fieldLoc, mapKeys);
             this.fieldViews.push([name, fieldView]);
             fieldLoc = fieldView.nextLoc();
         }
 
-        this._nextLoc = fieldLoc[1] === 32 ? fieldLoc : nextWord(fieldLoc);
+        this._nextLoc =
+            fieldLoc === undefined ? undefined : fieldLoc[1] === 32 ? fieldLoc : nextWord(fieldLoc);
     }
 
-    nextLoc(): StorageLocation {
+    nextLoc(): StorageLocation | undefined {
         return this._nextLoc;
     }
 
@@ -364,27 +395,17 @@ export class MapStorageView extends BaseStorageView<Map<Value, Value>, MappingTy
             keyView = makeMemoryView(this.type.keyType, 0n);
         }
 
+        // @todo(dimo) Would it be better here to check that `candidateSlot` is an explicitly defined in storage, and not just a 0 by default?
         for (const [candidateKey, candidateSlot] of candidateKeys) {
-            let decodedKey;
-            let decodedValue;
+            const decodedKey = keyView.decode(candidateKey);
+            const valueView = makeStorageView(
+                this.type.valueType,
+                [candidateSlot, 32],
+                this.mapKeys
+            );
+            const decodedValue = valueView.decode(state);
 
-            try {
-                decodedKey = keyView.decode(candidateKey);
-                const valueView = makeStorageView(
-                    this.type.valueType,
-                    [candidateSlot, 32],
-                    this.mapKeys
-                );
-                decodedValue = valueView.decode(state);
-            } catch (e: unknown) {
-                if (e instanceof DecodingError) {
-                    continue;
-                }
-
-                throw e;
-            }
-
-            if (decodedKey !== undefined && decodedValue !== undefined) {
+            if (!isFailure(decodedKey) && !isFailure(decodedValue)) {
                 res.set(decodedKey, decodedValue);
             }
         }
@@ -401,7 +422,7 @@ export abstract class PackedArrayStorageView<
         return nextWord(this.loc);
     }
 
-    decodeBytes(state: Storage): Uint8Array {
+    decodeBytes(state: Storage): Uint8Array | DecodingFailure {
         const word = this.fetchWord(this.key, state);
         const lByte = word[31];
 
@@ -414,10 +435,15 @@ export abstract class PackedArrayStorageView<
         }
 
         let len = this.decodeIntAt(this.key, this.endOffsetInWord, uint256, state);
+
+        if (isFailure(len)) {
+            return len;
+        }
+
         len = (len - 1n) / 2n;
 
         if (len > MAX_ARR_DECODE_LIMIT) {
-            this.fail(state, `${this.type.pp()} too large - ${len}`);
+            return new DecodingFailure(`${this.type.pp()} too large - ${len}`);
         }
 
         const numLen = Number(len);
@@ -428,14 +454,55 @@ export abstract class PackedArrayStorageView<
 }
 
 export class BytesStorageView extends PackedArrayStorageView<Uint8Array, BytesType> {
-    decode(state: Storage): Uint8Array {
+    decode(state: Storage): Uint8Array | DecodingFailure {
         return this.decodeBytes(state);
     }
 }
 
 export class StringStorageView extends PackedArrayStorageView<string, StringType> {
-    decode(state: Storage): string {
-        return bytesToUtf8(this.decodeBytes(state));
+    decode(state: Storage): string | DecodingFailure {
+        const bytes = this.decodeBytes(state);
+
+        if (isFailure(bytes)) {
+            return bytes;
+        }
+
+        return bytesToUtf8(bytes);
+    }
+}
+
+export class MissingStorageView extends BaseStorageView<Poison, MissingType> {
+    constructor(type: MissingType, loc: StorageLocation) {
+        super(type, loc);
+
+        if (this.type.rawTypeName !== undefined) {
+            const typeString = this.type.rawTypeName.typeString;
+
+            if (isTypeStringDynamicArray(typeString) || isTypeStringMapping(typeString)) {
+                if (!(this.endOffsetInWord === 32)) {
+                    this.fail(undefined, `Unexpected non-word aligned ${typeString} in storage`);
+                }
+            }
+        }
+    }
+    decode(): Poison {
+        return new MissingTypeFailure(
+            `missing ${this.type.rawTypeName ? this.type.rawTypeName.type : "<unknown>"}`
+        );
+    }
+
+    nextLoc(): StorageLocation | undefined {
+        if (this.type.rawTypeName === undefined) {
+            return undefined;
+        }
+
+        const typeString = this.type.rawTypeName.typeString;
+        // If we can guess this is a dynamic array or mapping from the typestring, then we know the nextLoc
+        if (isTypeStringDynamicArray(typeString) || isTypeStringMapping(typeString)) {
+            return nextWord(this.loc);
+        }
+
+        return undefined;
     }
 }
 
