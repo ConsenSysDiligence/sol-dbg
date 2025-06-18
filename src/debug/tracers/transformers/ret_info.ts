@@ -1,19 +1,20 @@
 import { InterpreterStep } from "@ethereumjs/evm";
 import { VM } from "@ethereumjs/vm";
 import {
+    DataLocation,
     FunctionDefinition,
     FunctionType,
     StateVariableVisibility,
-    TupleType,
     VariableDeclaration
 } from "solc-typed-ast";
-import { mustReadMem, repeat, stackInd, stackTop } from "../../../utils/misc";
+import { mustReadMem, stackInd, stackTop } from "../../../utils/misc";
 import { IArtifactManager } from "../../artifact_manager";
-import { cd_decodeValue } from "../../decoding/calldata/decode";
 import { OPCODES } from "../../opcodes";
-import { DataLocationKind, FrameKind } from "../../types";
+import { FrameKind } from "../../types";
 import { BasicStepInfo } from "./basic_info";
 import { ExternalFrameInfo, topExtFrame } from "./ext_stack";
+import { makeCalldataViews } from "../../decoding/calldata/view";
+import { simplifyType } from "../../decoding";
 
 export interface ReturnInfo {
     retInfo?: {
@@ -108,38 +109,9 @@ export async function addReturnInfo<T extends object & BasicStepInfo & ExternalF
         };
     }
 
-    const encVer = extFrame.info.artifact.abiEncoderVersion;
-    const origType = new TupleType(type.returns);
-    let abiType: TupleType;
-
-    try {
-        abiType = new TupleType(type.returns.map((t) => infer.toABIEncodedType(t, encVer)));
-    } catch {
-        return {
-            ...state,
-            retInfo: {
-                callStartStep,
-                rawReturnData,
-                decodedReturnData: []
-            }
-        };
-    }
-
-    const decodeRes = cd_decodeValue(
-        abiType,
-        origType,
-        { kind: DataLocationKind.CallData, address: 0n, base: 0n },
-        rawReturnData,
-        infer
-    );
-
-    let decodedReturnData: any[];
-
-    if (decodeRes === undefined) {
-        decodedReturnData = repeat(undefined, type.returns.length);
-    } else {
-        decodedReturnData = decodeRes[0];
-    }
+    // We treat these as in calldata, since they should already be abi-encoded in memory for the Return instruction
+    const views = makeCalldataViews(type.returns.map((t) => simplifyType(t, infer, DataLocation.CallData)), 0n);
+    const decodedReturnData = views.map((v) => v.decode(rawReturnData));
 
     return {
         ...state,

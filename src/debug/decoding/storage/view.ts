@@ -10,7 +10,7 @@ import {
     StringType,
     TypeNode
 } from "solc-typed-ast";
-import { DecodingFailure, MissingTypeFailure, Poison, Struct, Value } from "../value";
+import { DecodingFailure, Struct, Value } from "../value";
 import { View } from "../view";
 import { Storage } from "../../types";
 import {
@@ -30,7 +30,9 @@ import { ExpStructType, MissingType } from "../exp_types";
 import { assert } from "console";
 import { MapKeys } from "../../tracers";
 import { makeMemoryView } from "../memory";
-import { isFailure, isTypeStringDynamicArray, isTypeStringMapping } from "../utils";
+import { isFailure, isTypeStringDynamicArray, isTypeStringMapping, isTypeStringStatic32BytesInStorage } from "../utils";
+import { BaseMemoryView } from "../memory/view";
+import { bytesToHex } from "ethereum-cryptography/utils";
 
 type StorageLocation = [bigint, number];
 
@@ -142,6 +144,7 @@ export abstract class BaseStorageView<
      * The first location after the end of this view
      */
     abstract nextLoc(): StorageLocation | undefined;
+    abstract decode(state: Storage, mapKeys?: MapKeys): Val | DecodingFailure;
 }
 
 export class IntStorageView extends BaseStorageView<bigint, IntType> {
@@ -210,13 +213,13 @@ export class FixedBytesStorageView extends BaseStorageView<Uint8Array, FixedByte
 
 export class PointerStorageView extends BaseStorageView<Value, PointerType> {
     innerView: BaseStorageView<Value, TypeNode>;
-    constructor(type: PointerType, loc: [bigint, number], mapKeys?: MapKeys) {
+    constructor(type: PointerType, loc: [bigint, number]) {
         super(type, loc);
-        this.innerView = makeStorageView(type.to, loc, mapKeys);
+        this.innerView = makeStorageView(type.to, loc);
     }
 
-    decode(state: Storage): Value {
-        return this.innerView.decode(state);
+    decode(state: Storage, mapKeys?: MapKeys): Value {
+        return this.innerView.decode(state, mapKeys);
     }
 
     nextLoc(): StorageLocation | undefined {
@@ -237,7 +240,6 @@ export class ArrayStorageView extends BaseStorageView<Value[], ArrayType> {
     constructor(
         type: ArrayType,
         loc: [bigint, number],
-        private readonly mapKeys: MapKeys | undefined = undefined
     ) {
         super(type, loc);
 
@@ -279,7 +281,7 @@ export class ArrayStorageView extends BaseStorageView<Value[], ArrayType> {
         return this._nextLoc;
     }
 
-    decode(state: Storage): Value[] | DecodingFailure {
+    decode(state: Storage, mapKeys?: MapKeys): Value[] | DecodingFailure {
         let sizeBigint: bigint | DecodingFailure;
         let contentsKey: bigint;
         const contentsOff: number = 32;
@@ -310,8 +312,8 @@ export class ArrayStorageView extends BaseStorageView<Value[], ArrayType> {
             if (elLoc === undefined) {
                 res.push(new DecodingFailure(`Failed earlier in array`));
             } else {
-                const view = makeStorageView(elT, elLoc, this.mapKeys);
-                res.push(view.decode(state));
+                const view = makeStorageView(elT, elLoc);
+                res.push(view.decode(state, mapKeys));
                 elLoc = view.nextLoc();
             }
         }
@@ -324,7 +326,7 @@ export class StructStorageView extends BaseStorageView<Struct, ExpStructType> {
     fieldViews: Array<[string, BaseStorageView<Value, TypeNode>]> = [];
     private _nextLoc: StorageLocation | undefined;
 
-    constructor(type: ExpStructType, loc: StorageLocation, mapKeys?: MapKeys) {
+    constructor(type: ExpStructType, loc: StorageLocation) {
         super(type, loc);
         assert(this.endOffsetInWord === 32, `Structs must start at 32 byte boundaries`);
 
@@ -334,7 +336,7 @@ export class StructStorageView extends BaseStorageView<Struct, ExpStructType> {
             const fieldView: BaseStorageView<Value, TypeNode> =
                 fieldLoc === undefined
                     ? new MissingStorageView(new MissingType(undefined), [-1n, 32])
-                    : makeStorageView(fieldT, fieldLoc, mapKeys);
+                    : makeStorageView(fieldT, fieldLoc);
             this.fieldViews.push([name, fieldView]);
             fieldLoc = fieldView.nextLoc();
         }
@@ -347,20 +349,28 @@ export class StructStorageView extends BaseStorageView<Struct, ExpStructType> {
         return this._nextLoc;
     }
 
-    decode(state: Storage): Struct {
+    decode(state: Storage, mapKeys?: MapKeys): Struct {
         const entries: Array<[string, Value]> = this.fieldViews.map(([name, view]) => [
             name,
-            view.decode(state)
+            view.decode(state, mapKeys)
         ]);
         return new Struct(entries);
     }
 }
 
+function decodeMapRefKey(type: TypeNode, data: Uint8Array): string {
+    if (!(type instanceof StringType || type instanceof BytesType)) {
+        throw new Error(`Invalid map reference key type ${type.pp()}`);
+    }
+
+    return type instanceof StringType ? bytesToUtf8(data) : bytesToHex(data);
+}
+
+
 export class MapStorageView extends BaseStorageView<Map<Value, Value>, MappingType> {
     constructor(
         type: MappingType,
         loc: StorageLocation,
-        private readonly mapKeys: MapKeys | undefined = undefined
     ) {
         super(type, loc);
     }
@@ -369,41 +379,39 @@ export class MapStorageView extends BaseStorageView<Map<Value, Value>, MappingTy
         return nextWord(this.loc);
     }
 
-    decode(state: Storage): Map<Value, Value> {
-        if (!this.mapKeys) {
+    decode(state: Storage, mapKeys?: MapKeys): Map<Value, Value> {
+        if (mapKeys === undefined) {
             return new Map();
         }
 
-        const candidateKeys = this.mapKeys.get(this.loc[0]);
+        const candidateKeys = mapKeys.get(this.loc[0]);
         const res = new Map<Value, Value>();
 
         if (candidateKeys === undefined) {
             return res;
         }
 
-        let keyView;
+        let keyView: BaseMemoryView<Value, TypeNode> | undefined;
 
-        if (this.type.keyType instanceof PointerType) {
-            const toT = this.type.keyType.to;
-            assert(
-                toT instanceof StringType || toT instanceof BytesType,
-                `Unexpected mapping key type {0}`,
-                this.type.keyType
-            );
-            keyView = makeMemoryView(this.type.keyType.to, 0n);
-        } else {
+        if (!(this.type.keyType instanceof PointerType)) {
             keyView = makeMemoryView(this.type.keyType, 0n);
         }
 
         // @todo(dimo) Would it be better here to check that `candidateSlot` is an explicitly defined in storage, and not just a 0 by default?
         for (const [candidateKey, candidateSlot] of candidateKeys) {
-            const decodedKey = keyView.decode(candidateKey);
+            let decodedKey: Value
+
+            if (keyView !== undefined) {
+                decodedKey = keyView.decode(candidateKey);
+            } else {
+                decodedKey = decodeMapRefKey((this.type.keyType as PointerType).to, candidateKey);
+            }
+
             const valueView = makeStorageView(
                 this.type.valueType,
-                [candidateSlot, 32],
-                this.mapKeys
+                [candidateSlot, 32]
             );
-            const decodedValue = valueView.decode(state);
+            const decodedValue = valueView.decode(state, mapKeys);
 
             if (!isFailure(decodedKey) && !isFailure(decodedValue)) {
                 res.set(decodedKey, decodedValue);
@@ -471,7 +479,7 @@ export class StringStorageView extends PackedArrayStorageView<string, StringType
     }
 }
 
-export class MissingStorageView extends BaseStorageView<Poison, MissingType> {
+export class MissingStorageView extends BaseStorageView<DecodingFailure, MissingType> {
     constructor(type: MissingType, loc: StorageLocation) {
         super(type, loc);
 
@@ -485,8 +493,9 @@ export class MissingStorageView extends BaseStorageView<Poison, MissingType> {
             }
         }
     }
-    decode(): Poison {
-        return new MissingTypeFailure(
+
+    decode(): DecodingFailure {
+        return new DecodingFailure(
             `missing ${this.type.rawTypeName ? this.type.rawTypeName.type : "<unknown>"}`
         );
     }
@@ -498,7 +507,7 @@ export class MissingStorageView extends BaseStorageView<Poison, MissingType> {
 
         const typeString = this.type.rawTypeName.typeString;
         // If we can guess this is a dynamic array or mapping from the typestring, then we know the nextLoc
-        if (isTypeStringDynamicArray(typeString) || isTypeStringMapping(typeString)) {
+        if (isTypeStringStatic32BytesInStorage(typeString)) {
             return nextWord(this.loc);
         }
 
@@ -568,13 +577,16 @@ function staticSize(typ: TypeNode): number {
         return staticSize(typ.to);
     }
 
+    if (typ instanceof MissingType && typ.rawTypeName !== undefined && isTypeStringStatic32BytesInStorage(typ.rawTypeName.typeString)) {
+        return 32;
+    }
+
     nyi(`NYI staticSize(${typ.pp()})`);
 }
 
 export function makeStorageView(
     type: TypeNode,
     loc: StorageLocation,
-    mapKeys?: MapKeys
 ): BaseStorageView<Value, TypeNode> {
     if (!typeFitsInLoc(type, loc)) {
         loc = nextWord(loc);
@@ -605,19 +617,23 @@ export function makeStorageView(
     }
 
     if (type instanceof ArrayType) {
-        return new ArrayStorageView(type, loc, mapKeys);
+        return new ArrayStorageView(type, loc);
     }
 
     if (type instanceof PointerType) {
-        return new PointerStorageView(type, loc, mapKeys);
+        return new PointerStorageView(type, loc);
     }
 
     if (type instanceof ExpStructType) {
-        return new StructStorageView(type, loc, mapKeys);
+        return new StructStorageView(type, loc);
     }
 
     if (type instanceof MappingType) {
-        return new MapStorageView(type, loc, mapKeys);
+        return new MapStorageView(type, loc);
+    }
+
+    if (type instanceof MissingType) {
+        return new MissingStorageView(type, loc)
     }
 
     nyi(`makeStoragView(${type.pp()})`);

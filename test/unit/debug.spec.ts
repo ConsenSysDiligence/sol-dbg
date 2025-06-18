@@ -6,6 +6,7 @@ import { assert, DecodedBytecodeSourceMapEntry, forAny } from "solc-typed-ast";
 import {
     ArtifactManager,
     ContractInfo,
+    ContractStates,
     decodeContractState,
     FoundryTxResult,
     PartialSolcOutput,
@@ -19,12 +20,15 @@ import {
     findLastNonInternalStepBeforeAssert,
     findLastNonInternalStepBeforeLastRevert,
     findLastNonInternalStepBeforeRevert,
+    nyi,
     ppStackTrace,
     sanitizeBigintFromJson,
     TxRunner
 } from "../../src/utils";
 import { lsJson } from "../utils";
 import { ResultKind, TestCase, TestStep } from "../utils/test_case";
+import { DecodingFailure, ExternalFunRef, InternalFunRef, Poison, Slice, Struct, Value } from "../../src/debug/decoding/value";
+import { View } from "../../src/debug/decoding/view";
 
 function checkResult(result: FoundryTxResult, step: TestStep): boolean {
     switch (step.result.kind) {
@@ -104,8 +108,7 @@ export function stackTracesEq(actualST: string, expectedST: string[]): boolean {
 
     if (actualSTLines.length !== expectedST.length) {
         console.error(
-            `Traces have different number of lines. Expected(${
-                expectedST.length
+            `Traces have different number of lines. Expected(${expectedST.length
             }): \n ${expectedST.join("\n")} \n Actual(${actualSTLines.length}): \n ${actualST}`
         );
 
@@ -139,6 +142,65 @@ function getStepFailTraceStep(step: TestStep, trace: StepState[]): StepState | u
     }
 
     return findFirstCallToFail(trace);
+}
+
+function contractStatesToJSON(s: ContractStates | undefined): any {
+    if (s === undefined) {
+        return s;
+    }
+
+    return Object.fromEntries(Object.entries(s).map(([k, v]) => [k, valueToJSON(v)]))
+}
+
+function valueToJSON(s: Value): any {
+    if (s instanceof Array) {
+        return s.map(valueToJSON);
+    }
+
+    if (s instanceof Map) {
+        const res: { [keys: string | number]: any } = {}
+        for (const [k, v] of s.entries()) {
+            res[valueToJSON(k)] = valueToJSON(v);
+        }
+        return res
+    }
+
+    if (s instanceof Struct) {
+        const res: { [keys: string]: any } = {}
+        for (const [k, v] of s.entries) {
+            res[valueToJSON(k)] = valueToJSON(v);
+        }
+        return res
+
+    }
+
+    if (typeof s === "bigint") {
+        return String(s);
+    }
+
+    if (s instanceof Address) {
+        return s.toString();
+    }
+
+    if (s instanceof Uint8Array) {
+        return `hex` + bytesToHex(s);
+    }
+
+    if (s instanceof DecodingFailure) {
+        return undefined;
+    }
+
+    if (
+        s instanceof ExternalFunRef ||
+        s instanceof InternalFunRef ||
+        s instanceof Slice ||
+        s instanceof View ||
+        s instanceof Poison
+    ) {
+        nyi(`valueToJSON(${s})`);
+    }
+
+    return s;
 }
 
 describe("Local tests", () => {
@@ -315,7 +377,6 @@ describe("Local tests", () => {
                                 const mapKeys = getMapKeys(keccakPreimages);
 
                                 const layout = decodeContractState(
-                                    artifactManager,
                                     infer,
                                     info.ast,
                                     storage,
@@ -325,7 +386,7 @@ describe("Local tests", () => {
                                 expect(layout).toBeDefined();
 
                                 const strLayout = JSON.stringify(
-                                    sanitizeBigintFromJson(layout),
+                                    valueToJSON(layout),
                                     undefined,
                                     2
                                 );
@@ -368,7 +429,7 @@ describe("Local tests", () => {
                                 expect(layout).toBeDefined();
 
                                 const strLayout = JSON.stringify(
-                                    sanitizeBigintFromJson(layout),
+                                    contractStatesToJSON(layout),
                                     undefined,
                                     2
                                 );
@@ -446,9 +507,7 @@ describe("Local tests", () => {
                                             step.retInfo.decodedReturnData !== undefined
                                     )
                                     .map((step) =>
-                                        sanitizeBigintFromJson(
-                                            (step.retInfo as any).decodedReturnData
-                                        )
+                                        ((step.retInfo as any).decodedReturnData as Value[]).map(valueToJSON)
                                     );
 
                                 expect(actualDecodedReturns).toEqual(curStep.decodedReturns);

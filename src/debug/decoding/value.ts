@@ -41,16 +41,6 @@ export abstract class Poison {
     abstract pp(): string;
 }
 
-export class MissingTypeFailure extends Poison {
-    constructor(public readonly reason: string) {
-        super();
-    }
-
-    pp(): string {
-        return `<missing info: ${this.reason}>`;
-    }
-}
-
 export class DecodingFailure extends Poison {
     constructor(public readonly reason: string) {
         super();

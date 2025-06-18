@@ -5,8 +5,6 @@ import { ContractInfo, IArtifactManager } from "../../artifact_manager";
 import { isCalldataArrayType } from "../../decoding/utils";
 import { OPCODES } from "../../opcodes";
 import {
-    DataLocationKind,
-    DataView,
     Frame,
     FrameKind,
     InternalCallFrame,
@@ -15,6 +13,8 @@ import {
 import { BasicStepInfo } from "./basic_info";
 import { ExternalFrameInfo, topExtFrame } from "./ext_stack";
 import { SourceInfo } from "./source";
+import { View } from "../../decoding/view";
+import { makeStackView, simplifyType } from "../../decoding";
 
 export interface InternalFrameInfo {
     intStack: InternalCallFrame[];
@@ -31,15 +31,15 @@ function topFrame(step: InternalFrameInfo & ExternalFrameInfo & BasicStepInfo): 
 
 /**
  * Given a callable (function definition or public state variable) try to build
- * `DataView`s for all the callable arguments. On failure return undefined.
+ * `View`s for all the callable arguments. On failure return undefined.
  */
 function buildFunArgViews(
     callee: FunctionDefinition | VariableDeclaration,
     stack: Stack,
     contractInfo: ContractInfo,
     artifactManager: IArtifactManager
-): Array<[string, DataView]> | undefined {
-    const res: Array<[string, DataView]> = [];
+): Array<[string, View]> | undefined {
+    const res: Array<[string, View]> = [];
     let formals: Array<[string, TypeNode]>;
     const infer = artifactManager.infer(contractInfo.artifact.compilerVersion);
 
@@ -47,12 +47,12 @@ function buildFunArgViews(
         formals =
             callee instanceof FunctionDefinition
                 ? callee.vParameters.vParameters.map((argDef: VariableDeclaration) => [
-                      argDef.name,
-                      infer.variableDeclarationToTypeNode(argDef)
-                  ])
+                    argDef.name,
+                    infer.variableDeclarationToTypeNode(argDef)
+                ])
                 : infer
-                      .getterArgsAndReturn(callee)[0]
-                      .map((typ: TypeNode, i: number) => [`ARG_${i}`, typ]);
+                    .getterArgsAndReturn(callee)[0]
+                    .map((typ: TypeNode, i: number) => [`ARG_${i}`, typ]);
     } catch (e) {
         // `variableDeclarationToTypeNode` may fail when referencing structs/contracts that are defined
         // in SourceUnits that are missing
@@ -74,13 +74,7 @@ function buildFunArgViews(
 
         res.unshift([
             name,
-            {
-                type: typ,
-                loc: {
-                    kind: DataLocationKind.Stack,
-                    offsetFromTop
-                }
-            }
+            makeStackView(simplifyType(typ, infer, undefined), offsetFromTop)
         ]);
     }
 
@@ -170,7 +164,7 @@ export async function addInternalFrameInfo<
     }
 
     if (enteringInternalFun) {
-        let args: Array<[string, DataView | undefined]> | undefined;
+        let args: Array<[string, View]> | undefined;
 
         if (
             ast instanceof FunctionDefinition ||

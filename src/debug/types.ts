@@ -4,6 +4,7 @@ import { FunctionDefinition } from "solc-typed-ast";
 import { ImmMap } from "../utils/immutable_map";
 import { ArtifactInfo, ContractInfo } from "./artifact_manager/types";
 import { EVMOpInfo } from "./opcodes";
+import { View } from "./decoding/view";
 
 /**
  * A type alias for 0x-prefixed hex strings. Used for documentation purposes.
@@ -50,7 +51,7 @@ export interface BaseFrame {
      * If we have a `callee` try and infer where the arguments are placed in the VM state. Some arguments may not
      * exist in the case of msg.data generated from a fuzzer for example.
      */
-    readonly arguments: Array<[string, DataView | undefined]> | undefined;
+    readonly arguments: Array<[string, View]> | undefined;
     readonly startStep: number;
 }
 /**

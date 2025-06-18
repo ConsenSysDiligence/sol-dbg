@@ -8,7 +8,7 @@ import {
 import { MAX_ARR_DECODE_LIMIT, uint256 } from "../../utils/misc";
 import { DataLocationKind, MemoryLocationKind, StackLocation, StepState } from "../types";
 import { st_decodeInt } from "./stack";
-import { Poison, Value } from "./value";
+import { DecodingFailure, Value } from "./value";
 
 export function solLocToMemoryLocationKind(loc: SolDataLocation): MemoryLocationKind {
     if (loc === SolDataLocation.Default) {
@@ -84,8 +84,8 @@ export function sum(...ns: number[]): number {
     return res;
 }
 
-export function isFailure(t: Value): t is Poison {
-    return t instanceof Poison;
+export function isFailure(t: Value): t is DecodingFailure {
+    return t instanceof DecodingFailure;
 }
 
 export function isTypeStringDynamicArray(t: string): boolean {
@@ -94,4 +94,8 @@ export function isTypeStringDynamicArray(t: string): boolean {
 
 export function isTypeStringMapping(t: string): boolean {
     return t.startsWith("mapping(");
+}
+
+export function isTypeStringStatic32BytesInStorage(t: string): boolean {
+    return isTypeStringDynamicArray(t) || isTypeStringMapping(t);
 }

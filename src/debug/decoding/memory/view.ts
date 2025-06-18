@@ -11,7 +11,7 @@ import {
 } from "solc-typed-ast";
 import { Memory } from "../../types";
 import { View } from "../view";
-import { DecodingFailure, MissingTypeFailure, Poison, Struct, Value } from "../value";
+import { DecodingFailure, Struct, Value } from "../value";
 import {
     bigEndianBufToBigint,
     fits,
@@ -201,8 +201,8 @@ export class PointerMemView extends BaseMemoryView<Value, PointerType> {
 }
 
 export class MissingMemView extends BaseMemoryView<Value, MissingType> {
-    decode(): Value | Poison {
-        return new MissingTypeFailure(
+    decode(): DecodingFailure {
+        return new DecodingFailure(
             `${this.type.rawTypeName ? this.type.rawTypeName.type : "<unknown>"}`
         );
     }

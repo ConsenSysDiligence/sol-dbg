@@ -19,7 +19,7 @@ import {
     VariableDeclaration
 } from "solc-typed-ast";
 import { address } from "../../utils";
-import { isTypeStringDynamicArray, isTypeStringMapping } from "./utils";
+import { isTypeStringStatic32BytesInStorage } from "./utils";
 
 /**
  * An internal struct type that converts all field VariableDeclaration(s) to
@@ -188,14 +188,6 @@ export class MissingType extends TypeNode {
 }
 
 /**
- * @todo separate in 2 functions - isDynamicArray and isMapping?
- * @returns
- */
-function isTypeStringStatic32Bytes(t: string): boolean {
-    return isTypeStringDynamicArray(t) || isTypeStringMapping(t);
-}
-
-/**
  * Given a `ContractDefinition` try and compute an `ExpStructType` struct that
  * describes the layout of the class.  This takes into account all base classes,
  * and simplifies types using `simplifyType`.
@@ -248,13 +240,11 @@ export function getContractLayoutType(
                  * statically in the layout. Otherwise we have to abort decoding
                  */
                 complete = false;
-                if (isTypeStringStatic32Bytes(varDecl.typeString)) {
+                if (isTypeStringStatic32BytesInStorage(varDecl.typeString)) {
                     typeNode = new MissingType(varDecl.vType);
                 } else {
                     break;
                 }
-
-                continue;
             }
 
             stateVars.push([varDecl.name, simplifyType(typeNode, infer, DataLocation.Storage)]);

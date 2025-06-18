@@ -258,7 +258,7 @@
             },
             "errorString": "assert(e == E.O3)",
             "errorStack": [
-                "test/samples/local/external_primitive_datatypes/contracts/main.sol Failing.shouldBeO3(E.O4)"
+                "test/samples/local/external_primitive_datatypes/contracts/main.sol Failing.shouldBeO3(3)"
             ]
         },
         {

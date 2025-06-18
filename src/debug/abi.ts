@@ -21,22 +21,15 @@ import {
     VariableDeclaration,
     assert,
     enumToIntType,
-    isReferenceType,
     types
 } from "solc-typed-ast";
 import { ABIEncoderVersion } from "solc-typed-ast/dist/types/abi";
-import { getFunctionSelector, zip } from "../utils/misc";
+import { getFunctionSelector } from "../utils/misc";
 import { abiStaticTypeSize } from "../utils/solidity";
-import { IArtifactManager } from "./artifact_manager";
 import { cd_decodeValue } from "./decoding/calldata/decode";
-import { mem_decodeValue } from "./decoding/memory/decoding";
 import {
     DataLocationKind,
     DataView,
-    DecodedEventDesc,
-    EventDefInfo,
-    EventDesc,
-    LinearMemoryLocation
 } from "./types";
 
 /**
@@ -120,14 +113,14 @@ export function buildMsgDataViews(
     const formals: Array<[string, TypeNode]> =
         callee instanceof FunctionDefinition
             ? callee.vParameters.vParameters.map((argDef: VariableDeclaration) => [
-                  argDef.name,
-                  isTypeUnknownContract(argDef.vType)
-                      ? types.address
-                      : infer.variableDeclarationToTypeNode(argDef)
-              ])
+                argDef.name,
+                isTypeUnknownContract(argDef.vType)
+                    ? types.address
+                    : infer.variableDeclarationToTypeNode(argDef)
+            ])
             : infer
-                  .getterArgsAndReturn(callee)[0]
-                  .map((typ: TypeNode, i: number) => [`ARG_${i}`, typ]);
+                .getterArgsAndReturn(callee)[0]
+                .map((typ: TypeNode, i: number) => [`ARG_${i}`, typ]);
 
     let staticOff = 0;
     const len = data.length;
@@ -313,107 +306,4 @@ export function findMethodBySelector(
         }
     }
     return undefined;
-}
-
-/**
- * Given an `EventDefInfo` and a concrete event `EventDesc`, build `DataView`s for decoding the event arguments.
- * Supports decoding indexed arguments.
- */
-function buildEventDataViews(
-    evtDef: EventDefInfo,
-    evtDesc: EventDesc,
-    infer: InferType
-): Array<[string, DataView | number | undefined]> {
-    let staticOff = 0;
-    const res: Array<[string, DataView | number | undefined]> = [];
-
-    const len = evtDesc.payload.length;
-    let topicIdx = evtDef.definition.anonymous ? 0 : 1;
-
-    for (const [name, originalType, indexed] of evtDef.args) {
-        if (indexed) {
-            res.push([name, topicIdx < evtDesc.topics.length ? topicIdx++ : undefined]);
-            continue;
-        }
-
-        // @todo (dimo) Is it ok to hardcode the encoder version here?
-        const typ = toABIEncodedType(originalType, infer, ABIEncoderVersion.V2);
-        const staticSize = abiStaticTypeSize(typ);
-        const loc: LinearMemoryLocation | undefined =
-            staticOff + staticSize <= len
-                ? { kind: DataLocationKind.Memory, address: BigInt(staticOff) }
-                : undefined;
-
-        staticOff += staticSize;
-
-        const val: DataView | undefined = loc
-            ? { type: originalType, abiType: typ, loc }
-            : undefined;
-
-        res.push([name, val]);
-    }
-
-    return res;
-}
-
-/**
- * Decode a raw event. Currently only supports non-anonmyous events.
- */
-export function decodeEvent(
-    artifactManager: IArtifactManager,
-    evt: EventDesc
-): DecodedEventDesc | undefined {
-    if (evt.topics.length === 0) {
-        return undefined;
-    }
-
-    const defInfo = artifactManager.getEventDefInfo(evt.topics[0]);
-
-    if (!defInfo) {
-        return undefined;
-    }
-
-    const infer = artifactManager.infer(defInfo.artifact.compilerVersion);
-    const dataViews = buildEventDataViews(defInfo, evt, infer);
-    const argVals: Array<[string, any]> = [];
-
-    for (const [[name, view], [, type]] of zip(dataViews, defInfo.args)) {
-        if (view === undefined) {
-            // Failed building a view
-            argVals.push([name, undefined]);
-            continue;
-        }
-
-        if (typeof view === "number") {
-            if (isReferenceType(type)) {
-                // For indexed reference types just a hash of the value is
-                // stored in the topic. Can't decode.
-                argVals.push([name, undefined]);
-            }
-
-            const decodedVal = mem_decodeValue(
-                type,
-                { kind: DataLocationKind.Memory, address: 0n },
-                evt.topics[view],
-                infer
-            );
-
-            argVals.push([name, decodedVal ? decodedVal[0] : undefined]);
-            continue;
-        }
-
-        const decodedVal = mem_decodeValue(
-            type,
-            view.loc as LinearMemoryLocation,
-            evt.payload,
-            infer
-        );
-
-        argVals.push([name, decodedVal ? decodedVal[0] : undefined]);
-    }
-
-    return {
-        def: defInfo,
-        args: argVals
-    };
 }

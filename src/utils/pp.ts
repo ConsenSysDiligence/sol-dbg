@@ -7,7 +7,6 @@ import {
     BoolType,
     BytesType,
     ContractDefinition,
-    EnumDefinition,
     FixedBytesType,
     FunctionDefinition,
     FunctionKind,
@@ -15,14 +14,11 @@ import {
     IntType,
     PointerType,
     StringType,
-    StructDefinition,
     TypeNode,
-    UserDefinedType,
-    UserDefinedValueTypeDefinition
 } from "solc-typed-ast";
 import { ArtifactManager } from "../debug/artifact_manager/artifact_manager";
 import { ContractInfo, SourceFileInfo } from "../debug/artifact_manager/types";
-import { decodeValue } from "../debug/decoding";
+import { decodeView, ExpStructType } from "../debug/decoding";
 import { SolTxDebugger } from "../debug/tracers";
 import {
     decodeSourceLoc,
@@ -33,6 +29,7 @@ import {
     topExtFrame
 } from "../debug/tracers/transformers";
 import { ExternalFrame, Frame, FrameKind, StepState } from "../debug/types";
+import { Struct } from "../debug/decoding/value";
 
 const srcLocation = require("src-location");
 const fse = require("fs-extra");
@@ -58,33 +55,6 @@ function ppValue(typ: TypeNode, v: any, infer: InferType): string {
         return v ? "true" : "false";
     }
 
-    if (typ instanceof UserDefinedType) {
-        const def = typ.definition;
-
-        if (def instanceof EnumDefinition) {
-            const optInd = Number(v as bigint);
-
-            assert(
-                optInd >= 0 && optInd < def.vMembers.length,
-                `Enum value ${optInd} outside of enum range 0-${def.vMembers.length} of ${typ.pp()}`
-            );
-
-            return `${def.name}.${def.vMembers[optInd].name}`;
-        }
-
-        if (def instanceof ContractDefinition) {
-            return (v as Address).toString();
-        }
-
-        if (def instanceof UserDefinedValueTypeDefinition) {
-            const underlyingType = infer.typeNameToTypeNode(def.underlyingType);
-
-            return ppValue(underlyingType, v, infer);
-        }
-
-        throw new Error(`NYI ppValue of user-defined type ${typ.pp()}`);
-    }
-
     if (typ instanceof PointerType) {
         if (typ.to instanceof ArrayType) {
             const elT = typ.to.elementT;
@@ -100,17 +70,14 @@ function ppValue(typ: TypeNode, v: any, infer: InferType): string {
             return `"${v}"`;
         }
 
-        if (typ.to instanceof UserDefinedType && typ.to.definition instanceof StructDefinition) {
-            const fields = typ.to.definition.vMembers;
+        if (typ.to instanceof ExpStructType) {
             const strFields: string[] = [];
 
-            for (const field of fields) {
+            for (const [name, fieldT] of typ.to.fields) {
                 try {
-                    const fieldT = infer.variableDeclarationToTypeNode(field);
-
-                    strFields.push(field.name + ": " + ppValue(fieldT, v[field.name], infer));
+                    strFields.push(name + ": " + ppValue(fieldT, (v as Struct).field(name), infer));
                 } catch (e) {
-                    strFields.push(field.name + ": <failed decoding>");
+                    strFields.push(name + ": <failed decoding>");
                 }
             }
 
@@ -246,7 +213,7 @@ export function ppStackTrace(
                 assert(info !== undefined, ``);
                 const infer = solDbg.artifactManager.infer(info.artifact.compilerVersion);
 
-                const val = decodeValue(view, state, infer, mapKeys);
+                const val = decodeView(view, state, mapKeys);
 
                 funArgEls.push(ppValue(view.type, val, infer));
             }
@@ -361,8 +328,7 @@ export function debugDumpTrace(
         );
 
         console.error(
-            `${i} ${step.pc}: ${step.op.mnemonic} ${jumpType} ${
-                srcString !== undefined ? srcString : ""
+            `${i} ${step.pc}: ${step.op.mnemonic} ${jumpType} ${srcString !== undefined ? srcString : ""
             }`
         );
     }

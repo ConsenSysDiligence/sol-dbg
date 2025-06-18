@@ -493,9 +493,9 @@
       },
       "errorString": "assert(T.unwrap(arg.t) == 42)",
       "errorStack": [
-        "test/samples/local/storage/contracts/main.sol Storage.checkPrimitiveStruct_Storage({a: -42, b: 42, nextWordBytes: 2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a, sameWord: 2b, addr: 0x0000000000000000000000000000000000000042, e: E.C, flag: true, t: 41})",
-        "test/samples/local/storage/contracts/main.sol Storage.checkPrimitiveStruct_Memory({a: -42, b: 42, nextWordBytes: 2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a, sameWord: 2b, addr: 0x0000000000000000000000000000000000000042, e: E.C, flag: true, t: 41})",
-        "test/samples/local/storage/contracts/main.sol Storage.checkPrimitiveStruct({a: -42, b: 42, nextWordBytes: 2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a, sameWord: 2b, addr: 0x0000000000000000000000000000000000000042, e: E.C, flag: true, t: 41})"
+        "test/samples/local/storage/contracts/main.sol Storage.checkPrimitiveStruct_Storage({a: -42, b: 42, nextWordBytes: 2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a, sameWord: 2b, addr: 0x0000000000000000000000000000000000000042, e: 2, flag: true, t: 41})",
+        "test/samples/local/storage/contracts/main.sol Storage.checkPrimitiveStruct_Memory({a: -42, b: 42, nextWordBytes: 2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a, sameWord: 2b, addr: 0x0000000000000000000000000000000000000042, e: 2, flag: true, t: 41})",
+        "test/samples/local/storage/contracts/main.sol Storage.checkPrimitiveStruct({a: -42, b: 42, nextWordBytes: 2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a, sameWord: 2b, addr: 0x0000000000000000000000000000000000000042, e: 2, flag: true, t: 41})"
       ]
     }
   ]

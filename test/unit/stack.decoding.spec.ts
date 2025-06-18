@@ -1,6 +1,6 @@
 import expect from "expect";
 import { DataLocation, InferType, TypeNode } from "solc-typed-ast";
-import { Value } from "../../src/debug/decoding/value";
+import { hasPoison, Value } from "../../src/debug/decoding/value";
 import { Stack } from "../../src";
 import { makeStackView, simplifyType } from "../../src/debug/decoding/";
 import { hexToBytes } from "ethereum-cryptography/utils";
@@ -32,8 +32,9 @@ describe(`Memory Decoding Tests`, () => {
         it(`Sample ${type.pp()}`, () => {
             const simpleType = simplifyType(type, infer, DataLocation.Memory);
             const view = makeStackView(simpleType, offFromTop);
-            const values = view.decode(stack);
-            expect(values).toEqual(expectedValue);
+            const value = view.decode(stack);
+            expect(hasPoison(value)).toBeFalsy();
+            expect(value).toEqual(expectedValue);
         });
     }
 });

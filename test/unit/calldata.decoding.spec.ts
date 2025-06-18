@@ -12,7 +12,7 @@ import {
     UserDefinedType,
     XPath
 } from "solc-typed-ast";
-import { Struct, Value } from "../../src/debug/decoding/value";
+import { hasPoison, Struct, Value } from "../../src/debug/decoding/value";
 import { hexToBytes } from "ethereum-cryptography/utils";
 import { single, uint256 } from "../../src";
 import {
@@ -428,9 +428,10 @@ describe(`Calldata Decoding Tests`, () => {
                 simplifyType(t instanceof TypeNode ? t : t(unit), infer, DataLocation.CallData)
             );
             const views = makeCalldataViews(types, 4n);
-            const values = views.map((v) => v.decode(calldata));
+            const value = views.map((v) => v.decode(calldata));
 
-            expect(values).toEqual(expectedValues);
+            expect(hasPoison(value)).toBeFalsy();
+            expect(value).toEqual(expectedValues);
         });
     }
 });

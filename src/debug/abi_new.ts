@@ -14,7 +14,7 @@ import { View } from "./decoding/view";
 import { DecodedEventDesc, EventDefInfo, EventDesc, Memory } from "./types";
 import { bytes4, split, zip } from "../utils";
 import { BaseCalldataView, makeCalldataView, makeCalldataViews } from "./decoding/calldata/view";
-import { DecodingFailure, Poison, Value } from "./decoding/value";
+import { DecodingFailure, Value } from "./decoding/value";
 import { simplifyType } from "./decoding";
 import { IArtifactManager } from "./artifact_manager";
 
@@ -74,7 +74,7 @@ export function buildMsgViews(
                 .map((typ: TypeNode, i: number) => [`ARG_${i}`, typ]);
 
     const views = makeCalldataViews(
-        formals.map((x) => x[1]),
+        formals.map((x) => simplifyType(x[1], infer, DataLocation.CallData)),
         base
     );
     res.push(
@@ -99,7 +99,7 @@ class EventPayloadView<V extends Value, T extends TypeNode> extends BaseEventVie
     BaseCalldataView<V, T>,
     T
 > {
-    decode(state: EventDesc): V | Poison {
+    decode(state: EventDesc): V | DecodingFailure {
         return this.loc.decode(state.payload);
     }
 
@@ -109,7 +109,7 @@ class EventPayloadView<V extends Value, T extends TypeNode> extends BaseEventVie
 }
 
 class TopicPayloadView<T extends TypeNode> extends BaseEventView<Value, number, T> {
-    decode(state: EventDesc): Value | Poison {
+    decode(state: EventDesc): Value | DecodingFailure {
         if (this.type instanceof PointerType) {
             return new DecodingFailure(`Cannot decode indexed complex type ${this.type.pp()}`);
         }

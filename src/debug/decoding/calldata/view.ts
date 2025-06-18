@@ -12,7 +12,7 @@ import {
     TypeNode
 } from "solc-typed-ast";
 import { Memory } from "../../types";
-import { DecodingFailure, MissingTypeFailure, Poison, Struct, Value } from "../value";
+import { DecodingFailure, Struct, Value } from "../value";
 import { View } from "../view";
 import {
     bigEndianBufToBigint,
@@ -232,7 +232,7 @@ export abstract class BaseCalldataView<
 
         for (const t of type.elements) {
             if (failRemaining) {
-                res.push(new MissingTypeFailure(`Failed due to earlier failure.`));
+                res.push(new DecodingFailure(`Failed due to earlier failure.`));
             }
 
             assert(t !== null, `Unexpected null element in tuple type {0}`, type);
@@ -335,8 +335,37 @@ export class TupleCalldataView extends BaseCalldataView<Value[], TupleType> {
     }
 }
 
-export class ArrayCalldataView extends BaseCalldataView<Value[], ArrayType> {
-    decode(state: Memory): Value[] | Poison {
+export abstract class BaseArrayCalldataView extends BaseCalldataView<Value[], ArrayType> {
+    decodeArray(baseOff: bigint, bigIntSize: bigint, state: Memory): Value[] | DecodingFailure {
+        if (!inRange(bigIntSize, 0, MAX_ARR_DECODE_LIMIT)) {
+            return new DecodingFailure(`Array too large ${bigIntSize}`);
+        }
+
+        const size = Number(bigIntSize);
+        const res: Value[] = [];
+
+        let off: bigint = 0n;
+        const newBase = baseOff + this.base;
+        const hs = headSize(this.type.elementT);
+
+        if (hs === undefined) {
+            return new DecodingFailure(`Can't compute head size of ${this.type.elementT.pp()}`);
+        }
+
+        const elSize = BigInt(hs);
+
+        for (let i = 0; i < size; i++) {
+            const elView = makeCalldataView(this.type.elementT, off, newBase);
+            res.push(elView.decode(state));
+            off += elSize;
+        }
+
+        return res;
+    }
+}
+
+export class ArrayCalldataView extends BaseArrayCalldataView {
+    decode(state: Memory): Value[] | DecodingFailure {
         let baseOff: bigint = this.loc;
 
         // Dynamic sized arrays have length at the start. Fixed sized arrays do
@@ -354,37 +383,14 @@ export class ArrayCalldataView extends BaseCalldataView<Value[], ArrayType> {
             baseOff += 32n;
         }
 
-        if (!inRange(bigintSize, 0, MAX_ARR_DECODE_LIMIT)) {
-            return new DecodingFailure(`Array too large ${bigintSize}`);
-        }
-
-        const size = Number(bigintSize);
-        const res: Value[] = [];
-
-        let off: bigint = 0n;
-        const newBase = baseOff + this.base;
-        const hs = headSize(this.type.elementT);
-
-        if (hs === undefined) {
-            return new MissingTypeFailure(`Can't compute head size of ${this.type.elementT.pp()}`);
-        }
-
-        const elSize = BigInt(hs);
-
-        for (let i = 0; i < size; i++) {
-            const elView = makeCalldataView(this.type.elementT, off, newBase);
-            res.push(elView.decode(state));
-            off += elSize;
-        }
-
-        return res;
+        return this.decodeArray(baseOff, bigintSize, state);
     }
 }
 
 /**
  * An ArraySliceView is only created from stack locations. It should not be created in makeCalldataView.
  */
-export class ArraySliceCalldataView extends BaseCalldataView<Value[], ArrayType> {
+export class ArraySliceCalldataView extends BaseArrayCalldataView {
     constructor(
         type: ArrayType,
         loc: bigint,
@@ -393,9 +399,8 @@ export class ArraySliceCalldataView extends BaseCalldataView<Value[], ArrayType>
         super(type, loc, 0n);
     }
 
-    decode(): Value[] {
-        // @todo finish array slices
-        nyi(`Decoding array slices`);
+    decode(state: Memory): Value[] | DecodingFailure {
+        return this.decodeArray(this.loc, this.len, state);
     }
 }
 
@@ -434,9 +439,9 @@ export class PointerCalldataView extends BaseCalldataView<Value, PointerType> {
     }
 }
 
-export class MissingCalldataView extends BaseCalldataView<Value, MissingType> {
-    decode(): Value | Poison {
-        return new MissingTypeFailure(
+export class MissingCalldataView extends BaseCalldataView<DecodingFailure, MissingType> {
+    decode(): DecodingFailure {
+        return new DecodingFailure(
             `${this.type.rawTypeName ? this.type.rawTypeName.type : "<unknown>"}`
         );
     }
