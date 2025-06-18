@@ -1,6 +1,7 @@
 import {
     AddressType,
     ArrayType,
+    assert,
     BoolType,
     BytesType,
     FixedBytesType,
@@ -27,10 +28,9 @@ import {
 import { keccak256 } from "ethereum-cryptography/keccak";
 import { Address, bytesToUtf8 } from "@ethereumjs/util";
 import { ExpStructType, MissingType } from "../exp_types";
-import { assert } from "console";
 import { MapKeys } from "../../tracers";
 import { makeMemoryView } from "../memory";
-import { isFailure, isTypeStringDynamicArray, isTypeStringMapping, isTypeStringStatic32BytesInStorage } from "../utils";
+import { isFailure, isTypeStringStatic32BytesInStorage } from "../utils";
 import { BaseMemoryView } from "../memory/view";
 import { bytesToHex } from "ethereum-cryptography/utils";
 
@@ -486,10 +486,8 @@ export class MissingStorageView extends BaseStorageView<DecodingFailure, Missing
         if (this.type.rawTypeName !== undefined) {
             const typeString = this.type.rawTypeName.typeString;
 
-            if (isTypeStringDynamicArray(typeString) || isTypeStringMapping(typeString)) {
-                if (!(this.endOffsetInWord === 32)) {
-                    this.fail(undefined, `Unexpected non-word aligned ${typeString} in storage`);
-                }
+            if (isTypeStringStatic32BytesInStorage(typeString)) {
+                assert(this.endOffsetInWord === 32, `Unexpected non-word aligned {0} in storage`, typeString)
             }
         }
     }

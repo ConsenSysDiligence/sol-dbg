@@ -2,16 +2,6 @@ import { TypeNode } from "solc-typed-ast";
 import { DecodingFailure, Value } from "./value";
 import { Memory, Stack } from "../types";
 
-export class DecodingError<State> extends Error {
-    constructor(
-        public readonly view: View<any, any, any, any>,
-        public readonly state: State | undefined,
-        msg: string = ""
-    ) {
-        super(`Error decoding ${view.pp()}: ${msg}`);
-    }
-}
-
 export type StateArea = Memory | Stack | Storage;
 
 /**
@@ -27,7 +17,7 @@ export abstract class View<
     constructor(
         public readonly type: Type,
         protected loc: Loc
-    ) {}
+    ) { }
 
     /**
      * Decode a value from the given State
@@ -35,10 +25,5 @@ export abstract class View<
      */
     abstract decode(state: State): Val | DecodingFailure;
     abstract pp(): string;
-
-    protected fail(state: State | undefined, msg: string = ""): never {
-        throw new DecodingError(this, state, msg);
-    }
-
     //abstract encode(state: State, value: Val)
 }
