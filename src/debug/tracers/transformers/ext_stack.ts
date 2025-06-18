@@ -18,7 +18,7 @@ import {
 } from "../../types";
 import { BasicStepInfo } from "./basic_info";
 import { View } from "../../decoding/view";
-import { buildMsgViews } from "../../abi_new";
+import { buildMsgViews } from "../../abi";
 
 export interface ExternalFrameInfo {
     stack: ExternalFrame[];

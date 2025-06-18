@@ -1,76 +1,48 @@
-import { bytesToHex } from "ethereum-cryptography/utils";
 import {
-    AddressType,
-    ArrayType,
-    BytesType,
-    ContractDefinition,
-    EnumDefinition,
     FunctionDefinition,
-    InferType,
-    MappingType,
-    PointerType,
-    StateVariableVisibility,
-    StringType,
-    StructDefinition,
-    TupleType,
-    TypeName,
-    TypeNode,
-    UserDefinedType,
-    UserDefinedTypeName,
-    UserDefinedValueTypeDefinition,
     VariableDeclaration,
-    assert,
-    enumToIntType,
-    types
+    InferType,
+    FunctionKind,
+    TypeNode,
+    types,
+    TypeName,
+    UserDefinedTypeName,
+    DataLocation,
+    PointerType,
+    ContractDefinition,
+    StateVariableVisibility
 } from "solc-typed-ast";
-import { ABIEncoderVersion } from "solc-typed-ast/dist/types/abi";
-import { getFunctionSelector } from "../utils/misc";
-import { abiStaticTypeSize } from "../utils/solidity";
-import { cd_decodeValue } from "./decoding/calldata/decode";
-import {
-    DataLocationKind,
-    DataView,
-} from "./types";
+import { View } from "./decoding/view";
+import { DecodedEventDesc, EventDefInfo, EventDesc, Memory } from "./types";
+import { bytes4, getFunctionSelector, split, zip } from "../utils";
+import { BaseCalldataView, makeCalldataView, makeCalldataViews } from "./decoding/calldata/view";
+import { DecodingFailure, Value } from "./decoding/value";
+import { simplifyType } from "./decoding";
+import { IArtifactManager } from "./artifact_manager";
+import { bytesToHex } from "ethereum-cryptography/utils";
 
 /**
- * Given a callee AST Node (FunctionDefinition or VariableDeclaration
- * corresponding to a getter), some msg `data`, that lives in location
- * determined by `kind`, a type inference class as well as an `encoderVersion`
- * try and decode the function arguments for that particular callee from the
- * data.
+ * Return true if the given callee requires a selector
+ * @param callee
+ * @returns
  */
-export function decodeMethodArgs(
-    callee: FunctionDefinition | VariableDeclaration,
-    data: Uint8Array,
-    kind: DataLocationKind.Memory | DataLocationKind.CallData,
-    infer: InferType,
-    encoderVersion: ABIEncoderVersion
-): Array<[string, any]> {
-    const dataViews = buildMsgDataViews(callee, data, kind, infer, encoderVersion);
-
-    const res: Array<[string, any]> = [];
-
-    for (let i = 0; i < dataViews.length; i++) {
-        const name = dataViews[i][0];
-        const view = dataViews[i][1];
-
-        if (view === undefined) {
-            res.push([name, undefined]);
-            continue;
-        }
-
-        assert(view.abiType !== undefined && view.loc.kind === DataLocationKind.CallData, ``);
-
-        const val = cd_decodeValue(view.abiType, view.type, view.loc, data, infer);
-
-        res.push([name, val ? val[0] : val]);
+function hasSelector(callee: FunctionDefinition | VariableDeclaration): boolean {
+    if (callee instanceof VariableDeclaration) {
+        return true;
     }
 
-    return res;
+    if (
+        callee.isConstructor ||
+        callee.kind === FunctionKind.Receive ||
+        callee.kind === FunctionKind.Fallback
+    ) {
+        return false;
+    }
+
+    return true;
 }
 
-// @todo migrate to solc-typed-ast
-export function isTypeUnknownContract(t: TypeName | undefined): boolean {
+function isTypeUnknownContract(t: TypeName | undefined): boolean {
     return (
         t instanceof UserDefinedTypeName &&
         t.referencedDeclaration < 0 &&
@@ -80,34 +52,16 @@ export function isTypeUnknownContract(t: TypeName | undefined): boolean {
     );
 }
 
-/**
- * An ABI-decoder implementation that is resilient to failures in some arguments decoding.
- * This function will return partial decoding results. This is needed since the fuzzer may not
- * always produce inputs that decode in their entirety.
- */
-export function buildMsgDataViews(
+export function buildMsgViews(
     callee: FunctionDefinition | VariableDeclaration,
-    data: Uint8Array,
-    kind: DataLocationKind.Memory | DataLocationKind.CallData,
-    infer: InferType,
-    encoderVersion: ABIEncoderVersion
-): Array<[string, DataView | undefined]> {
-    const res: Array<[string, DataView | undefined]> = [];
-    let baseOff;
+    infer: InferType
+): Array<[string, View<Memory>]> {
+    const res: Array<[string, View]> = [];
+    let base: bigint = 0n;
 
-    if (callee instanceof FunctionDefinition && callee.isConstructor) {
-        baseOff = 0;
-    } else {
-        baseOff = 4;
-        const selector =
-            callee instanceof FunctionDefinition
-                ? getFunctionSelector(callee, infer)
-                : infer.signatureHash(callee);
-
-        assert(
-            selector === bytesToHex(data.slice(0, 4)),
-            `Expected selector ${selector} instead got ${data.slice(0, 4)}`
-        );
+    if (hasSelector(callee)) {
+        res.push(["<selector>", makeCalldataView(bytes4, 0n, base)]);
+        base = 4n;
     }
 
     const formals: Array<[string, TypeNode]> =
@@ -122,144 +76,119 @@ export function buildMsgDataViews(
                 .getterArgsAndReturn(callee)[0]
                 .map((typ: TypeNode, i: number) => [`ARG_${i}`, typ]);
 
-    let staticOff = 0;
-    const len = data.length;
-
-    for (const [name, originalType] of formals) {
-        const typ = toABIEncodedType(originalType, infer, encoderVersion);
-        const staticSize = abiStaticTypeSize(typ);
-        const loc =
-            baseOff + staticOff + staticSize <= len
-                ? { kind, address: BigInt(staticOff), base: BigInt(baseOff) }
-                : undefined;
-
-        staticOff += staticSize;
-
-        const val = loc ? { type: originalType, abiType: typ, loc } : undefined;
-
-        res.push([name, val]);
-    }
+    const views = makeCalldataViews(
+        formals.map((x) => simplifyType(x[1], infer, DataLocation.CallData)),
+        base
+    );
+    res.push(
+        ...zip(
+            formals.map((x) => x[0]),
+            views
+        )
+    );
 
     return res;
 }
 
-/**
- * Determine if the specified type `typ` is dynamic or not. Dynamic means
- * that if we are trying to read `typ` at location `loc`, in `loc` there should be just a
- * uint256 offset into memory/storage/calldata, where the actual data lives. Otherwise
- * (if the type is "static"), the direct encoding of the data will start at `loc`.
- *
- * Usually "static" types are just the value types - i.e. anything of statically
- * known size that fits in a uint256. As per https://docs.soliditylang.org/en/latest/abi-spec.html#formal-specification-of-the-encoding
- * there are several exceptions to the rule when encoding types in calldata:
- *
- * 1. Fixed size arrays with fixed-sized element types
- * 2. Tuples where all the tuple elements are fixed-size
- *
- * TODO(dimo):
- *  1. Check again that its not possible for tuples in internal calls to somehow get encoded on the stack
- *  2. What happens with return tuples? Are they always in memory?
- */
-function isTypeEncodingDynamic(typ: TypeNode): boolean {
-    if (
-        typ instanceof PointerType ||
-        typ instanceof ArrayType ||
-        typ instanceof StringType ||
-        typ instanceof BytesType
-    ) {
-        return true;
+abstract class BaseEventView<V extends Value, L, T extends TypeNode> extends View<
+    EventDesc,
+    V,
+    L,
+    T
+> { }
+
+class EventPayloadView<V extends Value, T extends TypeNode> extends BaseEventView<
+    V,
+    BaseCalldataView<V, T>,
+    T
+> {
+    decode(state: EventDesc): V | DecodingFailure {
+        return this.loc.decode(state.payload);
     }
 
-    // Tuples in calldata with static elements
-    if (typ instanceof TupleType) {
-        for (const elT of typ.elements) {
-            assert(elT !== null, ``);
+    pp(): string {
+        return `<${this.type.pp()}@${this.loc} in event payload>`;
+    }
+}
 
-            if (isTypeEncodingDynamic(elT)) {
-                return true;
-            }
+class TopicPayloadView<T extends TypeNode> extends BaseEventView<Value, number, T> {
+    decode(state: EventDesc): Value | DecodingFailure {
+        if (this.type instanceof PointerType) {
+            return new DecodingFailure(`Cannot decode indexed complex type ${this.type.pp()}`);
         }
 
-        return false;
+        const inner = makeCalldataView(this.type, 0n, 0n);
+        return inner.decode(state.topics[this.loc]);
     }
 
-    return false;
+    pp(): string {
+        return `<${this.type.pp()} in topic ${this.loc}>`;
+    }
+}
+
+type GenEventView = BaseEventView<Value, any, TypeNode>;
+export function buildEventViews(
+    evtDef: EventDefInfo,
+    infer: InferType
+): Array<[string, GenEventView]> {
+    const [indexedArgs, nonIndexedArgs] = split(
+        evtDef.args.map<[number, [string, TypeNode, boolean]]>((x, i) => [i, x]),
+        ([, [, , indexed]]) => indexed
+    );
+
+    let topicIdx = evtDef.definition.anonymous ? 0 : 1;
+    const indexedViews: GenEventView[] = indexedArgs.map(
+        ([, [, type]]) =>
+            new TopicPayloadView(simplifyType(type, infer, DataLocation.CallData), topicIdx++)
+    );
+    const nonIndexedViews: GenEventView[] = makeCalldataViews(
+        nonIndexedArgs.map(([, [, type]]) => simplifyType(type, infer, DataLocation.CallData)),
+        0n
+    ).map((v) => new EventPayloadView(v.type, v));
+
+    const allArgDesc: Array<[number, string, GenEventView]> = [
+        ...indexedViews.map<[number, string, GenEventView]>((view, i) => [
+            indexedArgs[i][0],
+            indexedArgs[i][1][0],
+            view
+        ]),
+        ...nonIndexedViews.map<[number, string, GenEventView]>((view, i) => [
+            nonIndexedArgs[i][0],
+            nonIndexedArgs[i][1][0],
+            view
+        ])
+    ];
+
+    allArgDesc.sort();
+
+    return allArgDesc.map(([, name, view]) => [name, view]);
 }
 
 /**
- * Convert an internal TypeNode to the external TypeNode that would correspond to it
- * after ABI-encoding with encoder version `encoderVersion`. Follows the following rules:
- *
- * 1. Contract definitions turned to address.
- * 2. Enum definitions turned to uint of minimal fitting size.
- * 3. Any storage pointer types are converted to memory pointer types.
- * 4. Throw an error on any nested mapping types.
- * 5. Fixed-size arrays with fixed-sized element types are encoded as inlined tuples
- * 6. Structs with fixed-sized elements are encoded as inlined tuples
- *
- * @see https://docs.soliditylang.org/en/latest/abi-spec.html
+ * Decode a raw event. Currently only supports non-anonmyous events.
  */
-export function toABIEncodedType(
-    type: TypeNode,
-    infer: InferType,
-    encoderVersion: ABIEncoderVersion
-): TypeNode {
-    if (type instanceof MappingType) {
-        throw new Error("Cannot abi-encode mapping types");
+export function decodeEvent(
+    artifactManager: IArtifactManager,
+    evt: EventDesc
+): DecodedEventDesc | undefined {
+    if (evt.topics.length === 0) {
+        return undefined;
     }
 
-    if (type instanceof ArrayType) {
-        const encodedElementT = toABIEncodedType(type.elementT, infer, encoderVersion);
+    const defInfo = artifactManager.getEventDefInfo(evt.topics[0]);
 
-        if (type.size !== undefined) {
-            const elements = [];
-
-            for (let i = 0; i < type.size; i++) {
-                elements.push(encodedElementT);
-            }
-
-            return new TupleType(elements);
-        }
-
-        return new ArrayType(encodedElementT, type.size);
+    if (!defInfo) {
+        return undefined;
     }
 
-    if (type instanceof PointerType) {
-        const toT = toABIEncodedType(type.to, infer, encoderVersion);
+    const infer = artifactManager.infer(defInfo.artifact.compilerVersion);
+    const dataViews = buildEventViews(defInfo, infer);
+    const argVals: Array<[string, any]> = dataViews.map(([name, view]) => [name, view.decode(evt)]);
 
-        return isTypeEncodingDynamic(toT) ? new PointerType(toT, type.location) : toT;
-    }
-
-    if (type instanceof UserDefinedType) {
-        if (type.definition instanceof UserDefinedValueTypeDefinition) {
-            return infer.typeNameToTypeNode(type.definition.underlyingType);
-        }
-
-        if (type.definition instanceof ContractDefinition) {
-            return new AddressType(false);
-        }
-
-        if (type.definition instanceof EnumDefinition) {
-            return enumToIntType(type.definition);
-        }
-
-        if (type.definition instanceof StructDefinition) {
-            assert(
-                encoderVersion !== ABIEncoderVersion.V1,
-                "Getters of struct return type are not supported by ABI encoder v1"
-            );
-
-            const fieldTs = type.definition.vMembers.map((fieldT: VariableDeclaration) =>
-                infer.variableDeclarationToTypeNode(fieldT)
-            );
-
-            return new TupleType(
-                fieldTs.map((fieldT: TypeNode) => toABIEncodedType(fieldT, infer, encoderVersion))
-            );
-        }
-    }
-
-    return type;
+    return {
+        def: defInfo,
+        args: argVals
+    };
 }
 
 /**
