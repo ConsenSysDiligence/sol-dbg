@@ -4,17 +4,12 @@ import { assert, FunctionDefinition, TypeNode, VariableDeclaration } from "solc-
 import { ContractInfo, IArtifactManager } from "../../artifact_manager";
 import { isCalldataArrayType } from "../../decoding/utils";
 import { OPCODES } from "../../opcodes";
-import {
-    DataLocationKind,
-    DataView,
-    Frame,
-    FrameKind,
-    InternalCallFrame,
-    Stack
-} from "../../types";
+import { Frame, FrameKind, InternalCallFrame, Stack } from "../../types";
 import { BasicStepInfo } from "./basic_info";
 import { ExternalFrameInfo, topExtFrame } from "./ext_stack";
 import { SourceInfo } from "./source";
+import { View } from "../../decoding/view";
+import { makeStackView, simplifyType } from "../../decoding";
 
 export interface InternalFrameInfo {
     intStack: InternalCallFrame[];
@@ -31,15 +26,15 @@ function topFrame(step: InternalFrameInfo & ExternalFrameInfo & BasicStepInfo): 
 
 /**
  * Given a callable (function definition or public state variable) try to build
- * `DataView`s for all the callable arguments. On failure return undefined.
+ * `View`s for all the callable arguments. On failure return undefined.
  */
 function buildFunArgViews(
     callee: FunctionDefinition | VariableDeclaration,
     stack: Stack,
     contractInfo: ContractInfo,
     artifactManager: IArtifactManager
-): Array<[string, DataView]> | undefined {
-    const res: Array<[string, DataView]> = [];
+): Array<[string, View]> | undefined {
+    const res: Array<[string, View]> = [];
     let formals: Array<[string, TypeNode]>;
     const infer = artifactManager.infer(contractInfo.artifact.compilerVersion);
 
@@ -72,16 +67,7 @@ function buildFunArgViews(
             return undefined;
         }
 
-        res.unshift([
-            name,
-            {
-                type: typ,
-                loc: {
-                    kind: DataLocationKind.Stack,
-                    offsetFromTop
-                }
-            }
-        ]);
+        res.unshift([name, makeStackView(simplifyType(typ, infer, undefined), offsetFromTop)]);
     }
 
     return res;
@@ -170,7 +156,7 @@ export async function addInternalFrameInfo<
     }
 
     if (enteringInternalFun) {
-        let args: Array<[string, DataView | undefined]> | undefined;
+        let args: Array<[string, View]> | undefined;
 
         if (
             ast instanceof FunctionDefinition ||

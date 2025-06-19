@@ -11,7 +11,7 @@ import {
 } from "solc-typed-ast";
 import { Memory } from "../../types";
 import { View } from "../view";
-import { Struct, Value } from "../value";
+import { DecodingFailure, Struct, Value } from "../value";
 import {
     bigEndianBufToBigint,
     fits,
@@ -21,19 +21,23 @@ import {
     uint256
 } from "../../../utils";
 import { Address, bytesToUtf8 } from "@ethereumjs/util";
-import { ExpStructType } from "../exp_types";
+import { ExpStructType, MissingType } from "../exp_types";
+import { isFailure } from "../utils";
 
 export abstract class BaseMemoryView<
     Val extends Value,
     Type extends TypeNode = TypeNode
 > extends View<Memory, Val, bigint, Type> {
-    protected readMemAt(off: bigint, calldata: Memory, len: bigint | number): Uint8Array {
+    protected readMemAt(
+        off: bigint,
+        calldata: Memory,
+        len: bigint | number
+    ): Uint8Array | DecodingFailure {
         const res = readMem(off, len, calldata);
 
         if (!res) {
             // OoB access
-            this.fail(
-                calldata,
+            return new DecodingFailure(
                 `OoB access at ${off}:${off + BigInt(len)} in memory of size ${calldata.length}`
             );
         }
@@ -41,8 +45,12 @@ export abstract class BaseMemoryView<
         return res;
     }
 
-    protected decodeIntAt(off: bigint, type: IntType, state: Memory): bigint {
+    protected decodeIntAt(off: bigint, type: IntType, state: Memory): bigint | DecodingFailure {
         const bytes = this.readMemAt(off, state, 32);
+
+        if (isFailure(bytes)) {
+            return bytes;
+        }
 
         let res = bigEndianBufToBigint(bytes);
 
@@ -54,20 +62,22 @@ export abstract class BaseMemoryView<
         }
 
         if (!fits(res, type)) {
-            this.fail(state, `Decoded value ${res} doesn't fit in expected type ${type.pp()}`);
+            return new DecodingFailure(
+                `Decoded value ${res} doesn't fit in expected type ${type.pp()}`
+            );
         }
         return res;
     }
 
-    protected decodeAddressAt(off: bigint, state: Memory): Address {
-        return new Address(this.readMemAt(off + 12n, state, 20));
-    }
-
-    protected decodeBytesAt(loc: bigint, state: Memory): Uint8Array {
+    protected decodeBytesAt(loc: bigint, state: Memory): Uint8Array | DecodingFailure {
         const len = this.decodeIntAt(loc, uint256, state);
 
+        if (isFailure(len)) {
+            return len;
+        }
+
         if (len >= MAX_ARR_DECODE_LIMIT) {
-            this.fail(state, `Bytes to decode too large - ${len}`);
+            return new DecodingFailure(`Bytes to decode too large - ${len}`);
         }
 
         return this.readMemAt(loc + 32n, state, len);
@@ -79,56 +89,63 @@ export abstract class BaseMemoryView<
 }
 
 export class IntMemView extends BaseMemoryView<bigint, IntType> {
-    decode(state: Memory): bigint {
+    decode(state: Memory): bigint | DecodingFailure {
         return this.decodeIntAt(this.loc, this.type, state);
     }
 }
 
 export class AddressMemView extends BaseMemoryView<Address, AddressType> {
-    decode(state: Memory): Address {
-        return new Address(this.readMemAt(this.loc + 12n, state, 20));
+    decode(state: Memory): Address | DecodingFailure {
+        const m = this.readMemAt(this.loc + 12n, state, 20);
+        return isFailure(m) ? m : new Address(m);
     }
 }
 
 export class BoolMemView extends BaseMemoryView<boolean, BoolType> {
-    decode(state: Memory): boolean {
-        return bigEndianBufToBigint(this.readMemAt(this.loc, state, 32)) !== 0n;
+    decode(state: Memory): boolean | DecodingFailure {
+        const m = this.readMemAt(this.loc, state, 32);
+        return isFailure(m) ? m : bigEndianBufToBigint(m) !== 0n;
     }
 }
 
 export class FixedBytesMemView extends BaseMemoryView<Uint8Array, FixedBytesType> {
-    decode(state: Memory): Uint8Array {
+    decode(state: Memory): Uint8Array | DecodingFailure {
         return this.readMemAt(this.loc, state, this.type.size);
     }
 }
 
 export class BytesMemView extends BaseMemoryView<Uint8Array, BytesType> {
-    decode(state: Memory): Uint8Array {
+    decode(state: Memory): Uint8Array | DecodingFailure {
         return this.decodeBytesAt(this.loc, state);
     }
 }
 
 export class StringMemView extends BaseMemoryView<string, StringType> {
-    decode(state: Memory): string {
+    decode(state: Memory): string | DecodingFailure {
         const bytes = this.decodeBytesAt(this.loc, state);
-        return bytesToUtf8(bytes);
+        return isFailure(bytes) ? bytes : bytesToUtf8(bytes);
     }
 }
 
 export class ArrayMemView extends BaseMemoryView<Value[], ArrayType> {
-    decode(state: Memory): Value[] {
-        let sizeBigint;
+    decode(state: Memory): Value[] | DecodingFailure {
+        let sizeBigint: bigint | DecodingFailure;
         let addr = this.loc;
 
         if (this.type.size === undefined) {
             sizeBigint = this.decodeIntAt(addr, uint256, state);
+
+            if (isFailure(sizeBigint)) {
+                return sizeBigint;
+            }
+
             addr += 32n;
         } else {
             sizeBigint = this.type.size;
         }
 
         if (sizeBigint >= MAX_ARR_DECODE_LIMIT) {
-            this.fail(state, `Array too large to decode: ${sizeBigint}`);
+            return new DecodingFailure(`Array too large to decode: ${sizeBigint}`);
         }
 
         const size = Number(sizeBigint);
@@ -161,10 +178,23 @@ export class StructMemView extends BaseMemoryView<Struct, ExpStructType> {
 }
 
 export class PointerMemView extends BaseMemoryView<Value, PointerType> {
-    decode(state: Memory): Value {
+    decode(state: Memory): Value | DecodingFailure {
         const offset = this.decodeIntAt(this.loc, uint256, state);
+
+        if (isFailure(offset)) {
+            return offset;
+        }
+
         const view = makeMemoryView(this.type.to, offset);
         return view.decode(state);
+    }
+}
+
+export class MissingMemView extends BaseMemoryView<Value, MissingType> {
+    decode(): DecodingFailure {
+        return new DecodingFailure(
+            `${this.type.rawTypeName ? this.type.rawTypeName.type : "<unknown>"}`
+        );
     }
 }
 
@@ -203,6 +233,10 @@ export function makeMemoryView(type: TypeNode, loc: bigint): BaseMemoryView<Valu
 
     if (type instanceof PointerType) {
         return new PointerMemView(type, loc);
+    }
+
+    if (type instanceof MissingType) {
+        return new MissingMemView(type, loc);
     }
 
     nyi(`makeMemoryView(${type.pp()})`);

@@ -1,4 +1,4 @@
-import { ContractStates, HexString, Scenario, TxDesc } from "../../src";
+import { HexString, Scenario, TxDesc } from "../../src";
 
 export enum ResultKind {
     ContractCreated = "contract_created",
@@ -35,6 +35,9 @@ interface ResultFoundryFail {
     kind: ResultKind.FoundryFail;
 }
 
+export type ContractJSONStates = { [addres: string]: ContractJSONState };
+type ContractJSONState = { [field: string]: any };
+
 // @todo: Test-relevant parts of this should be separated from BaseTestStep and moved under test/
 // BaseTestStep should be renamed to something more generic - e.g. TxDesc
 export interface TestStep extends TxDesc {
@@ -52,8 +55,8 @@ export interface TestStep extends TxDesc {
     errorString?: string;
     // Optional prefix to append to file path to find the files
     errorPathPrefix?: string;
-    layoutBefore?: ContractStates;
-    layoutAtFailure?: ContractStates;
+    layoutBefore?: ContractJSONStates;
+    layoutAtFailure?: ContractJSONStates;
     liveContracts?: string[];
     decodedEvents?: Array<{
         name: string;

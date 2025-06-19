@@ -260,7 +260,3 @@ export function detectArtifactCompilerVersion(artifact: PartialSolcOutput): stri
 
     return undefined;
 }
-
-export function isPartialSolcOutput(arg: any): arg is PartialSolcOutput {
-    return arg.hasOwnProperty("contracts") && arg.hasOwnProperty("sources");
-}

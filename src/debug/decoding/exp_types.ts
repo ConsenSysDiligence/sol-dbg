@@ -14,9 +14,12 @@ import {
     TypeName,
     TypeNode,
     UserDefinedType,
-    UserDefinedValueTypeDefinition
+    UserDefinedTypeName,
+    UserDefinedValueTypeDefinition,
+    VariableDeclaration
 } from "solc-typed-ast";
 import { address } from "../../utils";
+import { isTypeStringStatic32BytesInStorage } from "./utils";
 
 /**
  * An internal struct type that converts all field VariableDeclaration(s) to
@@ -34,6 +37,54 @@ export class ExpStructType extends TypeNode {
 
     pp(): string {
         return `struct ${this.name}{\n${this.fields.map(([name, type]) => `${name}: ${type.pp()}`).join("\n")}\n}`;
+    }
+}
+
+function isTypeUnknownContract(t: TypeName | undefined): boolean {
+    return (
+        t instanceof UserDefinedTypeName &&
+        t.referencedDeclaration < 0 &&
+        (t.typeString.startsWith("contract ") ||
+            t.typeString.startsWith("interface ") ||
+            t.typeString.startsWith("library "))
+    );
+}
+
+/**
+ * Helper for converting `TypeName`s to `TypeNode`s. In some cases when solc-typed-ast conversion fails,
+ * it can try and guess the correct simplified type from the typeString
+ *
+ * - unknown contracts - retun address
+ * - @todo unknown enum - optimistically guess uint8 if we are in version @todo
+ */
+function typeNameToTypeNode(t: TypeName, infer: InferType, loc?: DataLocation): TypeNode {
+    try {
+        return loc ? infer.typeNameToSpecializedTypeNode(t, loc) : infer.typeNameToTypeNode(t);
+    } catch (e) {
+        if (isTypeUnknownContract(t)) {
+            return address;
+        }
+
+        throw e;
+    }
+}
+
+/**
+ * Helper for converting `VariableDeclartaion`s to `TypeNode`s. In some cases when solc-typed-ast conversion fails,
+ * it can try and guess the correct simplified type from the typeString
+ *
+ * - unknown contracts - retun address
+ * - @todo unknown enum - optimistically guess uint8 if we are in version @todo
+ */
+function variableDeclarationToTypeNode(v: VariableDeclaration, infer: InferType): TypeNode {
+    try {
+        return infer.variableDeclarationToTypeNode(v);
+    } catch (e) {
+        if (v.vType && isTypeUnknownContract(v.vType)) {
+            return address;
+        }
+
+        throw e;
     }
 }
 
@@ -80,26 +131,35 @@ export function simplifyType(
     }
 
     if (rawT instanceof UserDefinedType) {
+        if (rawT.definition === undefined) {
+            return new MissingType(undefined);
+        }
+
         if (rawT.definition instanceof StructDefinition) {
             assert(loc !== undefined, `Missing location in struct expansion {0}`, rawT);
-            const fields: Array<[string, TypeNode]> = rawT.definition.vMembers.map((decl) => [
-                decl.name,
-                simplifyType(
-                    infer.typeNameToSpecializedTypeNode(decl.vType as TypeName, loc),
-                    infer,
-                    loc
-                )
-            ]);
+            const fields: Array<[string, TypeNode]> = rawT.definition.vMembers.map((decl) => {
+                let fieldT: TypeNode;
+                try {
+                    fieldT = typeNameToTypeNode(decl.vType as TypeName, infer, loc);
+                } catch (e) {
+                    fieldT = new MissingType(decl.vType);
+                }
+
+                return [decl.name, simplifyType(fieldT, infer, loc)];
+            });
 
             return new ExpStructType(rawT.name, fields, rawT);
         }
 
         if (rawT.definition instanceof UserDefinedValueTypeDefinition) {
-            return simplifyType(
-                infer.typeNameToTypeNode(rawT.definition.underlyingType),
-                infer,
-                loc
-            );
+            let underlyingType: TypeNode;
+            try {
+                underlyingType = typeNameToTypeNode(rawT.definition.underlyingType, infer);
+            } catch (e) {
+                underlyingType = new MissingType(rawT.definition.underlyingType);
+            }
+
+            return simplifyType(underlyingType, infer, loc);
         }
 
         if (rawT.definition instanceof ContractDefinition) {
@@ -111,6 +171,9 @@ export function simplifyType(
         }
     }
 
+    if (rawT instanceof MissingType) {
+        return rawT;
+    }
     return rawT;
 }
 
@@ -122,10 +185,6 @@ export class MissingType extends TypeNode {
     pp(): string {
         return `<missing type info for ${this.rawTypeName?.print()}>`;
     }
-}
-
-function isTypeStringStatic32Bytes(t: string): boolean {
-    return t.endsWith("[]") || t.includes("mapping(");
 }
 
 /**
@@ -140,6 +199,7 @@ function isTypeStringStatic32Bytes(t: string): boolean {
  * We return a tuple with the resulting layout, and a boolean specifying whether
  * the layout is complete.
  *
+ * @todo does this belong in storage decoding?
  * @param def
  * @param infer
  */
@@ -169,7 +229,7 @@ export function getContractLayoutType(
             let typeNode: TypeNode;
 
             try {
-                typeNode = infer.variableDeclarationToTypeNode(varDecl);
+                typeNode = variableDeclarationToTypeNode(varDecl, infer);
             } catch (e) {
                 /**
                  * Missing type info. If this is a:
@@ -180,13 +240,11 @@ export function getContractLayoutType(
                  * statically in the layout. Otherwise we have to abort decoding
                  */
                 complete = false;
-                if (isTypeStringStatic32Bytes(varDecl.typeString)) {
+                if (isTypeStringStatic32BytesInStorage(varDecl.typeString)) {
                     typeNode = new MissingType(varDecl.vType);
                 } else {
                     break;
                 }
-
-                continue;
             }
 
             stateVars.push([varDecl.name, simplifyType(typeNode, infer, DataLocation.Storage)]);

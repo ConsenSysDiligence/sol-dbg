@@ -11,7 +11,7 @@ import {
     UserDefinedType,
     XPath
 } from "solc-typed-ast";
-import { Struct, Value } from "../../src/debug/decoding/value";
+import { hasPoison, Struct, Value } from "../../src/debug/decoding/value";
 import { hexToBytes } from "ethereum-cryptography/utils";
 import { single } from "../../src";
 import { address, bool, bytes2, bytes32, int128, int8, uint16 } from "../utils";
@@ -291,8 +291,9 @@ describe(`Memory Decoding Tests`, () => {
                 DataLocation.Memory
             );
             const view = makeMemoryView(type, BigInt(offset));
-            const values = view.decode(memory);
-            expect(values).toEqual(expectedValue);
+            const value = view.decode(memory);
+            expect(hasPoison(value)).toBeFalsy();
+            expect(value).toEqual(expectedValue);
         });
     }
 });

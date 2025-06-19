@@ -15,7 +15,7 @@ import {
     TypeNode,
     XPath
 } from "solc-typed-ast";
-import { Struct, Value } from "../../src/debug/decoding/value";
+import { hasPoison, Struct, Value } from "../../src/debug/decoding/value";
 import { hexToBytes } from "ethereum-cryptography/utils";
 import {
     bigEndianBufToBigint,
@@ -747,6 +747,7 @@ describe(`Storage Decoding Tests`, () => {
             const type = typeDesc instanceof TypeNode ? typeDesc : typeDesc(unit);
             const view = makeStorageView(type, [BigInt(key), offset]);
             const value = view.decode(storage);
+            expect(hasPoison(value)).toBeFalsy();
             expect(value).toEqual(expectedValue);
         });
     }
@@ -789,8 +790,9 @@ describe(`Storage Decoding Tests`, () => {
             ]
         ]);
 
-        const view = makeStorageView(CLayoutType, [42n, 32], mapKeys);
-        const value = view.decode(toStorage(CStorDesc)) as Struct;
+        const view = makeStorageView(CLayoutType, [42n, 32]);
+        const value = view.decode(toStorage(CStorDesc), mapKeys) as Struct;
+        expect(hasPoison(value)).toBeFalsy();
         expect(value.field("f")).toEqual(expected);
     });
 
@@ -800,15 +802,11 @@ describe(`Storage Decoding Tests`, () => {
                 0n,
                 [
                     [
-                        hexToBytes(
-                            "00000000000000000000000000000000000000000000000000000000000000030102030000000000000000000000000000000000000000000000000000000000"
-                        ),
+                        hexToBytes("010203"),
                         0xce4edd0c850af0ce44d5c79dd9354de666aa901a00d2111f49bd97f94cb8f6bbn
                     ],
                     [
-                        hexToBytes(
-                            "00000000000000000000000000000000000000000000000000000000000000030102040000000000000000000000000000000000000000000000000000000000"
-                        ),
+                        hexToBytes("010204"),
                         0x8a03f525df54a7cbda74e29f15a3ba86a222d05788f5db224bb729a2a10080f4n
                     ]
                 ]
@@ -817,15 +815,11 @@ describe(`Storage Decoding Tests`, () => {
                 1n,
                 [
                     [
-                        hexToBytes(
-                            "00000000000000000000000000000000000000000000000000000000000000036162630000000000000000000000000000000000000000000000000000000000"
-                        ),
+                        hexToBytes("616263"),
                         0xac85c8cc1ac92e94a731b8df588044cbfd366c5ee08805d198cb1b094f3cacacn
                     ],
                     [
-                        hexToBytes(
-                            "00000000000000000000000000000000000000000000000000000000000000036465660000000000000000000000000000000000000000000000000000000000"
-                        ),
+                        hexToBytes("646566"),
                         0x007190f0fed5dcd60b9b3a23e83c99c86ff19bc3d9b603c39d3faf6b4ed8c5dcn
                     ]
                 ]
@@ -836,8 +830,8 @@ describe(`Storage Decoding Tests`, () => {
             [
                 "m1",
                 new Map([
-                    [hexToBytes("010203"), 1n],
-                    [hexToBytes("010204"), 2n]
+                    ["010203", 1n],
+                    ["010204", 2n]
                 ])
             ],
             [
@@ -854,8 +848,9 @@ describe(`Storage Decoding Tests`, () => {
         const [layout, complete] = getContractLayoutType(decl, infer);
         assert(complete, `Unexpected incomplete layout of ${decl.name}`);
 
-        const view = makeStorageView(layout, [0n, 32], mapKeys);
-        const value = view.decode(toStorage(mapWithComplexKeysStorDesc)) as Struct;
+        const view = makeStorageView(layout, [0n, 32]);
+        const value = view.decode(toStorage(mapWithComplexKeysStorDesc), mapKeys) as Struct;
+        expect(hasPoison(value)).toBeFalsy();
         expect(value).toEqual(expected);
     });
 });
