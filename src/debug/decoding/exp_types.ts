@@ -55,7 +55,6 @@ function isTypeUnknownContract(t: TypeName | undefined): boolean {
  * it can try and guess the correct simplified type from the typeString
  *
  * - unknown contracts - retun address
- * - @todo unknown enum - optimistically guess uint8 if we are in version @todo
  */
 function typeNameToTypeNode(t: TypeName, infer: InferType, loc?: DataLocation): TypeNode {
     try {
@@ -74,7 +73,6 @@ function typeNameToTypeNode(t: TypeName, infer: InferType, loc?: DataLocation): 
  * it can try and guess the correct simplified type from the typeString
  *
  * - unknown contracts - retun address
- * - @todo unknown enum - optimistically guess uint8 if we are in version @todo
  */
 function variableDeclarationToTypeNode(v: VariableDeclaration, infer: InferType): TypeNode {
     try {
@@ -199,7 +197,6 @@ export class MissingType extends TypeNode {
  * We return a tuple with the resulting layout, and a boolean specifying whether
  * the layout is complete.
  *
- * @todo does this belong in storage decoding?
  * @param def
  * @param infer
  */

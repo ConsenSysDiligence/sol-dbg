@@ -253,7 +253,6 @@ export function detectArtifactCompilerVersion(artifact: PartialSolcOutput): stri
                 }
             } catch (e) {
                 // Nothing to do;
-                console.error(e); // @todo remove
             }
         }
     }
