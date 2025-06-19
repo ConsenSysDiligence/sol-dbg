@@ -2,7 +2,15 @@ import { Common } from "@ethereumjs/common";
 import { TransactionFactory, TypedTransaction, TypedTxData } from "@ethereumjs/tx";
 import { Address, setLengthLeft } from "@ethereumjs/util";
 import { bytesToHex, hexToBytes } from "ethereum-cryptography/utils";
-import { FunctionDefinition, InferType, IntType, assert } from "solc-typed-ast";
+import {
+    AddressType,
+    BoolType,
+    FixedBytesType,
+    FunctionDefinition,
+    InferType,
+    IntType,
+    assert
+} from "solc-typed-ast";
 import {
     DataLocation,
     DataLocationKind,
@@ -17,6 +25,10 @@ export const ZERO_ADDRESS_STRING: HexString = "0x0000000000000000000000000000000
 export const ZERO_ADDRESS = Address.fromString(ZERO_ADDRESS_STRING);
 
 export const uint256 = new IntType(256, false);
+export const uint8 = new IntType(8, false);
+export const bytes4 = new FixedBytesType(4);
+export const bool = new BoolType();
+export const address = new AddressType(false);
 export const MAX_ARR_DECODE_LIMIT = BigInt(1000);
 
 export function toHexString(n: number | bigint | Uint8Array, padding = 0): HexString {
@@ -263,6 +275,24 @@ export function zip<T1, T2>(a: T1[], b: T2[]): Array<[T1, T2]> {
     }
 
     return res;
+}
+
+/**
+ * Split a list into two lists based on a user-provided predicate.
+ *
+ * @param a
+ * @param pred
+ * @returns
+ */
+export function split<T>(a: T[], pred: (x: T) => boolean): [T[], T[]] {
+    const trueA: T[] = [];
+    const falseA: T[] = [];
+
+    for (const x of a) {
+        (pred(x) ? trueA : falseA).push(x);
+    }
+
+    return [trueA, falseA];
 }
 
 export function zip3<T1, T2, T3>(a: T1[], b: T2[], c: T3[]): Array<[T1, T2, T3]> {

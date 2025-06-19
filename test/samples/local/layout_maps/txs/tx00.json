@@ -71,7 +71,7 @@
           "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0": "foo",
           "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa2": "barbarbar"
         },
-        "sMap":{
+        "sMap": {
           "boo": "baz",
           "doo": "daz"
         },
@@ -80,26 +80,18 @@
             "fa": "-1",
             "fb": "1000",
             "fc": "dy",
-            "fd": ["100"]
+            "fd": [
+              "100"
+            ]
           }
         },
         "emptyFMap": {},
         "nestedMap": {
           "1": {
-            "boo": {
-              "0": 222,
-              "1": 173,
-              "2": 190,
-              "3": 239
-            }
+            "boo": "hexdeadbeef"
           },
           "42": {
-            "ow": {
-              "0": 238,
-              "1": 238,
-              "2": 238,
-              "3": 238
-            }
+            "ow": "hexeeeeeeee"
           }
         },
         "arrOfMaps": [
@@ -112,11 +104,13 @@
         ],
         "mapOfArrs": {
           "43": [
-            "5", "6", "0"
+            "5",
+            "6",
+            "0"
           ]
         },
         "byteKeyMap": {
-          "0x01020304": "12"
+          "01020304": "12"
         }
       }
     }

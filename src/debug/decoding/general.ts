@@ -1,161 +1,43 @@
-import { ArrayType, assert, InferType, PointerType, TypeNode } from "solc-typed-ast";
-import { ABIEncoderVersion } from "solc-typed-ast/dist/types/abi";
-import { nyi, uint256 } from "../../utils/misc";
+import { nyi } from "../../utils/misc";
 import { topExtFrame } from "../tracers/transformers/ext_stack";
 import { MapKeys } from "../tracers/transformers/keccak256_invert";
-import {
-    DataLocation,
-    DataLocationKind,
-    DataView,
-    MemoryLocation,
-    MemoryLocationKind,
-    StepState,
-    StorageLocation
-} from "../types";
-import { cd_decodeArrayContents, cd_decodeValue } from "./calldata";
-import { mem_decodeValue } from "./memory";
-import { st_decodeInt, st_decodeValue } from "./stack";
-import { stor_decodeValue } from "./storage";
-import {
-    getCDArrayInStackOffAndLen,
-    isCalldataArrayType,
-    solLocToMemoryLocationKind
-} from "./utils";
+import { StepState } from "../types";
+import { View } from "./view";
+import { Value } from "./value";
+import { BaseStackView } from "./stack/view";
+import { BaseMemoryView } from "./memory/view";
+import { BaseCalldataView } from "./calldata/view";
+import { BaseStorageView } from "./storage/view";
 
-/**
- * Helper to dispatch the decoding of a given type `typ` at a given data location `loc` in a given `state`.
- * to the proper decoding logic (memory, calldata, storage, stack)
- */
-function decodeValInt(
-    typ: TypeNode,
-    loc: DataLocation,
-    state: StepState,
-    infer: InferType,
-    mapKeys?: MapKeys
-): any {
-    if (loc.kind === DataLocationKind.Memory) {
-        const res = mem_decodeValue(typ, loc, state.memory, infer);
+export function decodeView(v: View, state: StepState, mapKeys?: MapKeys): Value {
+    if (v instanceof BaseStackView) {
+        const res = v.decode(state.evmStack);
 
-        return res === undefined ? res : res[0];
-    }
-
-    if (loc.kind === DataLocationKind.CallData) {
-        const lastExtFrame = topExtFrame(state);
-
-        let abiType: TypeNode;
-
-        try {
-            abiType = infer.toABIEncodedType(typ, ABIEncoderVersion.V2);
-        } catch (e) {
-            return undefined;
+        if (res instanceof View) {
+            return decodeView(res, state, mapKeys);
         }
 
-        const res = cd_decodeValue(abiType, typ, loc, lastExtFrame.msgData, infer);
-
-        return res === undefined ? res : res[0];
-    }
-
-    if (loc.kind === DataLocationKind.Stack) {
-        return st_decodeValue(typ, loc, state.evmStack, infer);
-    }
-
-    const res = stor_decodeValue(typ, loc, state.storage, infer, mapKeys);
-
-    return res === undefined ? res : res[0];
-}
-
-/**
- * Decode a generic value expressed as a `DataView` (i.e. a tuple of type and location) given
- * the dbg state `state` at some step.
- */
-export function decodeValue(
-    view: DataView,
-    state: StepState,
-    infer: InferType,
-    mapKeys?: MapKeys
-): any {
-    const typ = view.type;
-    const loc = view.loc;
-
-    /**
-     * The only case where a pointer from one area of the state crosses into another
-     * area of the state are pointers in the stack. All other pointers stay in their
-     * own memory region
-     */
-    if (typ instanceof PointerType && loc.kind === DataLocationKind.Stack) {
-        if (isCalldataArrayType(typ)) {
-            const [off, len] = getCDArrayInStackOffAndLen(loc, state);
-
-            if (off === undefined || len === undefined) {
-                return undefined;
-            }
-
-            const lastExtFrame = topExtFrame(state);
-
-            let abiType: TypeNode;
-
-            try {
-                abiType = infer.toABIEncodedType(typ, ABIEncoderVersion.V2);
-            } catch (e) {
-                return undefined;
-            }
-
-            assert(
-                abiType instanceof PointerType && abiType.to instanceof ArrayType,
-                `InternalError`
-            );
-
-            const res = cd_decodeArrayContents(
-                abiType.to,
-                typ.to as ArrayType,
-                off,
-                Number(len),
-                lastExtFrame.msgData,
-                infer
-            );
-
-            return res === undefined ? res : res[0];
-        }
-
-        const off = st_decodeInt(uint256, loc, state.evmStack);
-
-        if (off === undefined) {
-            return undefined;
-        }
-
-        const kind: MemoryLocationKind = solLocToMemoryLocationKind(typ.location);
-
-        let pointedToLoc: MemoryLocation;
-
-        if (kind === DataLocationKind.Storage) {
-            pointedToLoc = {
-                kind,
-                address: off,
-                endOffsetInWord: 32
-            } as StorageLocation;
-        } else if (kind === DataLocationKind.Memory) {
-            pointedToLoc = {
-                kind,
-                address: off
-            };
-        } else if (kind === DataLocationKind.CallData) {
-            pointedToLoc = {
-                kind,
-                address: off,
-                base: 0n
-            };
-        } else {
-            nyi(`NYI data location kind ${kind}`);
-        }
-
-        const res = decodeValInt(typ.to, pointedToLoc, state, infer, mapKeys);
-
-        //console.error(`decodeValue: res ${res}`);
         return res;
     }
 
-    const res = decodeValInt(typ, loc, state, infer, mapKeys);
-    //console.error(`decodeValue: res ${res}`);
+    if (v instanceof BaseMemoryView) {
+        return v.decode(state.memory);
+    }
 
-    return res;
+    if (v instanceof BaseCalldataView) {
+        const lastExtFrame = topExtFrame(state);
+        const res = v.decode(lastExtFrame.msgData);
+
+        if (res instanceof View) {
+            return decodeView(res, state, mapKeys);
+        }
+
+        return res;
+    }
+
+    if (v instanceof BaseStorageView) {
+        return v.decode(state.storage, mapKeys);
+    }
+
+    nyi(`View ${v.pp()}`);
 }

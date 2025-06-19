@@ -23,7 +23,7 @@ import {
     getCreationCodeHash
 } from "../../artifacts/helpers";
 import { PartialBytecodeDescription, PartialSolcOutput } from "../../artifacts/solc";
-import { zip3 } from "../../utils/misc";
+import { getFunctionSelector, zip3 } from "../../utils/misc";
 import { findContractDef, findFallbackFun, findReceiveFun } from "../../utils/solidity";
 import { DecodedBytecodeSourceMapEntry, fastParseBytecodeSourceMapping } from "../../utils/srcmap";
 import { OpcodeInfo } from "../opcodes";
@@ -465,12 +465,43 @@ export class ArtifactManager implements IArtifactManager {
             return findFallbackFun(contract);
         }
 
-        const selector = data.slice(0, 4);
+        const selector = data instanceof Uint8Array ? data.slice(0, 4) : data.slice(0, 8);
+        const strSelector = typeof selector === "string" ? selector : bytesToHex(selector);
+        const infer = this.infer(info.artifact.compilerVersion);
 
-        const funMatch = this.findMethod(selector, info);
+        for (const base of contract.vLinearizedBaseContracts) {
+            if (!base) {
+                continue;
+            }
 
-        // Return either the fun match, or fallback fun if there is one
-        return funMatch ? funMatch[1] : findFallbackFun(contract);
+            for (const fun of base.vFunctions) {
+                const funSel = getFunctionSelector(fun, infer);
+                if (funSel == strSelector) {
+                    return fun;
+                }
+            }
+
+            for (const v of base.vStateVariables) {
+                if (v.visibility !== StateVariableVisibility.Public) {
+                    continue;
+                }
+
+                let hash: string | undefined;
+
+                try {
+                    hash = infer.signatureHash(v);
+                } catch (e) {
+                    continue;
+                }
+
+                if (hash == strSelector) {
+                    return v;
+                }
+            }
+        }
+
+        // the fallback fun if there is one
+        return findFallbackFun(contract);
     }
 
     getEventDefInfo(arg: bigint | Uint8Array | EventDesc): EventDefInfo | undefined {

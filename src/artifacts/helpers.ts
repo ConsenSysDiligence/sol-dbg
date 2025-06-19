@@ -253,14 +253,9 @@ export function detectArtifactCompilerVersion(artifact: PartialSolcOutput): stri
                 }
             } catch (e) {
                 // Nothing to do;
-                console.error(e); // @todo remove
             }
         }
     }
 
     return undefined;
-}
-
-export function isPartialSolcOutput(arg: any): arg is PartialSolcOutput {
-    return arg.hasOwnProperty("contracts") && arg.hasOwnProperty("sources");
 }
