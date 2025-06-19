@@ -36,19 +36,19 @@ interface ResultFoundryFail {
 }
 
 export type ContractJSONStates = { [addres: string]: ContractJSONState };
-type ContractJSONState = { [field: string]: any }
+type ContractJSONState = { [field: string]: any };
 
 // @todo: Test-relevant parts of this should be separated from BaseTestStep and moved under test/
 // BaseTestStep should be renamed to something more generic - e.g. TxDesc
 export interface TestStep extends TxDesc {
     // Expected result of the transaction
     result:
-    | ResultContractCreated
-    | ResultValueReturned
-    | ResultRevert
-    | ResultLastRevert
-    | ResultFoundryFail
-    | ResultAssert;
+        | ResultContractCreated
+        | ResultValueReturned
+        | ResultRevert
+        | ResultLastRevert
+        | ResultFoundryFail
+        | ResultAssert;
     // Stack trace at the first error in the tx
     errorStack?: string[];
     // String in the original file in which the error location maps to

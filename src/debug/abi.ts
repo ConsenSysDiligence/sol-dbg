@@ -8,18 +8,15 @@ import {
     TypeName,
     UserDefinedTypeName,
     DataLocation,
-    PointerType,
-    ContractDefinition,
-    StateVariableVisibility
+    PointerType
 } from "solc-typed-ast";
 import { View } from "./decoding/view";
 import { DecodedEventDesc, EventDefInfo, EventDesc, Memory } from "./types";
-import { bytes4, getFunctionSelector, split, zip } from "../utils";
+import { bytes4, split, zip } from "../utils";
 import { BaseCalldataView, makeCalldataView, makeCalldataViews } from "./decoding/calldata/view";
 import { DecodingFailure, Value } from "./decoding/value";
 import { simplifyType } from "./decoding";
 import { IArtifactManager } from "./artifact_manager";
-import { bytesToHex } from "ethereum-cryptography/utils";
 
 /**
  * Return true if the given callee requires a selector
@@ -67,14 +64,14 @@ export function buildMsgViews(
     const formals: Array<[string, TypeNode]> =
         callee instanceof FunctionDefinition
             ? callee.vParameters.vParameters.map((argDef: VariableDeclaration) => [
-                argDef.name,
-                isTypeUnknownContract(argDef.vType)
-                    ? types.address
-                    : infer.variableDeclarationToTypeNode(argDef)
-            ])
+                  argDef.name,
+                  isTypeUnknownContract(argDef.vType)
+                      ? types.address
+                      : infer.variableDeclarationToTypeNode(argDef)
+              ])
             : infer
-                .getterArgsAndReturn(callee)[0]
-                .map((typ: TypeNode, i: number) => [`ARG_${i}`, typ]);
+                  .getterArgsAndReturn(callee)[0]
+                  .map((typ: TypeNode, i: number) => [`ARG_${i}`, typ]);
 
     const views = makeCalldataViews(
         formals.map((x) => simplifyType(x[1], infer, DataLocation.CallData)),
@@ -95,7 +92,7 @@ abstract class BaseEventView<V extends Value, L, T extends TypeNode> extends Vie
     V,
     L,
     T
-> { }
+> {}
 
 class EventPayloadView<V extends Value, T extends TypeNode> extends BaseEventView<
     V,
@@ -189,50 +186,4 @@ export function decodeEvent(
         def: defInfo,
         args: argVals
     };
-}
-
-/**
- * Given a 4-byte selector, a target contract and an `InferType` object return
- * the ASTNode that corresponds to the target callee. Must be either a
- * `FunctionDefinition`, a `VariableDeclaration` (for public state var getters),
- * or undefined (if we cannot identify it)
- */
-export function findMethodBySelector(
-    selector: Uint8Array | string,
-    contract: ContractDefinition,
-    infer: InferType
-): FunctionDefinition | VariableDeclaration | undefined {
-    const strSelector = typeof selector === "string" ? selector : bytesToHex(selector);
-
-    for (const base of contract.vLinearizedBaseContracts) {
-        if (!base) {
-            continue;
-        }
-
-        for (const fun of base.vFunctions) {
-            const funSel = getFunctionSelector(fun, infer);
-            if (funSel == strSelector) {
-                return fun;
-            }
-        }
-
-        for (const v of base.vStateVariables) {
-            if (v.visibility !== StateVariableVisibility.Public) {
-                continue;
-            }
-
-            let hash: string | undefined;
-
-            try {
-                hash = infer.signatureHash(v);
-            } catch (e) {
-                continue;
-            }
-
-            if (hash == strSelector) {
-                return v;
-            }
-        }
-    }
-    return undefined;
 }

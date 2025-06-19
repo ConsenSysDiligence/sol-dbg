@@ -110,7 +110,10 @@ export async function addReturnInfo<T extends object & BasicStepInfo & ExternalF
     }
 
     // We treat these as in calldata, since they should already be abi-encoded in memory for the Return instruction
-    const views = makeCalldataViews(type.returns.map((t) => simplifyType(t, infer, DataLocation.CallData)), 0n);
+    const views = makeCalldataViews(
+        type.returns.map((t) => simplifyType(t, infer, DataLocation.CallData)),
+        0n
+    );
     const decodedReturnData = views.map((v) => v.decode(rawReturnData));
 
     return {

@@ -14,7 +14,7 @@ import {
     IntType,
     PointerType,
     StringType,
-    TypeNode,
+    TypeNode
 } from "solc-typed-ast";
 import { ArtifactManager } from "../debug/artifact_manager/artifact_manager";
 import { ContractInfo, SourceFileInfo } from "../debug/artifact_manager/types";
@@ -328,7 +328,8 @@ export function debugDumpTrace(
         );
 
         console.error(
-            `${i} ${step.pc}: ${step.op.mnemonic} ${jumpType} ${srcString !== undefined ? srcString : ""
+            `${i} ${step.pc}: ${step.op.mnemonic} ${jumpType} ${
+                srcString !== undefined ? srcString : ""
             }`
         );
     }

@@ -5,7 +5,6 @@ import { VM } from "@ethereumjs/vm";
 import { assert, FunctionDefinition, VariableDeclaration } from "solc-typed-ast";
 import { getCodeHash, getCreationCodeHash } from "../../../artifacts";
 import { mustReadMem, stackTop, wordToAddress, ZERO_ADDRESS } from "../../../utils/misc";
-import { findMethodBySelector } from "../../abi";
 import { ContractInfo, IArtifactManager } from "../../artifact_manager";
 import { createsContract, increasesDepth, OPCODES } from "../../opcodes";
 import {
@@ -37,27 +36,6 @@ export function getCode(step: ExternalFrameInfo): Uint8Array {
 }
 
 /**
- * Given a contract info and a function selector find the (potentially inherited) entry point (function or public var getter).
- * @param info
- * @param selector
- * @returns
- */
-function findEntryPoint(
-    info: ContractInfo,
-    selector: UnprefixedHexString,
-    artifactManager: IArtifactManager
-): FunctionDefinition | VariableDeclaration | undefined {
-    if (info.ast === undefined) {
-        return undefined;
-    }
-
-    const contract = info.ast;
-    const infer = artifactManager.infer(info.artifact.compilerVersion);
-
-    return findMethodBySelector(selector, contract, infer);
-}
-
-/**
  * Build a `CallFrame` from the given `sender` address, `receiver` address, `data` `Uint8Array`, (msg.data) and the current trace step number.
  */
 function makeCallFrame(
@@ -81,11 +59,11 @@ function makeCallFrame(
     if (contractInfo && contractInfo.ast) {
         const infer = artifactManager.infer(contractInfo.artifact.compilerVersion);
 
-        callee = findEntryPoint(contractInfo, selector, artifactManager);
+        callee = artifactManager.findEntryPoint(selector, contractInfo);
 
         if (callee !== undefined) {
             try {
-                args = buildMsgViews(callee, infer)
+                args = buildMsgViews(callee, infer);
             } catch (e) {
                 args = undefined;
             }
@@ -152,9 +130,9 @@ function decodeCall(step: BasicStepInfo): [Address, Address, Uint8Array] {
     const op = step.op;
     assert(
         op.opcode === OPCODES.CALL ||
-        op.opcode === OPCODES.CALLCODE ||
-        op.opcode === OPCODES.DELEGATECALL ||
-        op.opcode === OPCODES.STATICCALL,
+            op.opcode === OPCODES.CALLCODE ||
+            op.opcode === OPCODES.DELEGATECALL ||
+            op.opcode === OPCODES.STATICCALL,
         `Unexpected call instruction {0}`,
         op.mnemonic
     );

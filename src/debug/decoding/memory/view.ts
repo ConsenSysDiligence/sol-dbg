@@ -69,16 +69,6 @@ export abstract class BaseMemoryView<
         return res;
     }
 
-    protected decodeAddressAt(off: bigint, state: Memory): Address | DecodingFailure {
-        const m = this.readMemAt(off + 12n, state, 20);
-
-        if (isFailure(m)) {
-            return m;
-        }
-
-        return new Address(m);
-    }
-
     protected decodeBytesAt(loc: bigint, state: Memory): Uint8Array | DecodingFailure {
         const len = this.decodeIntAt(loc, uint256, state);
 

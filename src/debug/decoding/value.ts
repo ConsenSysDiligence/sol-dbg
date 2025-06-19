@@ -6,17 +6,17 @@ export class ExternalFunRef {
     constructor(
         public readonly address: Address,
         public readonly selector: Uint8Array
-    ) { }
+    ) {}
 }
 
 export class InternalFunRef {
-    constructor(public readonly fun: FunctionDefinition) { }
+    constructor(public readonly fun: FunctionDefinition) {}
 }
 
 export type FunctionValue = ExternalFunRef | InternalFunRef;
 
 export class Struct {
-    constructor(public readonly entries: Array<[string, Value]>) { }
+    constructor(public readonly entries: Array<[string, Value]>) {}
     field(name: string): Value {
         // @todo optimize if we end up using this more
         for (const [fieldName, val] of this.entries) {
@@ -34,7 +34,7 @@ export class Slice {
         public readonly array: Value[],
         public readonly start: number,
         public readonly end: number
-    ) { }
+    ) {}
 }
 
 export abstract class Poison {

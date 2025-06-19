@@ -237,10 +237,7 @@ function keccakOfAddr(addr: bigint): bigint {
 export class ArrayStorageView extends BaseStorageView<Value[], ArrayType> {
     private _nextLoc: StorageLocation | undefined;
 
-    constructor(
-        type: ArrayType,
-        loc: [bigint, number],
-    ) {
+    constructor(type: ArrayType, loc: [bigint, number]) {
         super(type, loc);
 
         if (type.size === undefined) {
@@ -366,12 +363,8 @@ function decodeMapRefKey(type: TypeNode, data: Uint8Array): string {
     return type instanceof StringType ? bytesToUtf8(data) : bytesToHex(data);
 }
 
-
 export class MapStorageView extends BaseStorageView<Map<Value, Value>, MappingType> {
-    constructor(
-        type: MappingType,
-        loc: StorageLocation,
-    ) {
+    constructor(type: MappingType, loc: StorageLocation) {
         super(type, loc);
     }
 
@@ -399,7 +392,7 @@ export class MapStorageView extends BaseStorageView<Map<Value, Value>, MappingTy
 
         // @todo(dimo) Would it be better here to check that `candidateSlot` is an explicitly defined in storage, and not just a 0 by default?
         for (const [candidateKey, candidateSlot] of candidateKeys) {
-            let decodedKey: Value
+            let decodedKey: Value;
 
             if (keyView !== undefined) {
                 decodedKey = keyView.decode(candidateKey);
@@ -407,10 +400,7 @@ export class MapStorageView extends BaseStorageView<Map<Value, Value>, MappingTy
                 decodedKey = decodeMapRefKey((this.type.keyType as PointerType).to, candidateKey);
             }
 
-            const valueView = makeStorageView(
-                this.type.valueType,
-                [candidateSlot, 32]
-            );
+            const valueView = makeStorageView(this.type.valueType, [candidateSlot, 32]);
             const decodedValue = valueView.decode(state, mapKeys);
 
             if (!isFailure(decodedKey) && !isFailure(decodedValue)) {
@@ -487,7 +477,11 @@ export class MissingStorageView extends BaseStorageView<DecodingFailure, Missing
             const typeString = this.type.rawTypeName.typeString;
 
             if (isTypeStringStatic32BytesInStorage(typeString)) {
-                assert(this.endOffsetInWord === 32, `Unexpected non-word aligned {0} in storage`, typeString)
+                assert(
+                    this.endOffsetInWord === 32,
+                    `Unexpected non-word aligned {0} in storage`,
+                    typeString
+                );
             }
         }
     }
@@ -575,7 +569,11 @@ function staticSize(typ: TypeNode): number {
         return staticSize(typ.to);
     }
 
-    if (typ instanceof MissingType && typ.rawTypeName !== undefined && isTypeStringStatic32BytesInStorage(typ.rawTypeName.typeString)) {
+    if (
+        typ instanceof MissingType &&
+        typ.rawTypeName !== undefined &&
+        isTypeStringStatic32BytesInStorage(typ.rawTypeName.typeString)
+    ) {
         return 32;
     }
 
@@ -584,8 +582,18 @@ function staticSize(typ: TypeNode): number {
 
 export function makeStorageView(
     type: TypeNode,
-    loc: StorageLocation,
+    loc: StorageLocation
 ): BaseStorageView<Value, TypeNode> {
+    if (type instanceof MissingType) {
+        if (type.rawTypeName !== undefined) {
+            if (isTypeStringStatic32BytesInStorage(type.rawTypeName.typeString)) {
+                loc = loc[1] === 32 ? loc : nextWord(loc);
+            }
+        }
+
+        return new MissingStorageView(type, loc);
+    }
+
     if (!typeFitsInLoc(type, loc)) {
         loc = nextWord(loc);
     }
@@ -628,10 +636,6 @@ export function makeStorageView(
 
     if (type instanceof MappingType) {
         return new MapStorageView(type, loc);
-    }
-
-    if (type instanceof MissingType) {
-        return new MissingStorageView(type, loc)
     }
 
     nyi(`makeStoragView(${type.pp()})`);

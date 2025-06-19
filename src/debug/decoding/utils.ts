@@ -5,16 +5,7 @@ import {
     DataLocation as SolDataLocation,
     TypeNode
 } from "solc-typed-ast";
-import { DataLocationKind, MemoryLocationKind, } from "../types";
 import { DecodingFailure, Value } from "./value";
-
-export function solLocToMemoryLocationKind(loc: SolDataLocation): MemoryLocationKind {
-    if (loc === SolDataLocation.Default) {
-        return DataLocationKind.Memory;
-    }
-
-    return loc as unknown as MemoryLocationKind;
-}
 
 export function isCalldataArrayType(typ: TypeNode): boolean {
     return (
@@ -46,6 +37,10 @@ export function isTypeStringDynamicArray(t: string): boolean {
 
 export function isTypeStringMapping(t: string): boolean {
     return t.startsWith("mapping(");
+}
+
+export function isTypeStringStruct(t: string): boolean {
+    return t.startsWith("struct ");
 }
 
 export function isTypeStringStatic32BytesInStorage(t: string): boolean {

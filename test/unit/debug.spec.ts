@@ -27,7 +27,15 @@ import {
 } from "../../src/utils";
 import { lsJson } from "../utils";
 import { ResultKind, TestCase, TestStep } from "../utils/test_case";
-import { DecodingFailure, ExternalFunRef, InternalFunRef, Poison, Slice, Struct, Value } from "../../src/debug/decoding/value";
+import {
+    DecodingFailure,
+    ExternalFunRef,
+    InternalFunRef,
+    Poison,
+    Slice,
+    Struct,
+    Value
+} from "../../src/debug/decoding/value";
 import { View } from "../../src/debug/decoding/view";
 
 function checkResult(result: FoundryTxResult, step: TestStep): boolean {
@@ -108,7 +116,8 @@ export function stackTracesEq(actualST: string, expectedST: string[]): boolean {
 
     if (actualSTLines.length !== expectedST.length) {
         console.error(
-            `Traces have different number of lines. Expected(${expectedST.length
+            `Traces have different number of lines. Expected(${
+                expectedST.length
             }): \n ${expectedST.join("\n")} \n Actual(${actualSTLines.length}): \n ${actualST}`
         );
 
@@ -149,7 +158,7 @@ function contractStatesToJSON(s: ContractStates | undefined): any {
         return s;
     }
 
-    return Object.fromEntries(Object.entries(s).map(([k, v]) => [k, valueToJSON(v)]))
+    return Object.fromEntries(Object.entries(s).map(([k, v]) => [k, valueToJSON(v)]));
 }
 
 function valueToJSON(s: Value): any {
@@ -158,20 +167,19 @@ function valueToJSON(s: Value): any {
     }
 
     if (s instanceof Map) {
-        const res: { [keys: string | number]: any } = {}
+        const res: { [keys: string | number]: any } = {};
         for (const [k, v] of s.entries()) {
             res[valueToJSON(k)] = valueToJSON(v);
         }
-        return res
+        return res;
     }
 
     if (s instanceof Struct) {
-        const res: { [keys: string]: any } = {}
+        const res: { [keys: string]: any } = {};
         for (const [k, v] of s.entries) {
             res[valueToJSON(k)] = valueToJSON(v);
         }
-        return res
-
+        return res;
     }
 
     if (typeof s === "bigint") {
@@ -385,11 +393,7 @@ describe("Local tests", () => {
 
                                 expect(layout).toBeDefined();
 
-                                const strLayout = JSON.stringify(
-                                    valueToJSON(layout),
-                                    undefined,
-                                    2
-                                );
+                                const strLayout = JSON.stringify(valueToJSON(layout), undefined, 2);
 
                                 expect(strLayout).toEqual(
                                     JSON.stringify(curStep.layoutBefore, null, 2)
@@ -507,7 +511,9 @@ describe("Local tests", () => {
                                             step.retInfo.decodedReturnData !== undefined
                                     )
                                     .map((step) =>
-                                        ((step.retInfo as any).decodedReturnData as Value[]).map(valueToJSON)
+                                        ((step.retInfo as any).decodedReturnData as Value[]).map(
+                                            valueToJSON
+                                        )
                                     );
 
                                 expect(actualDecodedReturns).toEqual(curStep.decodedReturns);

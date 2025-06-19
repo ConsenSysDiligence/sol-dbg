@@ -4,12 +4,7 @@ import { assert, FunctionDefinition, TypeNode, VariableDeclaration } from "solc-
 import { ContractInfo, IArtifactManager } from "../../artifact_manager";
 import { isCalldataArrayType } from "../../decoding/utils";
 import { OPCODES } from "../../opcodes";
-import {
-    Frame,
-    FrameKind,
-    InternalCallFrame,
-    Stack
-} from "../../types";
+import { Frame, FrameKind, InternalCallFrame, Stack } from "../../types";
 import { BasicStepInfo } from "./basic_info";
 import { ExternalFrameInfo, topExtFrame } from "./ext_stack";
 import { SourceInfo } from "./source";
@@ -47,12 +42,12 @@ function buildFunArgViews(
         formals =
             callee instanceof FunctionDefinition
                 ? callee.vParameters.vParameters.map((argDef: VariableDeclaration) => [
-                    argDef.name,
-                    infer.variableDeclarationToTypeNode(argDef)
-                ])
+                      argDef.name,
+                      infer.variableDeclarationToTypeNode(argDef)
+                  ])
                 : infer
-                    .getterArgsAndReturn(callee)[0]
-                    .map((typ: TypeNode, i: number) => [`ARG_${i}`, typ]);
+                      .getterArgsAndReturn(callee)[0]
+                      .map((typ: TypeNode, i: number) => [`ARG_${i}`, typ]);
     } catch (e) {
         // `variableDeclarationToTypeNode` may fail when referencing structs/contracts that are defined
         // in SourceUnits that are missing
@@ -72,10 +67,7 @@ function buildFunArgViews(
             return undefined;
         }
 
-        res.unshift([
-            name,
-            makeStackView(simplifyType(typ, infer, undefined), offsetFromTop)
-        ]);
+        res.unshift([name, makeStackView(simplifyType(typ, infer, undefined), offsetFromTop)]);
     }
 
     return res;
