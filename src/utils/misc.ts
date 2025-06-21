@@ -24,6 +24,8 @@ import {
 export const ZERO_ADDRESS_STRING: HexString = "0x0000000000000000000000000000000000000000";
 export const ZERO_ADDRESS = Address.fromString(ZERO_ADDRESS_STRING);
 
+export const ZERO_BYTES32 = new Uint8Array(32);
+
 export const uint256 = new IntType(256, false);
 export const uint8 = new IntType(8, false);
 export const bytes4 = new FixedBytesType(4);
@@ -113,22 +115,19 @@ export function fits(val: bigint, typ: IntType): boolean {
 
 /* istanbul ignore next */
 export function ppLoc(loc: DataLocation): string {
-    return `{kind: ${loc.kind}, ${
-        loc.kind === DataLocationKind.Stack ? "offsetFromTop" : "address"
-    }: ${loc.kind === DataLocationKind.Stack ? loc.offsetFromTop : loc.address.toString(16)}${
-        loc.kind === DataLocationKind.Storage
+    return `{kind: ${loc.kind}, ${loc.kind === DataLocationKind.Stack ? "offsetFromTop" : "address"
+        }: ${loc.kind === DataLocationKind.Stack ? loc.offsetFromTop : loc.address.toString(16)}${loc.kind === DataLocationKind.Storage
             ? `, offsetInWord: ${loc.endOffsetInWord}`
             : loc.kind === DataLocationKind.CallData
-              ? `, base: ${loc.base}`
-              : ""
-    }}`;
+                ? `, base: ${loc.base}`
+                : ""
+        }}`;
 }
 
 /* istanbul ignore next */
 export function ppView(view: DataView): string {
-    return `{type: ${view.type.pp()}, abiType: ${
-        view.abiType ? view.abiType.pp() : "undefined"
-    }, loc: ${ppLoc(view.loc)}}`;
+    return `{type: ${view.type.pp()}, abiType: ${view.abiType ? view.abiType.pp() : "undefined"
+        }, loc: ${ppLoc(view.loc)}}`;
 }
 
 /* istanbul ignore next */
@@ -212,6 +211,28 @@ export function bigEndianBufToBigint(buf: Uint8Array): bigint {
 
     return res;
 }
+
+export function encodeBigintInBigEndianBuf(src: bigint, dest: Uint8Array, nBytes: number, endOffset: number | undefined = undefined): void {
+    let bytes: number[] = [];
+    let neg = src < 0n;
+    let final = neg ? -1n : 0x00n;
+
+    endOffset = endOffset === undefined ? dest.length : endOffset;
+
+    do {
+        bytes.unshift(Number(src % 256n));
+        src >>= 8n;
+    } while (src !== final || bytes.length < nBytes)
+
+    const baseByteOff = endOffset - bytes.length
+    for (let i = 0; i < bytes.length; i++) {
+        dest[baseByteOff + i] = bytes[i];
+    }
+}
+
+export function encodeAddressInWord(addr: Address, dest: Uint8Array): void {
+}
+
 
 /**
  * Convert a big-endian 2's complement encoding to a number. Throws an error if the value doesn't fit.
@@ -339,4 +360,8 @@ export function single<T>(a: T[]): T {
     }
 
     return a[0];
+}
+
+export function min(a: number, b: number): number {
+    return a < b ? a : b;
 }

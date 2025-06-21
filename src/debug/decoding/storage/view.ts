@@ -8,31 +8,35 @@ import {
     IntType,
     MappingType,
     PointerType,
+    stringToBytes,
     StringType,
     TypeNode
 } from "solc-typed-ast";
 import { DecodingFailure, Struct, Value } from "../value";
-import { View } from "../view";
+import { EncodingError, View } from "../view";
 import { Storage } from "../../types";
 import {
     address,
     bigEndianBufToBigint,
     bigIntToBuf,
     bool,
+    encodeBigintInBigEndianBuf,
     fits,
     MAX_ARR_DECODE_LIMIT,
+    min,
     nyi,
     uint256,
-    uint8
+    uint8,
+    ZERO_BYTES32
 } from "../../../utils";
 import { keccak256 } from "ethereum-cryptography/keccak";
-import { Address, bytesToUtf8 } from "@ethereumjs/util";
+import { Address, bytesToUtf8, setLengthRight } from "@ethereumjs/util";
 import { ExpStructType, MissingType } from "../exp_types";
 import { MapKeys } from "../../tracers";
 import { makeMemoryView } from "../memory";
 import { isFailure, isTypeStringStatic32BytesInStorage } from "../utils";
 import { BaseMemoryView } from "../memory/view";
-import { bytesToHex } from "ethereum-cryptography/utils";
+import { bytesToHex, equalsBytes } from "ethereum-cryptography/utils";
 
 type StorageLocation = [bigint, number];
 
@@ -66,6 +70,16 @@ export abstract class BaseStorageView<
         }
 
         return res;
+    }
+
+    protected setWord(key: bigint, value: Uint8Array, storage: Storage): Storage {
+        const keyHash = bigEndianBufToBigint(keccak256(bigIntToBuf(key, 32, "big")));
+
+        if (equalsBytes(value, ZERO_BYTES32)) {
+            return storage.delete(keyHash);
+        }
+
+        return storage.set(keyHash, value)
     }
 
     /**
@@ -136,6 +150,33 @@ export abstract class BaseStorageView<
         return res;
     }
 
+    protected encodeIntAt(
+        val: bigint,
+        key: bigint,
+        endOffsetInWord: number,
+        type: IntType,
+        state: Storage
+    ): Storage {
+        const size = type.nBits / 8;
+
+        if (endOffsetInWord < size) {
+            throw new EncodingError(
+                `Internal Error: Can't decode ${type.pp()} starting at offset ${endOffsetInWord} in word ${key}`
+            );
+        }
+
+        if (!fits(val, type)) {
+            throw new EncodingError(
+                `Decoded value ${val} from ${[key, endOffsetInWord]} doesn't fit in expected typee ${type.pp()}`
+            );
+        }
+
+        const word = this.fetchWord(key, state);
+        encodeBigintInBigEndianBuf(val, word, type.nBits / 8, endOffsetInWord);
+        return this.setWord(key, word, state);
+    }
+
+
     pp(): string {
         return `<${this.type.pp()}@${this.loc} in storage>`;
     }
@@ -145,6 +186,8 @@ export abstract class BaseStorageView<
      */
     abstract nextLoc(): StorageLocation | undefined;
     abstract decode(state: Storage, mapKeys?: MapKeys): Val | DecodingFailure;
+
+    abstract encode(value: Val, state: Storage): Storage
 }
 
 export class IntStorageView extends BaseStorageView<bigint, IntType> {
@@ -154,6 +197,10 @@ export class IntStorageView extends BaseStorageView<bigint, IntType> {
 
     nextLoc(): StorageLocation {
         return move(this.loc, this.type.nBits / 8);
+    }
+
+    encode(value: bigint, state: Storage): Storage {
+        return this.encodeIntAt(value, this.key, this.endOffsetInWord, this.type, state)
     }
 }
 
@@ -166,6 +213,10 @@ export class BoolStorageView extends BaseStorageView<boolean, BoolType> {
         }
 
         return byte !== BigInt(0);
+    }
+
+    encode(value: boolean, state: Storage): Storage {
+        return this.encodeIntAt(value ? 1n : 0n, this.key, this.endOffsetInWord, uint8, state)
     }
 
     nextLoc(): StorageLocation {
@@ -183,6 +234,18 @@ export class AddressStorageView extends BaseStorageView<Address, AddressType> {
 
         const bytes = this.fetchBytes(this.key, this.endOffsetInWord - 20, 20, state);
         return new Address(bytes);
+    }
+
+    encode(value: Address, state: Storage): Storage {
+        if (this.endOffsetInWord < 20) {
+            throw new EncodingError(
+                `Unalighed read: Can't decode ${this.type.pp()} starting at offset ${this.endOffsetInWord} in word ${this.key}`
+            );
+        }
+
+        const word = this.fetchWord(this.key, state);
+        word.set(value.bytes, this.endOffsetInWord - 20);
+        return this.setWord(this.key, word, state);
     }
 
     nextLoc(): StorageLocation {
@@ -206,6 +269,18 @@ export class FixedBytesStorageView extends BaseStorageView<Uint8Array, FixedByte
         );
     }
 
+    encode(value: Uint8Array, state: Storage): Storage {
+        if (this.endOffsetInWord < this.type.size) {
+            throw new EncodingError(
+                `Unalighed read: Can't decode ${this.type.pp()} starting at offset ${this.endOffsetInWord} in word ${this.key}`
+            );
+        }
+
+        const word = this.fetchWord(this.key, state);
+        word.set(value, this.endOffsetInWord - this.type.size);
+        return this.setWord(this.key, word, state);
+    }
+
     nextLoc(): StorageLocation {
         return move(this.loc, this.type.size);
     }
@@ -220,6 +295,10 @@ export class PointerStorageView extends BaseStorageView<Value, PointerType> {
 
     decode(state: Storage, mapKeys?: MapKeys): Value {
         return this.innerView.decode(state, mapKeys);
+    }
+
+    encode(value: Value, state: Storage): Storage {
+        return this.innerView.encode(value, state);
     }
 
     nextLoc(): StorageLocation | undefined {
@@ -281,7 +360,6 @@ export class ArrayStorageView extends BaseStorageView<Value[], ArrayType> {
     decode(state: Storage, mapKeys?: MapKeys): Value[] | DecodingFailure {
         let sizeBigint: bigint | DecodingFailure;
         let contentsKey: bigint;
-        const contentsOff: number = 32;
 
         if (this.type.size) {
             sizeBigint = this.type.size;
@@ -302,7 +380,7 @@ export class ArrayStorageView extends BaseStorageView<Value[], ArrayType> {
 
         const size = Number(sizeBigint);
         const res: Value[] = [];
-        let elLoc: StorageLocation | undefined = [contentsKey, contentsOff];
+        let elLoc: StorageLocation | undefined = [contentsKey, 32];
         const elT = this.type.elementT;
 
         for (let i = 0; i < size; i++) {
@@ -316,6 +394,33 @@ export class ArrayStorageView extends BaseStorageView<Value[], ArrayType> {
         }
 
         return res;
+    }
+
+    encode(value: Value[], state: Storage): Storage {
+        let s: Storage = state;
+
+        if (this.type.size !== undefined && BigInt(value.length) !== this.type.size) {
+            throw new EncodingError(`Invalid length ${value.length} for encoding an array of type ${this.type.pp()}`)
+        }
+
+        const size = BigInt(value.length);
+        let baseKey = this.key;
+
+        if (this.type.size === undefined) {
+            s = this.encodeIntAt(size, this.key, this.endOffsetInWord, uint256, s)
+            baseKey = keccakOfAddr(baseKey);
+        }
+
+        let elLoc: StorageLocation | undefined = [baseKey, 32];
+
+        for (let i = 0; i < size; i++) {
+            const view = makeStorageView(this.type.elementT, elLoc);
+            s = view.encode(value[i], s);
+            elLoc = view.nextLoc();
+            assert(elLoc !== undefined, `Internal error: elLoc shouldnt be undefined in ArrayStorageView.encode`)
+        }
+
+        return s.collapseUntil(state);
     }
 }
 
@@ -352,6 +457,20 @@ export class StructStorageView extends BaseStorageView<Struct, ExpStructType> {
             view.decode(state, mapKeys)
         ]);
         return new Struct(entries);
+    }
+
+    encode(value: Struct, state: Storage): Storage {
+        if (value.entries.length !== this.fieldViews.length) {
+            throw new EncodingError(`Mismatch in number of fields in encoding of ${value} to ${this.type.pp()}`)
+        }
+
+        let s = state;
+
+        for (let i = 0; i < value.entries.length; i++) {
+            s = this.fieldViews[i][1].encode(value.entries[i][1], s);
+        }
+
+        return s.collapseUntil(state);
     }
 }
 
@@ -410,6 +529,11 @@ export class MapStorageView extends BaseStorageView<Map<Value, Value>, MappingTy
 
         return res;
     }
+
+    encode(): Storage {
+        // Needs memory encodings first
+        nyi(`map encodings`)
+    }
 }
 
 export abstract class PackedArrayStorageView<
@@ -449,11 +573,41 @@ export abstract class PackedArrayStorageView<
 
         return this.fetchBytes(addr, 0, numLen, state);
     }
+
+    encodeBytesAt(bytes: Uint8Array, slot: bigint, state: Storage): Storage {
+        let w = this.fetchWord(slot, state);
+
+        if (bytes.length < 32) {
+            w[31] = 2 * bytes.length;
+            w.set(bytes, 0)
+            return this.setWord(slot, w, state);
+        }
+
+        let s = this.encodeIntAt(BigInt(2 * bytes.length + 1), slot, 32, uint256, state);
+        let addr = keccakOfAddr(this.key);
+        let srcOff = 0;
+        while (srcOff < bytes.length) {
+            let w = bytes.slice(srcOff, min(srcOff + 32, bytes.length));
+            if (w.length < 32) {
+                w = setLengthRight(w, 32)
+            }
+
+            s = this.setWord(addr, w, s);
+            addr++;
+            srcOff += 32;
+        }
+
+        return s.collapseUntil(state);
+    }
 }
 
 export class BytesStorageView extends PackedArrayStorageView<Uint8Array, BytesType> {
     decode(state: Storage): Uint8Array | DecodingFailure {
         return this.decodeBytes(state);
+    }
+
+    encode(value: Uint8Array, state: Storage): Storage {
+        return this.encodeBytesAt(value, this.key, state)
     }
 }
 
@@ -466,6 +620,10 @@ export class StringStorageView extends PackedArrayStorageView<string, StringType
         }
 
         return bytesToUtf8(bytes);
+    }
+
+    encode(value: string, state: Storage): Storage {
+        return this.encodeBytesAt(stringToBytes(value), this.key, state)
     }
 }
 
@@ -490,6 +648,10 @@ export class MissingStorageView extends BaseStorageView<DecodingFailure, Missing
         return new DecodingFailure(
             `missing ${this.type.rawTypeName ? this.type.rawTypeName.type : "<unknown>"}`
         );
+    }
+
+    encode(value: DecodingFailure, state: Storage): Storage {
+        throw new EncodingError(`Cannot encode a missing value`);
     }
 
     nextLoc(): StorageLocation | undefined {

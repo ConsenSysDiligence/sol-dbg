@@ -86,6 +86,10 @@ export abstract class BaseMemoryView<
     pp(): string {
         return `<${this.type.pp()}@${this.loc} in memory>`;
     }
+
+    get offset(): bigint {
+        return this.loc;
+    }
 }
 
 export class IntMemView extends BaseMemoryView<bigint, IntType> {

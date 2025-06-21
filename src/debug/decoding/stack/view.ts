@@ -10,13 +10,15 @@ import {
 } from "solc-typed-ast";
 import { Stack } from "../../types";
 import { DecodingFailure, Value } from "../value";
-import { View } from "../view";
-import { bigEndianBufToBigint, fits, nyi, uint256, wordToAddress } from "../../../utils";
+import { EncodingError, View } from "../view";
+import { bigEndianBufToBigint, encodeBigintInBigEndianBuf, fits, nyi, uint256, uint8, wordToAddress } from "../../../utils";
 import { Address } from "@ethereumjs/util";
 import { makeStorageView } from "../storage";
 import { isCalldataArrayType, isFailure } from "../utils";
-import { ArraySliceCalldataView, makeCalldataView } from "../calldata/view";
+import { ArraySliceCalldataView, BaseCalldataView, makeCalldataView } from "../calldata/view";
 import { makeMemoryView } from "../memory";
+import { BaseStorageView } from "../storage/view";
+import { BaseMemoryView } from "../memory/view";
 
 export abstract class BaseStackView<Val extends Value, Type extends TypeNode> extends View<
     Stack,
@@ -59,11 +61,25 @@ export abstract class BaseStackView<Val extends Value, Type extends TypeNode> ex
     pp(): string {
         return `<${this.type.pp()}@${this.loc} in stack>`;
     }
+
+    abstract encode(value: Val, state: Stack): void;
+
+    encodeIntAt(value: bigint, type: IntType, offsetFromTop: number, state: Stack): void {
+        if (state.length <= offsetFromTop) {
+            throw new EncodingError(`OoB access at ${offsetFromTop} in stack`)
+        }
+
+        encodeBigintInBigEndianBuf(value, state[offsetFromTop], type.nBits / 8);
+    }
 }
 
 export class IntStackView extends BaseStackView<bigint, IntType> {
     decode(state: Stack): bigint | DecodingFailure {
         return this.decodeIntAt(this.loc, this.type, state);
+    }
+
+    encode(value: bigint, state: Stack): void {
+        this.encodeIntAt(value, this.type, this.loc, state)
     }
 }
 
@@ -72,6 +88,10 @@ export class BoolStackView extends BaseStackView<boolean, BoolType> {
         const res = this.decodeIntAt(this.loc, uint256, state);
         return isFailure(res) ? res : res === 1n;
     }
+
+    encode(value: boolean, state: Stack): void {
+        this.encodeIntAt(value ? 1n : 0n, uint8, this.loc, state)
+    }
 }
 
 export class AddressStackView extends BaseStackView<Address, AddressType> {
@@ -79,12 +99,31 @@ export class AddressStackView extends BaseStackView<Address, AddressType> {
         const w = this.fetchStackWord(this.loc, state);
         return isFailure(w) ? w : wordToAddress(w);
     }
+
+    encode(value: Address, state: Stack): void {
+        const w = this.fetchStackWord(this.loc, state);
+
+        if (isFailure(w)) {
+            throw new EncodingError(w.reason)
+        }
+
+        w.set(value.bytes, 12)
+    }
 }
 
 export class FixedBytesStackView extends BaseStackView<Uint8Array, FixedBytesType> {
     decode(state: Stack): Uint8Array | DecodingFailure {
         const w = this.fetchStackWord(this.loc, state);
         return isFailure(w) ? w : w.slice(0, this.type.size);
+    }
+
+    encode(value: Uint8Array, state: Stack): void {
+        const w = this.fetchStackWord(this.loc, state);
+        if (isFailure(w)) {
+            throw new EncodingError(w.reason)
+        }
+
+        w.set(value)
     }
 }
 
@@ -125,6 +164,20 @@ export class PointerStackView extends BaseStackView<PointerValue, PointerType> {
         }
 
         nyi(`Stack pointer to ${this.type.location}`);
+    }
+
+    encode(value: PointerValue, state: Stack): void {
+        if (value instanceof BaseStorageView) {
+            if (value.endOffsetInWord !== 32) {
+                throw new EncodingError(`Unexpected non-word-aligned storage pointer in stack encoding`)
+            }
+
+            this.encodeIntAt(value.key, uint256, this.loc, state);
+        } else if (value instanceof BaseMemoryView || value instanceof BaseCalldataView) {
+            this.encodeIntAt(value.offset, uint256, this.loc, state);
+        }
+
+        nyi(`Unexpected pointer ${value.pp()}`)
     }
 }
 
