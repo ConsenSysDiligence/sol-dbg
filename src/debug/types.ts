@@ -1,4 +1,4 @@
-import { Address } from "@ethereumjs/util";
+import { Address, PrefixedHexString } from "@ethereumjs/util";
 import * as sol from "solc-typed-ast";
 import { FunctionDefinition } from "solc-typed-ast";
 import { ImmMap } from "../utils/immutable_map";
@@ -9,7 +9,7 @@ import { View } from "./decoding/view";
 /**
  * A type alias for 0x-prefixed hex strings. Used for documentation purposes.
  */
-export type HexString = string;
+export type HexString = PrefixedHexString;
 
 /**
  * A type alias for hex strings without 0x prefix. Used for documentation purposes.

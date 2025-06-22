@@ -1,4 +1,4 @@
-import { EvmError, ExecResult } from "@ethereumjs/evm";
+import { EVMError, ExecResult } from "@ethereumjs/evm";
 
 /**
  * The following code has been copied from
@@ -8,7 +8,7 @@ import { EvmError, ExecResult } from "@ethereumjs/evm";
  * Since its not exported by the underyling package, but we need it to hack on the VM to add foundry cheatcodes.
  */
 
-export function EvmErrorResult(error: EvmError, gasUsed: bigint): ExecResult {
+export function EvmErrorResult(error: EVMError, gasUsed: bigint): ExecResult {
     return {
         returnValue: new Uint8Array(0),
         executionGasUsed: gasUsed,

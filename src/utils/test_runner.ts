@@ -1,8 +1,8 @@
-import { Block } from "@ethereumjs/block";
-import { Common, EVMStateManagerInterface, Hardfork } from "@ethereumjs/common";
-import { DefaultStateManager } from "@ethereumjs/statemanager";
+import { Block, createBlock } from "@ethereumjs/block";
+import { Common, StateManagerInterface, Hardfork } from "@ethereumjs/common";
+import { MerkleStateManager } from "@ethereumjs/statemanager";
 import { TypedTransaction, TypedTxData } from "@ethereumjs/tx";
-import { Account, Address, PrefixedHexString } from "@ethereumjs/util";
+import { Address, PrefixedHexString, createAccount, createAddressFromString, hexToBigInt } from "@ethereumjs/util";
 import { bytesToHex, hexToBytes } from "ethereum-cryptography/utils";
 import { assert } from "solc-typed-ast";
 import { IArtifactManager } from "../debug/artifact_manager/artifact_manager";
@@ -18,7 +18,7 @@ import {
 import { map_add } from "./map";
 import { hexStrToBuf32, makeFakeTransaction, ZERO_ADDRESS_STRING } from "./misc";
 import { set_add, set_subtract } from "./set";
-import { HexString } from "./types";
+import { HexString } from "../debug";
 
 export interface TxDesc {
     address: HexString;
@@ -69,7 +69,7 @@ export class TxRunner {
     private _txs: TypedTransaction[];
     private _txToBlock: Map<string, Block>;
     private _results: FoundryTxResult[];
-    private _stateRootBeforeTx = new Map<string, EVMStateManagerInterface>();
+    private _stateRootBeforeTx = new Map<string, StateManagerInterface>();
     private _contractsBeforeTx = new Map<string, Set<PrefixedHexString>>();
     private _keccakPreimagesBeforeTx = new Map<string, Map<bigint, Uint8Array>>();
 
@@ -101,7 +101,7 @@ export class TxRunner {
 
         const contractsBefore = await this.setupInitialState(
             scenario.initialState,
-            stateManager as DefaultStateManager
+            stateManager as MerkleStateManager
         );
 
         const keccakPreimages: KeccakPreimageMap = new Map();
@@ -122,7 +122,7 @@ export class TxRunner {
 
             const [trace, res, stateAfter] = await this.tracer.debugTx(tx, block, stateManager);
 
-            await (stateManager as DefaultStateManager).flush();
+            await (stateManager as MerkleStateManager).flush();
 
             const [gen, kill] = getContractGenKillSet(trace, res);
             set_add(contractsBefore, gen);
@@ -141,33 +141,33 @@ export class TxRunner {
 
     private async setupInitialState(
         initialState: InitialState,
-        state: DefaultStateManager
+        state: MerkleStateManager
     ): Promise<Set<PrefixedHexString>> {
         const initialContracts = new Set<PrefixedHexString>();
 
         await state.checkpoint();
 
         for (const addressStr of Object.keys(initialState.accounts)) {
-            const { nonce, balance, code, storage } = initialState.accounts[addressStr];
+            const { nonce, balance, code, storage } = initialState.accounts[addressStr as HexString];
 
-            const address = Address.fromString(addressStr);
+            const address = createAddressFromString(addressStr);
             const codeBuf = hexToBytes(code.slice(2));
 
-            const acct = new Account();
+            const acct = createAccount({
+                nonce: BigInt(nonce),
+                balance: BigInt(balance)
+            })
 
-            acct.nonce = BigInt(nonce);
-            acct.balance = BigInt(balance);
-
-            state.putAccount(address, acct);
+            await state.putAccount(address, acct);
 
             for (const [key, val] of Object.entries(storage)) {
                 const keyBuf = hexStrToBuf32(key.slice(2));
                 const valBuf = hexStrToBuf32(val.slice(2));
 
-                await state.putContractStorage(address, keyBuf, valBuf);
+                await state.putStorage(address, keyBuf, valBuf);
             }
 
-            await state.putContractCode(address, codeBuf);
+            await state.putCode(address, codeBuf);
 
             if (codeBuf.length > 0) {
                 initialContracts.add(address.toString());
@@ -182,30 +182,30 @@ export class TxRunner {
 
     async txDescToTx(
         step: TxDesc,
-        stateManager: EVMStateManagerInterface,
+        stateManager: StateManagerInterface,
         common: Common
     ): Promise<TypedTransaction> {
-        const senderAddress = Address.fromString(step.origin);
+        const senderAddress = createAddressFromString(step.origin);
         const senderAccount = await stateManager.getAccount(senderAddress);
         const senderNonce = senderAccount !== undefined ? senderAccount.nonce : 0;
 
         const txData: TypedTxData = {
-            value: step.value,
-            gasLimit: step.gasLimit,
+            value: hexToBigInt(step.value),
+            gasLimit: hexToBigInt(step.gasLimit),
             gasPrice: 8,
-            data: step.input,
+            data: hexToBytes(step.input),
             nonce: senderNonce
         };
 
         if (step.address !== ZERO_ADDRESS_STRING) {
-            txData.to = step.address;
+            txData.to = createAddressFromString(step.address);
         }
 
         return makeFakeTransaction(txData, step.origin, common);
     }
 
     private blockFromTxDesc(step: TxDesc, common: Common): Block {
-        return Block.fromBlockData(
+        return createBlock(
             {
                 header: {
                     coinbase: step.origin,
@@ -229,7 +229,7 @@ export class TxRunner {
         return this._results;
     }
 
-    getStateBeforeTx(tx: TypedTransaction): EVMStateManagerInterface {
+    getStateBeforeTx(tx: TypedTransaction): StateManagerInterface {
         const txHash = bytesToHex(tx.hash());
         const res = this._stateRootBeforeTx.get(txHash);
 
@@ -273,7 +273,7 @@ export class TxRunner {
         const preimages = this.getKeccakPreimagesBefore(tx);
 
         if (contracts === undefined) {
-            contracts = [...this.getContractsBefore(tx)].map(Address.fromString);
+            contracts = [...this.getContractsBefore(tx)].map(createAddressFromString);
         }
 
         return await decodeContractStates(this.artifactManager, contracts, state, preimages);
@@ -309,7 +309,7 @@ export class TxRunner {
         tx: TypedTransaction,
         tracer: BaseSolTxTracer<StepT, CtxT>,
         ctx: CtxT
-    ): Promise<[StepT[], FoundryTxResult, EVMStateManagerInterface, CtxT]> {
+    ): Promise<[StepT[], FoundryTxResult, StateManagerInterface, CtxT]> {
         const block = this.getBlock(tx);
         const stateBefore = this.getStateBeforeTx(tx);
 

@@ -39,7 +39,7 @@ import {
     uint248,
     uint8
 } from "../utils";
-import { Address, setLengthLeft } from "@ethereumjs/util";
+import { createAddressFromString, setLengthLeft } from "@ethereumjs/util";
 
 type StorageDesc = { [key: string]: string };
 
@@ -388,7 +388,7 @@ const samples: Array<[StorageDesc, number, number, ExpStructType, Value]> = [
                     ["b", 65535n],
                     ["c", 123456n],
                     ["d", true],
-                    ["e", Address.fromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")],
+                    ["e", createAddressFromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")],
                     ["b1", hexToBytes("0102")],
                     [
                         "b2",
@@ -405,7 +405,7 @@ const samples: Array<[StorageDesc, number, number, ExpStructType, Value]> = [
                     ["x", -1n],
                     ["y", 45678n],
                     ["b", true],
-                    ["addrs", Address.fromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")]
+                    ["addrs", createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")]
                 ])
             ],
             [
@@ -417,8 +417,8 @@ const samples: Array<[StorageDesc, number, number, ExpStructType, Value]> = [
                     [
                         "addrs",
                         [
-                            Address.fromString("0x0000000000000000000000000000000000000000"),
-                            Address.fromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
+                            createAddressFromString("0x0000000000000000000000000000000000000000"),
+                            createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
                         ]
                     ]
                 ])
@@ -435,7 +435,7 @@ const samples: Array<[StorageDesc, number, number, ExpStructType, Value]> = [
                             ["b", true],
                             [
                                 "addrs",
-                                Address.fromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
+                                createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
                             ]
                         ])
                     ],
@@ -454,7 +454,7 @@ const samples: Array<[StorageDesc, number, number, ExpStructType, Value]> = [
                             ["b", true],
                             [
                                 "addrs",
-                                Address.fromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
+                                createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
                             ]
                         ])
                     ],
@@ -474,10 +474,10 @@ const samples: Array<[StorageDesc, number, number, ExpStructType, Value]> = [
                             [
                                 "addrs",
                                 [
-                                    Address.fromString(
+                                    createAddressFromString(
                                         "0x0000000000000000000000000000000000000000"
                                     ),
-                                    Address.fromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
+                                    createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
                                 ]
                             ]
                         ])
@@ -499,10 +499,10 @@ const samples: Array<[StorageDesc, number, number, ExpStructType, Value]> = [
                                 [
                                     "addrs",
                                     [
-                                        Address.fromString(
+                                        createAddressFromString(
                                             "0x0000000000000000000000000000000000000000"
                                         ),
-                                        Address.fromString(
+                                        createAddressFromString(
                                             "0xcD6a42782d230D7c13A74ddec5dD140e55499Df9"
                                         )
                                     ]

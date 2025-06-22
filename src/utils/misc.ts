@@ -1,6 +1,6 @@
 import { Common } from "@ethereumjs/common";
-import { TransactionFactory, TypedTransaction, TypedTxData } from "@ethereumjs/tx";
-import { Address, setLengthLeft } from "@ethereumjs/util";
+import { createTx, TypedTransaction, TypedTxData } from "@ethereumjs/tx";
+import { Address, setLengthLeft, createAddressFromString } from "@ethereumjs/util";
 import { bytesToHex, hexToBytes } from "ethereum-cryptography/utils";
 import {
     AddressType,
@@ -22,7 +22,7 @@ import {
 } from "../debug/types";
 
 export const ZERO_ADDRESS_STRING: HexString = "0x0000000000000000000000000000000000000000";
-export const ZERO_ADDRESS = Address.fromString(ZERO_ADDRESS_STRING);
+export const ZERO_ADDRESS = createAddressFromString(ZERO_ADDRESS_STRING);
 
 export const ZERO_BYTES32 = new Uint8Array(32);
 
@@ -46,7 +46,7 @@ export function toHexString(n: number | bigint | Uint8Array, padding = 0): HexSt
         hex = hex.padStart(padding, "0");
     }
 
-    return "0x" + hex;
+    return `0x${hex}`;
 }
 
 export function bigIntToBuf(
@@ -81,8 +81,8 @@ export function makeFakeTransaction(
     from: string,
     common: Common
 ): TypedTransaction {
-    const fromAddr = Address.fromString(from);
-    const tx = TransactionFactory.fromTxData(txData, { common, freeze: false });
+    const fromAddr = createAddressFromString(from);
+    const tx = createTx(txData, { common, freeze: false });
 
     /**
      *  Intentionally override

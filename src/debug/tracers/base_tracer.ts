@@ -1,10 +1,10 @@
 import { Block } from "@ethereumjs/block";
-import { Blockchain } from "@ethereumjs/blockchain";
-import { Chain, Common, EVMStateManagerInterface, Hardfork } from "@ethereumjs/common";
-import { EVM, getOpcodesForHF, InterpreterStep } from "@ethereumjs/evm";
-import { DefaultStateManager } from "@ethereumjs/statemanager";
+import { createBlockchain } from "@ethereumjs/blockchain";
+import { Mainnet, Common, StateManagerInterface, Hardfork } from "@ethereumjs/common";
+import { createEVM, EVM, getOpcodesForHF, InterpreterStep } from "@ethereumjs/evm";
+import { MerkleStateManager } from "@ethereumjs/statemanager";
 import { TypedTransaction } from "@ethereumjs/tx";
-import { RunTxResult, VM } from "@ethereumjs/vm";
+import { createVM, runTx, RunTxResult, VM } from "@ethereumjs/vm";
 import { assert } from "solc-typed-ast";
 import { IArtifactManager } from "../artifact_manager";
 import {
@@ -62,7 +62,7 @@ export abstract class BaseSolTxTracer<TraceT, CtxT> {
     }
 
     private static async getEVM(opts: EVMOpts, foundryCheatcodes: boolean): Promise<EVM> {
-        const tmpEvm = await EVM.create(opts);
+        const tmpEvm = await createEVM(opts);
 
         if (!foundryCheatcodes) {
             return tmpEvm;
@@ -86,7 +86,7 @@ export abstract class BaseSolTxTracer<TraceT, CtxT> {
             ]
         };
 
-        const res = await EVM.create(optsCopy);
+        const res = await createEVM(optsCopy);
         foundryCtxMap.set(res, foundryCtx);
         return res;
     }
@@ -109,14 +109,14 @@ export abstract class BaseSolTxTracer<TraceT, CtxT> {
     }
 
     static async createVm(
-        stateManager: EVMStateManagerInterface | undefined,
+        stateManager: StateManagerInterface | undefined,
         foundryCheatcodes: boolean
     ): Promise<VM> {
-        const common = new Common({ chain: Chain.Mainnet, hardfork: Hardfork.Shanghai });
-        const blockchain = await Blockchain.create({ common });
+        const common = new Common({ chain: Mainnet, hardfork: Hardfork.Shanghai });
+        const blockchain = await createBlockchain({ common });
 
         if (!stateManager) {
-            stateManager = new DefaultStateManager();
+            stateManager = new MerkleStateManager();
         }
 
         const evm = await BaseSolTxTracer.getEVM(
@@ -124,7 +124,7 @@ export abstract class BaseSolTxTracer<TraceT, CtxT> {
             foundryCheatcodes
         );
 
-        const vm = await VM.create({
+        const vm = await createVM({
             common,
             blockchain,
             stateManager,
@@ -156,9 +156,9 @@ export abstract class BaseSolTxTracer<TraceT, CtxT> {
     async debugTx(
         tx: TypedTransaction,
         block: Block | undefined, // TODO: Make block required and add to processRawTraceStep
-        stateBefore: EVMStateManagerInterface,
+        stateBefore: StateManagerInterface,
         ctx: CtxT
-    ): Promise<[TraceT[], FoundryTxResult, EVMStateManagerInterface, CtxT]> {
+    ): Promise<[TraceT[], FoundryTxResult, StateManagerInterface, CtxT]> {
         const vm = await BaseSolTxTracer.createVm(
             stateBefore.shallowCopy(true),
             this.foundryCheatcodes
@@ -177,7 +177,7 @@ export abstract class BaseSolTxTracer<TraceT, CtxT> {
             next();
         });
 
-        const txRes = await vm.runTx({
+        const txRes = await runTx(vm, {
             tx,
             block,
             skipBalance: true,
@@ -207,8 +207,8 @@ export abstract class MapOnlyTracer<TraceT> extends BaseSolTxTracer<TraceT, null
     async debugTx(
         tx: TypedTransaction,
         block: Block | undefined,
-        stateBefore: EVMStateManagerInterface
-    ): Promise<[TraceT[], FoundryTxResult, EVMStateManagerInterface, null]> {
+        stateBefore: StateManagerInterface
+    ): Promise<[TraceT[], FoundryTxResult, StateManagerInterface, null]> {
         return super.debugTx(tx, block, stateBefore, null);
     }
 }

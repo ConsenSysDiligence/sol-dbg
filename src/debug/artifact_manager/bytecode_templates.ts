@@ -30,7 +30,7 @@ export function makeTemplate(artifact: PartialBytecodeDescription): BytecodeTemp
     skipRanges.sort();
 
     return {
-        object: hexToBytes("0x" + artifact.object),
+        object: hexToBytes(`0x${artifact.object}`),
         skipRanges
     };
 }
