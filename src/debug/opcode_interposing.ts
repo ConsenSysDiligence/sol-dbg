@@ -99,7 +99,7 @@ export function foundryInterposedOps(opcodes: any, foundryCtx: FoundryContext): 
 
                 if (
                     common.isActivatedEIP(3860) &&
-                    length > Number(common.param("vm", "maxInitCodeSize")) &&
+                    length > Number(common.param("maxInitCodeSize")) &&
                     !runState.interpreter._evm.allowUnlimitedInitCodeSize
                 ) {
                     trap(ERROR.INITCODE_SIZE_VIOLATION);
@@ -131,7 +131,7 @@ export function foundryInterposedOps(opcodes: any, foundryCtx: FoundryContext): 
 
                 if (
                     common.isActivatedEIP(3860) &&
-                    length > Number(common.param("vm", "maxInitCodeSize")) &&
+                    length > Number(common.param("maxInitCodeSize")) &&
                     !runState.interpreter._evm.allowUnlimitedInitCodeSize
                 ) {
                     trap(ERROR.INITCODE_SIZE_VIOLATION);

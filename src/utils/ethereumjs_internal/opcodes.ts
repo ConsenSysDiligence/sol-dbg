@@ -1,4 +1,4 @@
-import { EvmError } from "@ethereumjs/evm";
+import { EVMError } from "@ethereumjs/evm";
 import {
     Address,
     BIGINT_0,
@@ -22,7 +22,7 @@ import {
  */
 export function trap(err: string): never {
     // TODO: facilitate extra data along with errors
-    throw new EvmError(err as any);
+    throw new EVMError(err as any);
 }
 
 /**

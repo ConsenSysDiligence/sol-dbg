@@ -1,4 +1,4 @@
-import { Address } from "@ethereumjs/util";
+import { Address, createAddressFromString } from "@ethereumjs/util";
 import { bytesToHex } from "ethereum-cryptography/utils";
 import expect from "expect";
 import fse from "fs-extra";
@@ -116,8 +116,7 @@ export function stackTracesEq(actualST: string, expectedST: string[]): boolean {
 
     if (actualSTLines.length !== expectedST.length) {
         console.error(
-            `Traces have different number of lines. Expected(${
-                expectedST.length
+            `Traces have different number of lines. Expected(${expectedST.length
             }): \n ${expectedST.join("\n")} \n Actual(${actualSTLines.length}): \n ${actualST}`
         );
 
@@ -369,9 +368,9 @@ describe("Local tests", () => {
                                 const tx = runner.txs[i];
                                 const stateBefore = runner.getStateBeforeTx(tx);
 
-                                const addr = Address.fromString(curStep.address);
+                                const addr = createAddressFromString(curStep.address);
 
-                                const code = await stateBefore.getContractCode(addr);
+                                const code = await stateBefore.getCode(addr);
                                 expect(code.length).toBeGreaterThan(0);
 
                                 const info = artifactManager.getContractFromDeployedBytecode(code);

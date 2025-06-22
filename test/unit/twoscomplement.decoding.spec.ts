@@ -1,4 +1,3 @@
-import { bytesToHex } from "ethereum-cryptography/utils";
 import { IntMemView } from "../../src/debug/decoding/memory/view";
 import { encodeBigintInBigEndianBuf, uint256 } from "../../src/utils"
 import { int256 } from "../utils"
@@ -26,7 +25,6 @@ describe(`Twos complement tests`, () => {
     it("Roundtrip decoding", () => {
         for (const n of samples) {
             encodeBigintInBigEndianBuf(n, buf, 32);
-            console.error(bytesToHex(buf))
             const x = (n < 0 ? intView : uintView).decode(buf);
             expect(x).toEqual(n);
         }

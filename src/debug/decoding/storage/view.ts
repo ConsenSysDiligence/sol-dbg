@@ -30,7 +30,7 @@ import {
     ZERO_BYTES32
 } from "../../../utils";
 import { keccak256 } from "ethereum-cryptography/keccak";
-import { Address, bytesToUtf8, setLengthRight } from "@ethereumjs/util";
+import { Address, bytesToUtf8 } from "@ethereumjs/util";
 import { ExpStructType, MissingType } from "../exp_types";
 import { MapKeys } from "../../tracers";
 import { makeMemoryView } from "../memory";
@@ -575,9 +575,8 @@ export abstract class PackedArrayStorageView<
     }
 
     encodeBytesAt(bytes: Uint8Array, slot: bigint, state: Storage): Storage {
-        let w = this.fetchWord(slot, state);
-
         if (bytes.length < 32) {
+            const w = this.fetchWord(slot, state);
             w[31] = 2 * bytes.length;
             w.set(bytes, 0)
             return this.setWord(slot, w, state);
@@ -587,9 +586,14 @@ export abstract class PackedArrayStorageView<
         let addr = keccakOfAddr(this.key);
         let srcOff = 0;
         while (srcOff < bytes.length) {
-            let w = bytes.slice(srcOff, min(srcOff + 32, bytes.length));
-            if (w.length < 32) {
-                w = setLengthRight(w, 32)
+            let end = min(srcOff + 32, bytes.length);
+            let w: Uint8Array;
+
+            if (end - srcOff === 32) {
+                w = bytes.slice(srcOff, end);
+            } else {
+                w = this.fetchWord(addr, s);
+                w.set(bytes.slice(srcOff, end));
             }
 
             s = this.setWord(addr, w, s);

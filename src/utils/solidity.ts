@@ -7,6 +7,10 @@ export function findReceiveFun(
     contract: sol.ContractDefinition
 ): sol.FunctionDefinition | undefined {
     for (const base of contract.vLinearizedBaseContracts) {
+        if (base === undefined) {
+            continue;
+        }
+
         for (const fun of base.vFunctions) {
             if (fun.kind === sol.FunctionKind.Receive) {
                 return fun;
@@ -24,6 +28,10 @@ export function findFallbackFun(
     contract: sol.ContractDefinition
 ): sol.FunctionDefinition | undefined {
     for (const base of contract.vLinearizedBaseContracts) {
+        if (base === undefined) {
+            continue;
+        }
+
         for (const fun of base.vFunctions) {
             if (fun.kind === sol.FunctionKind.Fallback) {
                 return fun;

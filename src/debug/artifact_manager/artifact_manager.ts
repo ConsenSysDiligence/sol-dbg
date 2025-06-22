@@ -44,7 +44,7 @@ export interface IArtifactManager {
         selector: HexString | Uint8Array
     ): [ContractInfo, FunctionDefinition | VariableDeclaration] | undefined;
     findEntryPoint(
-        data: HexString | Uint8Array,
+        data: Uint8Array,
         contract: ContractInfo
     ): FunctionDefinition | VariableDeclaration | undefined;
     getEventDefInfo(topic: bigint | Uint8Array | EventDesc): EventDefInfo | undefined;
@@ -403,7 +403,7 @@ export class ArtifactManager implements IArtifactManager {
         info?: ContractInfo
     ): [ContractInfo, FunctionDefinition | VariableDeclaration] | undefined {
         if (selector instanceof Uint8Array) {
-            selector = bytesToHex(selector);
+            selector = `0x${bytesToHex(selector)}`;
         }
 
         for (const contract of info ? [info] : this._contracts) {
@@ -443,7 +443,7 @@ export class ArtifactManager implements IArtifactManager {
      *      - normal function match
      */
     findEntryPoint(
-        data: HexString | Uint8Array,
+        data: Uint8Array,
         info: ContractInfo
     ): FunctionDefinition | VariableDeclaration | undefined {
         const contract = info.ast;
@@ -465,8 +465,7 @@ export class ArtifactManager implements IArtifactManager {
             return findFallbackFun(contract);
         }
 
-        const selector = data instanceof Uint8Array ? data.slice(0, 4) : data.slice(0, 8);
-        const strSelector = typeof selector === "string" ? selector : bytesToHex(selector);
+        const strSelector: UnprefixedHexString = bytesToHex(data.slice(0, 4));
         const infer = this.infer(info.artifact.compilerVersion);
 
         for (const base of contract.vLinearizedBaseContracts) {

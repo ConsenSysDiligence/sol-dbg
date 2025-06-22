@@ -53,7 +53,7 @@ import {
 } from "../utils";
 import fse from "fs-extra";
 import { ppType, TypeGenerator } from "../utils/misc";
-import { Address, setLengthLeft } from "@ethereumjs/util";
+import { createAddressFromString, setLengthLeft } from "@ethereumjs/util";
 
 type StorageDesc = { [key: string]: string };
 
@@ -397,7 +397,7 @@ const samples: Array<[StorageDesc, number, number, TypeNode | TypeGenerator, Val
         0,
         22,
         address,
-        Address.fromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
+        createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
     ],
     [simpleStorDesc, 0, 2, bool, false],
     [simpleStorDesc, 1, 32, bytes5, hexToBytes("0405060708")],
@@ -454,7 +454,7 @@ const samples: Array<[StorageDesc, number, number, TypeNode | TypeGenerator, Val
                     ["b", 65535n],
                     ["c", 123456n],
                     ["d", true],
-                    ["e", Address.fromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")],
+                    ["e", createAddressFromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")],
                     ["b1", hexToBytes("0102")],
                     [
                         "b2",
@@ -471,7 +471,7 @@ const samples: Array<[StorageDesc, number, number, TypeNode | TypeGenerator, Val
                     ["x", -1n],
                     ["y", 45678n],
                     ["b", true],
-                    ["addrs", Address.fromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")]
+                    ["addrs", createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")]
                 ])
             ],
             [
@@ -483,8 +483,8 @@ const samples: Array<[StorageDesc, number, number, TypeNode | TypeGenerator, Val
                     [
                         "addrs",
                         [
-                            Address.fromString("0x0000000000000000000000000000000000000000"),
-                            Address.fromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
+                            createAddressFromString("0x0000000000000000000000000000000000000000"),
+                            createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
                         ]
                     ]
                 ])
@@ -501,7 +501,7 @@ const samples: Array<[StorageDesc, number, number, TypeNode | TypeGenerator, Val
                             ["b", true],
                             [
                                 "addrs",
-                                Address.fromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
+                                createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
                             ]
                         ])
                     ],
@@ -520,7 +520,7 @@ const samples: Array<[StorageDesc, number, number, TypeNode | TypeGenerator, Val
                             ["b", true],
                             [
                                 "addrs",
-                                Address.fromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
+                                createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
                             ]
                         ])
                     ],
@@ -540,10 +540,10 @@ const samples: Array<[StorageDesc, number, number, TypeNode | TypeGenerator, Val
                             [
                                 "addrs",
                                 [
-                                    Address.fromString(
+                                    createAddressFromString(
                                         "0x0000000000000000000000000000000000000000"
                                     ),
-                                    Address.fromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
+                                    createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
                                 ]
                             ]
                         ])
@@ -565,10 +565,10 @@ const samples: Array<[StorageDesc, number, number, TypeNode | TypeGenerator, Val
                                 [
                                     "addrs",
                                     [
-                                        Address.fromString(
+                                        createAddressFromString(
                                             "0x0000000000000000000000000000000000000000"
                                         ),
-                                        Address.fromString(
+                                        createAddressFromString(
                                             "0xcD6a42782d230D7c13A74ddec5dD140e55499Df9"
                                         )
                                     ]

@@ -1,6 +1,6 @@
 import { InterpreterStep } from "@ethereumjs/evm";
 import { TypedTransaction } from "@ethereumjs/tx";
-import { Address } from "@ethereumjs/util";
+import { createAddressFromString } from "@ethereumjs/util";
 import { VM } from "@ethereumjs/vm";
 import { ContractStates, decodeContractStates } from "../layout";
 import { BaseSolTxTracer } from "./base_tracer";
@@ -87,7 +87,7 @@ export class StorageDecodeTracer extends BaseSolTxTracer<
         const state = vm.stateManager;
         const decodedStorage: ContractStates = await decodeContractStates(
             this.artifactManager,
-            [...ctx.liveContracts].map(Address.fromString),
+            [...ctx.liveContracts].map(createAddressFromString),
             state,
             ctx.preimages
         );
