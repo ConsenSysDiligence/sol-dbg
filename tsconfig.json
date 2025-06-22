@@ -7,7 +7,9 @@
         "sourceMap": true,
         "outDir": "dist",
         "removeComments": false,
-
+        "lib": [
+            "ES2024"
+        ],
         "strict": true,
         "noImplicitAny": true,
         "strictNullChecks": true,
@@ -16,15 +18,14 @@
         "strictPropertyInitialization": true,
         "noImplicitThis": true,
         "alwaysStrict": true,
-
         "noUnusedLocals": true,
         "noImplicitReturns": true,
-
         "esModuleInterop": true,
         "forceConsistentCasingInFileNames": true,
         "resolveJsonModule": true
     },
-
-    "include": ["src/**/*"],
-    "exclude": [ ]
+    "include": [
+        "src/**/*"
+    ],
+    "exclude": []
 }
