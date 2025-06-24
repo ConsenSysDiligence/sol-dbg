@@ -1,30 +1,21 @@
 import expect from "expect";
 import {
     ArrayType,
-    assert,
-    ASTReader,
     BytesType,
-    compileSourceString,
-    ContractDefinition,
     DataLocation,
-    InferType,
     MappingType,
     PointerType,
-    SourceUnit,
     StringType,
-    TypeNode,
-    XPath
+    TypeNode
 } from "solc-typed-ast";
 import { hasPoison, Struct, Value } from "../../src/debug/decoding/value";
-import { hexToBytes } from "ethereum-cryptography/utils";
+import { bytesToHex, hexToBytes } from "ethereum-cryptography/utils";
 import {
     bigEndianBufToBigint,
     ExpStructType,
-    getContractLayoutType,
     ImmMap,
     makeStorageView,
     MapKeys,
-    single,
     Storage,
     uint256
 } from "../../src";
@@ -48,11 +39,8 @@ import {
     uint144,
     uint16,
     uint248,
-    uint64,
     uint8
 } from "../utils";
-import fse from "fs-extra";
-import { ppType, TypeGenerator } from "../utils/misc";
 import { createAddressFromString, setLengthLeft } from "@ethereumjs/util";
 
 type StorageDesc = { [key: string]: string };
@@ -66,14 +54,14 @@ function toStorage(s: StorageDesc): Storage {
     );
 }
 
-const simpleStorDesc = {
+export const simpleStorDesc = {
     "0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563":
         "0xcd6a42782d230d7c13a74ddec5dd140e55499df90180000000000001e240",
     "0x405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5ace": "0x4342",
     "0xb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6": "0x0405060708",
     "0xc2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85b": "0x44"
 };
-const CStorDesc = {
+export const CStorDesc = {
     "0x028b9bace4e6c7d3310bd31a6a3810bcc4ffceb5c4e4242dbb19dacc27a59f72": "0x02",
     "0x11c44e4875b74d31ff9fd779bf2566af7bd15b87fc985d01f5094b89e3669e4f": "0x04",
     "0x37fa166cbdbfbb1561ccd9ea985ec0218b5e68502e230525f544285b2bdf3d7e": "0x010000000d",
@@ -87,7 +75,7 @@ const CStorDesc = {
     "0xc9b370bcd3a6b8dd1220b7a7faea196be095b68db0e96af1b734f26b58075de4": "0x04030201",
     "0xde857217eaef9a2f6b2dade6c3e435fdb07f23d3e6a6109ea1626de7e649c81a": "0x0100000001"
 };
-const moreStructsStorDesc = {
+export const moreStructsStorDesc = {
     "0x0175b7a638427703f0dbe7bb9bbf987a2551717b34e79f33b5b1008d1fa01db9": "0x02",
     "0x02c1acb1a5666d7e1b67652ace0fcd5a29681aed81ffbc4cf16cfeaa3c83369a": "0x02",
     "0x036b6384b5eca791c62761152d0c79bb0604c104a5fb6f4eb0703f3154bb3db0": "0xff",
@@ -140,7 +128,7 @@ const moreStructsStorDesc = {
     "0xf3f7a9fe364faab93b216da50a3214154f22a0a2b415b23a84c8169e8b636ee3": "0xff",
     "0xf652222313e28459528d920b65115c16c04f3efc82aaedc97be59f3f377c0d3f": "0xb26e"
 };
-const bytesStorDesc = {
+export const bytesStorDesc = {
     "0x1ab0c6948a275349ae45a06aad66a8bd65ac18074615d53676c09b67809099e0":
         "0x0102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f",
     "0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563":
@@ -158,7 +146,7 @@ const bytesStorDesc = {
         "0x616161616161616161616161616161616161616161616161616161616161613e"
 };
 
-const miscStorDesc = {
+export const miscStorDesc = {
     "0x0175b7a638427703f0dbe7bb9bbf987a2551717b34e79f33b5b1008d1fa01db9":
         "0x04000000000000000000000000000003",
     "0x036b6384b5eca791c62761152d0c79bb0604c104a5fb6f4eb0703f3154bb3db0": "0x02",
@@ -199,19 +187,19 @@ const miscStorDesc = {
         "0x02000000000000000000000000000001",
     "0xf652222313e28459528d920b65115c16c04f3efc82aaedc97be59f3f377c0d3f": "0x03"
 };
-const mapWithComplexKeysStorDesc = {
+export const mapWithComplexKeysStorDesc = {
     "0x134266f27b803cd76c24f211c4457379daae4fac618eaef4ab979796508e0c3e": "0x03",
     "0x6b561827e89dd864e82f1287442a6f56c5408b1313c5133c7dacd8fed2fbd375": "0x04",
     "0xcb85c6f413feb024aaf9fe6ef133f21422160ad679b1000921a475400fde1ef5": "0x02",
     "0xe2fe0e2425d2aed896ad86c3e2c0ea7d679d08e1a849442d22f76adef98bbd97": "0x01"
 };
 
-const uint8x2 = new PointerType(new ArrayType(uint8, 2n), DataLocation.Storage);
-const S = new ExpStructType("S", [
+export const uint8x2 = new PointerType(new ArrayType(uint8, 2n), DataLocation.Storage);
+export const S = new ExpStructType("S", [
     ["x", int32],
     ["y", bool]
 ]);
-const CLayoutType = new ExpStructType(
+export const CLayoutType = new ExpStructType(
     "C",
     [
         ["a", uint256],
@@ -235,7 +223,7 @@ const CLayoutType = new ExpStructType(
     undefined
 );
 
-const SimpleTypes = new ExpStructType("MoreStructs.SimpleTypes", [
+export const SimpleTypes = new ExpStructType("MoreStructs.SimpleTypes", [
     ["a", int8],
     ["b", uint16],
     ["c", uint256],
@@ -245,34 +233,34 @@ const SimpleTypes = new ExpStructType("MoreStructs.SimpleTypes", [
     ["b2", bytes32],
     ["en", uint8]
 ]);
-const S_static = new ExpStructType("MoreStructs.S_static", [
+export const S_static = new ExpStructType("MoreStructs.S_static", [
     ["x", int8],
     ["y", uint256],
     ["b", bool],
     ["addrs", address]
 ]);
-const S1 = new ExpStructType("MoreStructs.S1", [
+export const S1 = new ExpStructType("MoreStructs.S1", [
     ["x", int8],
     ["y", uint256],
     ["b", bool],
     ["addrs", new PointerType(new ArrayType(address), DataLocation.Storage)]
 ]);
-const S_nested_static_static = new ExpStructType("MoreStructs.S_nested_static_static", [
+export const S_nested_static_static = new ExpStructType("MoreStructs.S_nested_static_static", [
     ["t", int16],
     ["s", new PointerType(S_static, DataLocation.Storage)],
     ["b", bytes3]
 ]);
-const S_nested_dynamic_static = new ExpStructType("MoreStructs.S_nested_dynamic_static", [
+export const S_nested_dynamic_static = new ExpStructType("MoreStructs.S_nested_dynamic_static", [
     ["t", new PointerType(new ArrayType(int16), DataLocation.Storage)],
     ["s", new PointerType(S_static, DataLocation.Storage)],
     ["b", bytes3]
 ]);
-const S_nested_static_dynamic = new ExpStructType("MoreStructs.S_nested_static_dynamic", [
+export const S_nested_static_dynamic = new ExpStructType("MoreStructs.S_nested_static_dynamic", [
     ["t", int16],
     ["s", new PointerType(S1, DataLocation.Storage)],
     ["b", bytes3]
 ]);
-const S_struct_arr = new ExpStructType("MoreStructs.S_struct_arr", [
+export const S_struct_arr = new ExpStructType("MoreStructs.S_struct_arr", [
     ["x", int8],
     [
         "sArr",
@@ -282,12 +270,12 @@ const S_struct_arr = new ExpStructType("MoreStructs.S_struct_arr", [
         )
     ]
 ]);
-const ArrTypes = new ExpStructType("MoreStructs.ArrTypes", [
+export const ArrTypes = new ExpStructType("MoreStructs.ArrTypes", [
     ["a1", new PointerType(new ArrayType(uint16), DataLocation.Storage)],
     ["a2", new PointerType(new ArrayType(int128, 4n), DataLocation.Storage)]
 ]);
 
-const MoreStructsLayoutType = new ExpStructType("MoreStructs", [
+export const MoreStructsLayoutType = new ExpStructType("MoreStructs", [
     ["st", new PointerType(SimpleTypes, DataLocation.Storage)],
     ["s_static", new PointerType(S_static, DataLocation.Storage)],
     ["s1", new PointerType(S1, DataLocation.Storage)],
@@ -297,38 +285,38 @@ const MoreStructsLayoutType = new ExpStructType("MoreStructs", [
     ["s_struct_arr", new PointerType(S_struct_arr, DataLocation.Storage)],
     ["at", new PointerType(ArrTypes, DataLocation.Storage)]
 ]);
-const bytesLayoutType = new ExpStructType("Bytes", [
+export const bytesLayoutType = new ExpStructType("Bytes", [
     ["smallB", new PointerType(new BytesType(), DataLocation.Storage)],
     ["bigB", new PointerType(new BytesType(), DataLocation.Storage)],
     ["biggerB", new PointerType(new BytesType(), DataLocation.Storage)],
     ["smallS", new PointerType(new StringType(), DataLocation.Storage)],
     ["bigS", new PointerType(new StringType(), DataLocation.Storage)]
 ]);
-const SmallerThanWordType = new ExpStructType("Misc.SmallerThanWord", [
+export const SmallerThanWordType = new ExpStructType("Misc.SmallerThanWord", [
     ["a", uint120],
     ["b", uint112]
 ]);
-const OneWordType = new ExpStructType("Misc.OneWord", [
+export const OneWordType = new ExpStructType("Misc.OneWord", [
     ["a", uint120],
     ["b", uint136]
 ]);
-const MoreThanOneWordType = new ExpStructType("Misc.MoreThanOneWord", [
+export const MoreThanOneWordType = new ExpStructType("Misc.MoreThanOneWord", [
     ["a", uint120],
     ["b", uint144]
 ]);
-const ThreeWordsType = new ExpStructType("Misc.ThreeWords", [
+export const ThreeWordsType = new ExpStructType("Misc.ThreeWords", [
     ["a", uint120],
     ["c", uint248],
     ["b", uint144]
 ]);
-const FourWordsType = new ExpStructType("Misc.FourWords", [
+export const FourWordsType = new ExpStructType("Misc.FourWords", [
     ["a", uint120],
     ["c", uint256],
     ["d", uint248],
     ["b", uint144]
 ]);
 
-const miscLayoutType = new ExpStructType("Misc", [
+export const miscLayoutType = new ExpStructType("Misc", [
     [
         "x",
         new PointerType(
@@ -388,59 +376,7 @@ const miscLayoutType = new ExpStructType("Misc", [
     ["v", uint256]
 ]);
 
-const samples: Array<[StorageDesc, number, number, TypeNode | TypeGenerator, Value]> = [
-    [simpleStorDesc, 0, 32, uint64, 123456n],
-    [simpleStorDesc, 0, 24, int8, -128n],
-    [simpleStorDesc, 0, 23, bool, true],
-    [
-        simpleStorDesc,
-        0,
-        22,
-        address,
-        createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
-    ],
-    [simpleStorDesc, 0, 2, bool, false],
-    [simpleStorDesc, 1, 32, bytes5, hexToBytes("0405060708")],
-    [simpleStorDesc, 2, 32, uint8x2, [0x42n, 0x43n]],
-    [simpleStorDesc, 3, 32, uint8, 0x44n],
-    [CStorDesc, 42, 32, uint256, 5678n],
-    [
-        CStorDesc,
-        42,
-        32,
-        CLayoutType,
-        new Struct([
-            ["a", 5678n],
-            ["e", [1n, 2n, 3n, 4n]],
-            ["f", new Map()],
-            ["g", 34n],
-            ["h", 45n],
-            [
-                "s",
-                new Struct([
-                    ["x", 13n],
-                    ["y", true]
-                ])
-            ],
-            ["k", -127n],
-            ["l", hexToBytes("00000000000000000000000000000000000000002a")],
-            ["m", [1n, 2n, 3n, 4n, 5n, 6n, 7n, 8n, 9n, 10n, 0n, 0n]],
-            [
-                "n",
-                [
-                    hexToBytes("0000000000"),
-                    hexToBytes("0000000000"),
-                    hexToBytes("0000000000"),
-                    hexToBytes("0000000000"),
-                    hexToBytes("0000000023"),
-                    hexToBytes("0000000000"),
-                    hexToBytes("0000000000"),
-                    hexToBytes("0000000000")
-                ]
-            ],
-            ["o", hexToBytes("0000000035")]
-        ])
-    ],
+const samples: Array<[StorageDesc, number, number, ExpStructType, Value]> = [
     [
         moreStructsStorDesc,
         0,
@@ -723,43 +659,458 @@ const samples: Array<[StorageDesc, number, number, TypeNode | TypeGenerator, Val
             ],
             ["v", 101n]
         ])
+    ],
+    [
+        CStorDesc,
+        42,
+        32,
+        CLayoutType,
+        new Struct([
+            ["a", 5678n],
+            ["e", [1n, 2n, 3n, 4n]],
+            [
+                "f",
+                new Map([
+                    [
+                        0n,
+                        new Struct([
+                            ["x", 1n],
+                            ["y", true]
+                        ])
+                    ],
+                    [
+                        1n,
+                        new Struct([
+                            ["x", 2n],
+                            ["y", false]
+                        ])
+                    ]
+                ])
+            ],
+            ["g", 34n],
+            ["h", 45n],
+            [
+                "s",
+                new Struct([
+                    ["x", 13n],
+                    ["y", true]
+                ])
+            ],
+            ["k", -127n],
+            ["l", hexToBytes("00000000000000000000000000000000000000002a")],
+            ["m", [1n, 2n, 3n, 4n, 5n, 6n, 7n, 8n, 9n, 10n, 0n, 0n]],
+            [
+                "n",
+                [
+                    hexToBytes("0000000000"),
+                    hexToBytes("0000000000"),
+                    hexToBytes("0000000000"),
+                    hexToBytes("0000000000"),
+                    hexToBytes("0000000023"),
+                    hexToBytes("0000000000"),
+                    hexToBytes("0000000000"),
+                    hexToBytes("0000000000")
+                ]
+            ],
+            ["o", hexToBytes("0000000035")]
+        ])
     ]
 ];
 
-let unit: SourceUnit;
-const infer = new InferType("0.8.21");
+function ppStorage(s: Storage): string {
+    const lines: string[] = [];
 
-beforeAll(async () => {
-    const file = fse.readFileSync("test/samples/decoding/storage_views_test.sol", {
-        encoding: "utf-8"
-    });
-    const compileResult = await compileSourceString(
-        "storage_views_test.sol",
-        file,
-        "0.8.29",
-        undefined,
-        undefined,
-        { viaIR: true }
-    );
-    const reader = new ASTReader();
-    unit = single(reader.read(compileResult.data));
-});
-
-describe(`Storage Decoding Tests`, () => {
-    for (const [storageDesc, key, offset, typeDesc, expectedValue] of samples) {
-        const storage = toStorage(storageDesc);
-
-        it(`Sample ${ppType(typeDesc)}`, () => {
-            const type = typeDesc instanceof TypeNode ? typeDesc : typeDesc(unit);
-            const view = makeStorageView(type, [BigInt(key), offset]);
-            const value = view.decode(storage);
-            expect(hasPoison(value)).toBeFalsy();
-            expect(value).toEqual(expectedValue);
-        });
+    for (const [k, v] of s.entries()) {
+        lines.push(`${k}: ${bytesToHex(v)}`);
     }
 
-    it(`Map decoding with simple keys`, () => {
-        const mapKeys: MapKeys = new Map([
+    lines.sort();
+    return `{\n${lines.join(",\n")}\n}`;
+}
+
+describe(`Storage Encoding Tests`, () => {
+    for (const [expectedStorageDesc, key, offset, type, value] of samples) {
+        const expStorage = toStorage(expectedStorageDesc);
+
+        it(`Sample ${type.name} `, () => {
+            const view = makeStorageView(type, [BigInt(key), offset]);
+            const initialStorage = ImmMap.fromEntries<bigint, Uint8Array>([]);
+            const actualStorage = view.encode(value, initialStorage);
+            expect(ppStorage(actualStorage)).toEqual(ppStorage(expStorage));
+        });
+    }
+});
+
+const rttSamples: Array<[TypeNode, Value, bigint, MapKeys | undefined]> = [
+    [
+        MoreStructsLayoutType,
+        new Struct([
+            [
+                "st",
+                new Struct([
+                    ["a", -1n],
+                    ["b", 65535n],
+                    ["c", 123456n],
+                    ["d", true],
+                    ["e", createAddressFromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")],
+                    ["b1", hexToBytes("0102")],
+                    [
+                        "b2",
+                        hexToBytes(
+                            "0000000000000000000000000000000000000000000000000000000000abcdef"
+                        )
+                    ],
+                    ["en", 1n]
+                ])
+            ],
+            [
+                "s_static",
+                new Struct([
+                    ["x", -1n],
+                    ["y", 45678n],
+                    ["b", true],
+                    ["addrs", createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")]
+                ])
+            ],
+            [
+                "s1",
+                new Struct([
+                    ["x", -1n],
+                    ["y", 45678n],
+                    ["b", true],
+                    [
+                        "addrs",
+                        [
+                            createAddressFromString("0x0000000000000000000000000000000000000000"),
+                            createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
+                        ]
+                    ]
+                ])
+            ],
+            [
+                "s_nested_static_static",
+                new Struct([
+                    ["t", -1n],
+                    [
+                        "s",
+                        new Struct([
+                            ["x", -1n],
+                            ["y", 45678n],
+                            ["b", true],
+                            [
+                                "addrs",
+                                createAddressFromString(
+                                    "0xcD6a42782d230D7c13A74ddec5dD140e55499Df9"
+                                )
+                            ]
+                        ])
+                    ],
+                    ["b", hexToBytes("040506")]
+                ])
+            ],
+            [
+                "s_nested_dynamic_static",
+                new Struct([
+                    ["t", []],
+                    [
+                        "s",
+                        new Struct([
+                            ["x", -1n],
+                            ["y", 45678n],
+                            ["b", true],
+                            [
+                                "addrs",
+                                createAddressFromString(
+                                    "0xcD6a42782d230D7c13A74ddec5dD140e55499Df9"
+                                )
+                            ]
+                        ])
+                    ],
+                    ["b", hexToBytes("070809")]
+                ])
+            ],
+            [
+                "s_nested_static_dynamic",
+                new Struct([
+                    ["t", -1234n],
+                    [
+                        "s",
+                        new Struct([
+                            ["x", -1n],
+                            ["y", 45678n],
+                            ["b", true],
+                            [
+                                "addrs",
+                                [
+                                    createAddressFromString(
+                                        "0x0000000000000000000000000000000000000000"
+                                    ),
+                                    createAddressFromString(
+                                        "0xcD6a42782d230D7c13A74ddec5dD140e55499Df9"
+                                    )
+                                ]
+                            ]
+                        ])
+                    ],
+                    ["b", hexToBytes("020304")]
+                ])
+            ],
+            [
+                "s_struct_arr",
+                new Struct([
+                    ["x", -128n],
+                    [
+                        "sArr",
+                        [
+                            new Struct([
+                                ["x", -1n],
+                                ["y", 45678n],
+                                ["b", true],
+                                [
+                                    "addrs",
+                                    [
+                                        createAddressFromString(
+                                            "0x0000000000000000000000000000000000000000"
+                                        ),
+                                        createAddressFromString(
+                                            "0xcD6a42782d230D7c13A74ddec5dD140e55499Df9"
+                                        )
+                                    ]
+                                ]
+                            ]),
+                            new Struct([
+                                ["x", -2n],
+                                ["y", 45679n],
+                                ["b", false],
+                                ["addrs", []]
+                            ])
+                        ]
+                    ]
+                ])
+            ],
+            [
+                "at",
+                new Struct([
+                    ["a1", [12n, 13n, 14n]],
+                    ["a2", [-1n, -2n, -3n, -4n]]
+                ])
+            ]
+        ]),
+        0n,
+        undefined
+    ],
+    [
+        bytesLayoutType,
+        new Struct([
+            [
+                "smallB",
+                hexToBytes("000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e")
+            ],
+            [
+                "bigB",
+                hexToBytes("000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f")
+            ],
+            [
+                "biggerB",
+                hexToBytes(
+                    "000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f"
+                )
+            ],
+            ["smallS", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
+            ["bigS", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]
+        ]),
+        0n,
+        undefined
+    ],
+    [
+        miscLayoutType,
+        new Struct([
+            [
+                "x",
+                [
+                    [1n, 2n],
+                    [3n, 4n]
+                ]
+            ],
+            [
+                "y",
+                [
+                    [1n, 2n],
+                    [3n, 4n]
+                ]
+            ],
+            [
+                "z",
+                [
+                    [1n, 2n],
+                    [3n, 4n]
+                ]
+            ],
+            [
+                "p",
+                [
+                    new Struct([
+                        ["a", 1n],
+                        ["b", 2n]
+                    ]),
+                    new Struct([
+                        ["a", 3n],
+                        ["b", 4n]
+                    ])
+                ]
+            ],
+            [
+                "q",
+                [
+                    new Struct([
+                        ["a", 1n],
+                        ["b", 2n]
+                    ]),
+                    new Struct([
+                        ["a", 3n],
+                        ["b", 4n]
+                    ])
+                ]
+            ],
+            [
+                "r",
+                [
+                    new Struct([
+                        ["a", 1n],
+                        ["b", 2n]
+                    ]),
+                    new Struct([
+                        ["a", 3n],
+                        ["b", 4n]
+                    ])
+                ]
+            ],
+            [
+                "s",
+                [
+                    new Struct([
+                        ["a", 1n],
+                        ["c", 2n],
+                        ["b", 3n]
+                    ]),
+                    new Struct([
+                        ["a", 4n],
+                        ["c", 5n],
+                        ["b", 6n]
+                    ])
+                ]
+            ],
+            [
+                "t",
+                [
+                    new Struct([
+                        ["a", 1n],
+                        ["c", 2n],
+                        ["d", 3n],
+                        ["b", 4n]
+                    ]),
+                    new Struct([
+                        ["a", 5n],
+                        ["c", 6n],
+                        ["d", 7n],
+                        ["b", 8n]
+                    ])
+                ]
+            ],
+            ["v", 101n]
+        ]),
+        0n,
+        undefined
+    ],
+    [
+        CLayoutType,
+        new Struct([
+            ["a", 5678n],
+            ["e", [1n, 2n, 3n, 4n]],
+            ["f", new Map()],
+            ["g", 34n],
+            ["h", 45n],
+            [
+                "s",
+                new Struct([
+                    ["x", 13n],
+                    ["y", true]
+                ])
+            ],
+            ["k", -127n],
+            ["l", hexToBytes("00000000000000000000000000000000000000002a")],
+            ["m", [1n, 2n, 3n, 4n, 5n, 6n, 7n, 8n, 9n, 10n, 0n, 0n]],
+            [
+                "n",
+                [
+                    hexToBytes("0000000000"),
+                    hexToBytes("0000000000"),
+                    hexToBytes("0000000000"),
+                    hexToBytes("0000000000"),
+                    hexToBytes("0000000023"),
+                    hexToBytes("0000000000"),
+                    hexToBytes("0000000000"),
+                    hexToBytes("0000000000")
+                ]
+            ],
+            ["o", hexToBytes("0000000035")]
+        ]),
+        42n,
+        undefined
+    ],
+    [
+        CLayoutType,
+        new Struct([
+            ["a", 5678n],
+            ["e", [1n, 2n, 3n, 4n]],
+            [
+                "f",
+                new Map([
+                    [
+                        0n,
+                        new Struct([
+                            ["x", 1n],
+                            ["y", true]
+                        ])
+                    ],
+                    [
+                        1n,
+                        new Struct([
+                            ["x", 2n],
+                            ["y", false]
+                        ])
+                    ]
+                ])
+            ],
+            ["g", 34n],
+            ["h", 45n],
+            [
+                "s",
+                new Struct([
+                    ["x", 13n],
+                    ["y", true]
+                ])
+            ],
+            ["k", -127n],
+            ["l", hexToBytes("00000000000000000000000000000000000000002a")],
+            ["m", [1n, 2n, 3n, 4n, 5n, 6n, 7n, 8n, 9n, 10n, 0n, 0n]],
+            [
+                "n",
+                [
+                    hexToBytes("0000000000"),
+                    hexToBytes("0000000000"),
+                    hexToBytes("0000000000"),
+                    hexToBytes("0000000000"),
+                    hexToBytes("0000000023"),
+                    hexToBytes("0000000000"),
+                    hexToBytes("0000000000"),
+                    hexToBytes("0000000000")
+                ]
+            ],
+            ["o", hexToBytes("0000000035")]
+        ]),
+        42n,
+        new Map([
             [
                 44n,
                 [
@@ -777,32 +1128,24 @@ describe(`Storage Decoding Tests`, () => {
                     ]
                 ]
             ]
-        ]);
+        ])
+    ]
+];
 
-        const expected = new Map([
-            [
-                0n,
-                new Struct([
-                    ["x", 1n],
-                    ["y", true]
-                ])
-            ],
-            [
-                1n,
-                new Struct([
-                    ["x", 2n],
-                    ["y", false]
-                ])
-            ]
-        ]);
+describe(`Storage Eecoding RTT Tests`, () => {
+    for (const [type, value, baseOff, m] of rttSamples) {
+        it(`Sample ${type instanceof ExpStructType ? type.name : type.pp()} `, () => {
+            const storage: Storage = ImmMap.fromEntries([]);
+            const view = makeStorageView(type, [baseOff, 32]);
+            const newStore = view.encode(value, storage);
 
-        const view = makeStorageView(CLayoutType, [42n, 32]);
-        const value = view.decode(toStorage(CStorDesc), mapKeys) as Struct;
-        expect(hasPoison(value)).toBeFalsy();
-        expect(value.field("f")).toEqual(expected);
-    });
+            const decVal = view.decode(newStore, m);
+            expect(hasPoison(decVal)).toBeFalsy();
+            expect(decVal).toEqual(value);
+        });
+    }
 
-    it(`Map decoding with complex keys`, () => {
+    it(`Map encoding with complex keys`, () => {
         const mapKeys: MapKeys = new Map([
             [
                 0n,
@@ -832,7 +1175,7 @@ describe(`Storage Decoding Tests`, () => {
             ]
         ]);
 
-        const expected = new Struct([
+        const value = new Struct([
             [
                 "m1",
                 new Map([
@@ -850,36 +1193,23 @@ describe(`Storage Decoding Tests`, () => {
             ["mNoKeys", new Map([])]
         ]);
 
-        const decl = new XPath(unit).query("//ContractDefinition[@name='MapWithComplexKeys']")[0];
-        const [layout, complete] = getContractLayoutType(decl, infer);
-        assert(complete, `Unexpected incomplete layout of ${decl.name}`);
+        const layout = new ExpStructType("MapWithComplexKeys", [
+            ["m1", new MappingType(new PointerType(new BytesType(), DataLocation.Memory), uint256)],
+            [
+                "m2",
+                new MappingType(new PointerType(new StringType(), DataLocation.Memory), uint256)
+            ],
+            [
+                "mNoKeys",
+                new MappingType(new PointerType(new StringType(), DataLocation.Memory), uint256)
+            ]
+        ]);
 
         const view = makeStorageView(layout, [0n, 32]);
-        const value = view.decode(toStorage(mapWithComplexKeysStorDesc), mapKeys) as Struct;
-        expect(hasPoison(value)).toBeFalsy();
-        expect(value).toEqual(expected);
+        const storage: Storage = ImmMap.fromEntries([]);
+        const newStore = view.encode(value, storage);
+        const decValue = view.decode(newStore, mapKeys) as Struct;
+        expect(hasPoison(decValue)).toBeFalsy();
+        expect(decValue).toEqual(decValue);
     });
-});
-
-const contractLayoutTestSamples: ExpStructType[] = [
-    CLayoutType,
-    MoreStructsLayoutType,
-    miscLayoutType,
-    bytesLayoutType
-];
-
-describe(`Contract Layout Type Tests`, () => {
-    for (const expectedType of contractLayoutTestSamples) {
-        it(`Contract ${expectedType.name}`, () => {
-            const defs = unit
-                .getChildrenByType(ContractDefinition)
-                .filter((c) => c.name === expectedType.name);
-            expect(defs.length === 1).toBeTruthy();
-            const def = single(defs);
-            const [type, complete] = getContractLayoutType(def, infer);
-
-            expect(complete).toBeTruthy();
-            expect(type.pp()).toEqual(expectedType.pp());
-        });
-    }
 });

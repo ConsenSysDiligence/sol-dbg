@@ -17,7 +17,7 @@ import { single } from "../../src";
 import { address, bool, bytes2, bytes32, int128, int8, uint16 } from "../utils";
 import { makeMemoryView, simplifyType } from "../../src/debug/decoding/";
 import fse from "fs-extra";
-import { Address } from "@ethereumjs/util";
+import { createAddressFromString } from "@ethereumjs/util";
 
 const infer = new InferType("0.8.29");
 type TypeGenerator = (unit: SourceUnit) => TypeNode;
@@ -30,7 +30,7 @@ const samples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
         "0000000000000000000000005b38da6a701c568545dcfcb03fcb875f56beddc4",
         0,
         address,
-        Address.fromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")
+        createAddressFromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")
     ],
     [
         "0102000000000000000000000000000000000000000000000000000000000000",
@@ -76,7 +76,7 @@ const samples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
             ["b", 65535n],
             ["c", 123456n],
             ["d", true],
-            ["e", Address.fromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")],
+            ["e", createAddressFromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")],
             ["b1", hexToBytes("0102")],
             ["b2", hexToBytes("0000000000000000000000000000000000000000000000000000000000abcdef")],
             ["en", 1n]
@@ -125,7 +125,7 @@ const samples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
                     ["x", -1n],
                     ["y", 45678n],
                     ["b", true],
-                    ["addrs", Address.fromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")]
+                    ["addrs", createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")]
                 ])
             ],
             ["b", hexToBytes("0x070809")]
@@ -157,8 +157,8 @@ const samples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
                     [
                         "addrs",
                         [
-                            Address.fromString("0x0000000000000000000000000000000000000000"),
-                            Address.fromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
+                            createAddressFromString("0x0000000000000000000000000000000000000000"),
+                            createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
                         ]
                     ]
                 ])
@@ -189,7 +189,7 @@ const samples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
                     ["x", -1n],
                     ["y", 45678n],
                     ["b", true],
-                    ["addrs", Address.fromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")]
+                    ["addrs", createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")]
                 ])
             ],
             ["b", hexToBytes("0x040506")]
@@ -214,7 +214,7 @@ const samples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
             ["x", -1n],
             ["y", 45678n],
             ["b", true],
-            ["addrs", Address.fromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")]
+            ["addrs", createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")]
         ])
     ],
     [
@@ -244,8 +244,12 @@ const samples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
                         [
                             "addrs",
                             [
-                                Address.fromString("0x0000000000000000000000000000000000000000"),
-                                Address.fromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
+                                createAddressFromString(
+                                    "0x0000000000000000000000000000000000000000"
+                                ),
+                                createAddressFromString(
+                                    "0xcD6a42782d230D7c13A74ddec5dD140e55499Df9"
+                                )
                             ]
                         ]
                     ]),

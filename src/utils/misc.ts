@@ -1,6 +1,6 @@
 import { Common } from "@ethereumjs/common";
-import { TransactionFactory, TypedTransaction, TypedTxData } from "@ethereumjs/tx";
-import { Address, setLengthLeft } from "@ethereumjs/util";
+import { createTx, TypedTransaction, TypedTxData } from "@ethereumjs/tx";
+import { Address, setLengthLeft, createAddressFromString } from "@ethereumjs/util";
 import { bytesToHex, hexToBytes } from "ethereum-cryptography/utils";
 import {
     AddressType,
@@ -22,7 +22,9 @@ import {
 } from "../debug/types";
 
 export const ZERO_ADDRESS_STRING: HexString = "0x0000000000000000000000000000000000000000";
-export const ZERO_ADDRESS = Address.fromString(ZERO_ADDRESS_STRING);
+export const ZERO_ADDRESS = createAddressFromString(ZERO_ADDRESS_STRING);
+
+export const ZERO_BYTES32 = new Uint8Array(32);
 
 export const uint256 = new IntType(256, false);
 export const uint8 = new IntType(8, false);
@@ -44,7 +46,7 @@ export function toHexString(n: number | bigint | Uint8Array, padding = 0): HexSt
         hex = hex.padStart(padding, "0");
     }
 
-    return "0x" + hex;
+    return `0x${hex}`;
 }
 
 export function bigIntToBuf(
@@ -79,8 +81,8 @@ export function makeFakeTransaction(
     from: string,
     common: Common
 ): TypedTransaction {
-    const fromAddr = Address.fromString(from);
-    const tx = TransactionFactory.fromTxData(txData, { common, freeze: false });
+    const fromAddr = createAddressFromString(from);
+    const tx = createTx(txData, { common, freeze: false });
 
     /**
      *  Intentionally override
@@ -213,6 +215,29 @@ export function bigEndianBufToBigint(buf: Uint8Array): bigint {
     return res;
 }
 
+export function encodeBigintInBigEndianBuf(
+    src: bigint,
+    dest: Uint8Array,
+    nBytes: number,
+    endOffset: number | undefined = undefined
+): void {
+    const bytes: number[] = [];
+    const neg = src < 0n;
+    const final = neg ? -1n : 0x00n;
+
+    endOffset = endOffset === undefined ? dest.length : endOffset;
+
+    do {
+        bytes.unshift(Number(src % 256n));
+        src >>= 8n;
+    } while (src !== final || bytes.length < nBytes);
+
+    const baseByteOff = endOffset - bytes.length;
+    for (let i = 0; i < bytes.length; i++) {
+        dest[baseByteOff + i] = bytes[i];
+    }
+}
+
 /**
  * Convert a big-endian 2's complement encoding to a number. Throws an error if the value doesn't fit.
  */
@@ -339,4 +364,8 @@ export function single<T>(a: T[]): T {
     }
 
     return a[0];
+}
+
+export function min(a: number, b: number): number {
+    return a < b ? a : b;
 }

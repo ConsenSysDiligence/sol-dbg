@@ -252,6 +252,10 @@ export abstract class BaseCalldataView<
     pp(): string {
         return `<${this.type.pp()}@${this.loc + this.base} in calldata>`;
     }
+
+    get offset(): bigint {
+        return this.loc;
+    }
 }
 
 /**

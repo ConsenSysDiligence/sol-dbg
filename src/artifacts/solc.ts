@@ -1,4 +1,4 @@
-import { UnprefixedHexString } from "../utils/types";
+import { UnprefixedHexString } from "../debug";
 
 export type RawAST = any;
 

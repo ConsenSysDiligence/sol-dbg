@@ -98,14 +98,14 @@ function getBytecodeHashHacky(bytecode: Uint8Array): ContractMdStruct | undefine
     }
 
     if (ipfsCandidates.size === 1) {
-        return { ipfs: "0x" + bytesToHex([...ipfsCandidates][0]) };
+        return { ipfs: `0x${bytesToHex([...ipfsCandidates][0])}` };
     }
 
     if (bzzr0Candidates.size === 1) {
-        return { bzzr0: "0x" + bytesToHex([...bzzr0Candidates][0]) };
+        return { bzzr0: `0x${bytesToHex([...bzzr0Candidates][0])}` };
     }
 
-    return { bzzr1: "0x" + bytesToHex([...bzzr1Candidates][0]) };
+    return { bzzr1: `0x${bytesToHex([...bzzr1Candidates][0])}` };
 }
 
 function getDeployedBytecodeMdInfo(

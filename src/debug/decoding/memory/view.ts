@@ -1,33 +1,52 @@
 import {
     AddressType,
     ArrayType,
+    assert,
     BoolType,
     BytesType,
     FixedBytesType,
     IntType,
+    PackedArrayType,
     PointerType,
     StringType,
     TypeNode
 } from "solc-typed-ast";
 import { Memory } from "../../types";
-import { View } from "../view";
+import { EncodingError, View } from "../view";
 import { DecodingFailure, Struct, Value } from "../value";
 import {
     bigEndianBufToBigint,
+    encodeBigintInBigEndianBuf,
     fits,
     MAX_ARR_DECODE_LIMIT,
     nyi,
     readMem,
-    uint256
+    uint256,
+    ZERO_BYTES32
 } from "../../../utils";
 import { Address, bytesToUtf8 } from "@ethereumjs/util";
 import { ExpStructType, MissingType } from "../exp_types";
 import { isFailure } from "../utils";
+import { Allocator } from "./allocator";
+import { utf8ToBytes } from "ethereum-cryptography/utils";
 
 export abstract class BaseMemoryView<
     Val extends Value,
     Type extends TypeNode = TypeNode
 > extends View<Memory, Val, bigint, Type> {
+    protected writeMemAt(value: Uint8Array, off: bigint, mem: Memory): void {
+        if (off < 0n || off + BigInt(value.length) > BigInt(mem.length)) {
+            console.error(
+                `OoB writing mem at ${off} of length ${value.length} in memory of size ${mem.length}`
+            );
+            throw new EncodingError(
+                `OoB writing mem at ${off} of length ${value.length} in memory of size ${mem.length}`
+            );
+        }
+
+        mem.set(value, Number(off));
+    }
+
     protected readMemAt(
         off: bigint,
         calldata: Memory,
@@ -69,6 +88,79 @@ export abstract class BaseMemoryView<
         return res;
     }
 
+    pp(): string {
+        return `<${this.type.pp()}@${this.loc} in memory>`;
+    }
+
+    get offset(): bigint {
+        return this.loc;
+    }
+
+    protected encodeIntAt(value: bigint, off: bigint, state: Memory): void {
+        const word = new Uint8Array(32);
+
+        // Note nBytes is always 32 - an int always takes up the full word
+        encodeBigintInBigEndianBuf(value, word, 32, 32);
+        this.writeMemAt(word, off, state);
+    }
+
+    abstract encode(value: Val, state: Memory, alloc: Allocator): void;
+}
+
+export class IntMemView extends BaseMemoryView<bigint, IntType> {
+    decode(state: Memory): bigint | DecodingFailure {
+        return this.decodeIntAt(this.loc, this.type, state);
+    }
+
+    encode(value: bigint, state: Memory): void {
+        this.encodeIntAt(value, this.loc, state);
+    }
+}
+
+export class AddressMemView extends BaseMemoryView<Address, AddressType> {
+    decode(state: Memory): Address | DecodingFailure {
+        const m = this.readMemAt(this.loc + 12n, state, 20);
+        return isFailure(m) ? m : new Address(m);
+    }
+
+    encode(value: Address, state: Memory): void {
+        // We write a full word to make sure the lower bytes are 0-ed out
+        const w = new Uint8Array(32);
+        w.set(value.bytes, 12);
+        this.writeMemAt(w, this.loc, state);
+    }
+}
+
+const ONE_BYTES32 = new Uint8Array(32);
+ONE_BYTES32[31] = 1;
+
+export class BoolMemView extends BaseMemoryView<boolean, BoolType> {
+    decode(state: Memory): boolean | DecodingFailure {
+        const m = this.readMemAt(this.loc, state, 32);
+        return isFailure(m) ? m : bigEndianBufToBigint(m) !== 0n;
+    }
+
+    encode(value: boolean, state: Memory): void {
+        this.writeMemAt(value ? ONE_BYTES32 : ZERO_BYTES32, this.loc, state);
+    }
+}
+
+export class FixedBytesMemView extends BaseMemoryView<Uint8Array, FixedBytesType> {
+    decode(state: Memory): Uint8Array | DecodingFailure {
+        return this.readMemAt(this.loc, state, this.type.size);
+    }
+
+    encode(value: Uint8Array<ArrayBufferLike>, state: Memory): void {
+        const w = new Uint8Array(32);
+        w.set(value);
+        this.writeMemAt(w, this.loc, state);
+    }
+}
+
+export abstract class PackedArrayMemView<
+    V extends Value,
+    T extends TypeNode
+> extends BaseMemoryView<V, T> {
     protected decodeBytesAt(loc: bigint, state: Memory): Uint8Array | DecodingFailure {
         const len = this.decodeIntAt(loc, uint256, state);
 
@@ -83,47 +175,30 @@ export abstract class BaseMemoryView<
         return this.readMemAt(loc + 32n, state, len);
     }
 
-    pp(): string {
-        return `<${this.type.pp()}@${this.loc} in memory>`;
+    protected encodeBytesAt(value: Uint8Array, off: bigint, state: Memory): void {
+        this.encodeIntAt(BigInt(value.length), off, state);
+        this.writeMemAt(value, off + 32n, state);
     }
 }
 
-export class IntMemView extends BaseMemoryView<bigint, IntType> {
-    decode(state: Memory): bigint | DecodingFailure {
-        return this.decodeIntAt(this.loc, this.type, state);
-    }
-}
-
-export class AddressMemView extends BaseMemoryView<Address, AddressType> {
-    decode(state: Memory): Address | DecodingFailure {
-        const m = this.readMemAt(this.loc + 12n, state, 20);
-        return isFailure(m) ? m : new Address(m);
-    }
-}
-
-export class BoolMemView extends BaseMemoryView<boolean, BoolType> {
-    decode(state: Memory): boolean | DecodingFailure {
-        const m = this.readMemAt(this.loc, state, 32);
-        return isFailure(m) ? m : bigEndianBufToBigint(m) !== 0n;
-    }
-}
-
-export class FixedBytesMemView extends BaseMemoryView<Uint8Array, FixedBytesType> {
-    decode(state: Memory): Uint8Array | DecodingFailure {
-        return this.readMemAt(this.loc, state, this.type.size);
-    }
-}
-
-export class BytesMemView extends BaseMemoryView<Uint8Array, BytesType> {
+export class BytesMemView extends PackedArrayMemView<Uint8Array, BytesType> {
     decode(state: Memory): Uint8Array | DecodingFailure {
         return this.decodeBytesAt(this.loc, state);
     }
+
+    encode(value: Uint8Array, state: Memory): void {
+        this.encodeBytesAt(value, this.loc, state);
+    }
 }
 
-export class StringMemView extends BaseMemoryView<string, StringType> {
+export class StringMemView extends PackedArrayMemView<string, StringType> {
     decode(state: Memory): string | DecodingFailure {
         const bytes = this.decodeBytesAt(this.loc, state);
         return isFailure(bytes) ? bytes : bytesToUtf8(bytes);
+    }
+
+    encode(value: string, state: Memory): void {
+        this.encodeBytesAt(utf8ToBytes(value), this.loc, state);
     }
 }
 
@@ -159,6 +234,21 @@ export class ArrayMemView extends BaseMemoryView<Value[], ArrayType> {
 
         return res;
     }
+
+    encode(value: Value[], state: Memory, alloc: Allocator): void {
+        let off = this.loc;
+
+        if (this.type.size === undefined) {
+            this.encodeIntAt(BigInt(value.length), off, state);
+            off += 32n;
+        }
+
+        for (const v of value) {
+            const view = makeMemoryView(this.type.elementT, off);
+            view.encode(v, state, alloc);
+            off += 32n;
+        }
+    }
 }
 
 export class StructMemView extends BaseMemoryView<Struct, ExpStructType> {
@@ -175,6 +265,19 @@ export class StructMemView extends BaseMemoryView<Struct, ExpStructType> {
 
         return new Struct(entries);
     }
+
+    encode(value: Struct, state: Memory, alloc: Allocator): void {
+        let offset = this.loc;
+
+        assert(value.entries.length === this.type.fields.length, `Mismatch in encoding struct`);
+
+        for (let i = 0; i < this.type.fields.length; i++) {
+            const [, type] = this.type.fields[i];
+            const view = makeMemoryView(type, offset);
+            view.encode(value.entries[i][1], state, alloc);
+            offset += 32n;
+        }
+    }
 }
 
 export class PointerMemView extends BaseMemoryView<Value, PointerType> {
@@ -188,6 +291,40 @@ export class PointerMemView extends BaseMemoryView<Value, PointerType> {
         const view = makeMemoryView(this.type.to, offset);
         return view.decode(state);
     }
+
+    /**
+     * Helper to compute how much memory we need to allocate for a pointed-to value of type t
+     */
+    static allocSize(v: Value | undefined, t: TypeNode): number {
+        if (t instanceof ArrayType) {
+            return (
+                (v as Value[]).length * PointerMemView.allocSize(undefined, t.elementT) +
+                (t.size !== undefined ? 0 : 32)
+            );
+        }
+
+        if (t instanceof ExpStructType) {
+            let size = 0;
+            for (let i = 0; i < t.fields.length; i++) {
+                size += PointerMemView.allocSize((v as Struct).entries[i][1], t.fields[i][1]);
+            }
+
+            return size;
+        }
+
+        if (t instanceof PackedArrayType) {
+            return Buffer.from(v as Uint8Array | string).length + 32;
+        }
+
+        return 32;
+    }
+
+    encode(value: Value, state: Memory, alloc: Allocator): void {
+        const ptr = alloc.alloc(PointerMemView.allocSize(value, this.type.to));
+        this.encodeIntAt(ptr, this.loc, state);
+        const view = makeMemoryView(this.type.to, ptr);
+        view.encode(value, state, alloc);
+    }
 }
 
 export class MissingMemView extends BaseMemoryView<Value, MissingType> {
@@ -195,6 +332,10 @@ export class MissingMemView extends BaseMemoryView<Value, MissingType> {
         return new DecodingFailure(
             `${this.type.rawTypeName ? this.type.rawTypeName.type : "<unknown>"}`
         );
+    }
+
+    encode(): void {
+        throw new EncodingError(`Cannot encode missing type ${this.type.pp()}`);
     }
 }
 

@@ -1,4 +1,4 @@
-import { EVMStateManagerInterface } from "@ethereumjs/common";
+import { StateManagerInterface } from "@ethereumjs/common";
 import { Address } from "@ethereumjs/util";
 import { assert, ContractDefinition, InferType } from "solc-typed-ast";
 import { IArtifactManager } from "./artifact_manager";
@@ -14,14 +14,14 @@ export type ContractStates = { [addres: string]: Struct };
 export async function decodeContractStates(
     artifactManager: IArtifactManager,
     contracts: Iterable<Address>,
-    state: EVMStateManagerInterface,
+    state: StateManagerInterface,
     preimages: KeccakPreimageMap
 ): Promise<ContractStates> {
     const res: ContractStates = {};
     const mapKeys = getMapKeys(preimages);
 
     for (const addr of contracts) {
-        const code = await state.getContractCode(addr);
+        const code = await state.getCode(addr);
         const info = artifactManager.getContractFromDeployedBytecode(code);
 
         if (!info || !info.ast) {

@@ -37,7 +37,7 @@ import {
     uint24,
     uint8
 } from "../utils";
-import { Address } from "@ethereumjs/util";
+import { createAddressFromString } from "@ethereumjs/util";
 import { makeCalldataViews, simplifyType } from "../../src/debug/decoding/";
 import fse from "fs-extra";
 
@@ -86,7 +86,7 @@ const samples: Array<[string, Array<TypeNode | TypeGenerator>, Value[]]> = [
     [
         "0x0848ace50000000000000000000000004838b106fce9647bdf1e7877bf73ce8b0bad5f97",
         [address],
-        [Address.fromString("0x4838B106FCe9647Bdf1E7877BF73cE8B0BAD5f97")]
+        [createAddressFromString("0x4838B106FCe9647Bdf1E7877BF73cE8B0BAD5f97")]
     ],
     [
         "0x20a6db030012340000000000000000000000000000000000000000000000000000000000",
@@ -99,7 +99,7 @@ const samples: Array<[string, Array<TypeNode | TypeGenerator>, Value[]]> = [
         [
             false,
             255n,
-            Address.fromString("0x4838B106FCe9647Bdf1E7877BF73cE8B0BAD5f97"),
+            createAddressFromString("0x4838B106FCe9647Bdf1E7877BF73cE8B0BAD5f97"),
             hexToBytes("0xfa"),
             -129n
         ]
@@ -176,14 +176,21 @@ const samples: Array<[string, Array<TypeNode | TypeGenerator>, Value[]]> = [
                 [
                     "0xf8e81D47203A594245E36C48e151709F0C19fBe8",
                     "0x5B38Da6a701c568545dCfcB03FcB875f56beddC4"
-                ].map(Address.fromString)
+                ].map(createAddressFromString)
             ]
         ]
     ],
     [
         "0x6aa9556cffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8000000000000000000000000000000000000000000000000000000000000000e700000000000000000000000000000000000000000000000000000000000000000000000000000000000000005b38da6a701c568545dcfcb03fcb875f56beddc4",
         [tupleS_static],
-        [[-128n, 231n, false, Address.fromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")]]
+        [
+            [
+                -128n,
+                231n,
+                false,
+                createAddressFromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")
+            ]
+        ]
     ],
     [
         "0x86bd3303ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000d000000000000000000000000000000000000000000000000000000000000002a00000000000000000000000000000000000000000000000000000000000000000000000000000000000000005b38da6a701c568545dcfcb03fcb875f56beddc40102030000000000000000000000000000000000000000000000000000000000",
@@ -191,7 +198,12 @@ const samples: Array<[string, Array<TypeNode | TypeGenerator>, Value[]]> = [
         [
             [
                 -1n,
-                [13n, 42n, false, Address.fromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")],
+                [
+                    13n,
+                    42n,
+                    false,
+                    createAddressFromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")
+                ],
                 hexToBytes("010203")
             ]
         ]
@@ -206,7 +218,7 @@ const samples: Array<[string, Array<TypeNode | TypeGenerator>, Value[]]> = [
                     -128n,
                     37n,
                     true,
-                    Address.fromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")
+                    createAddressFromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")
                 ],
                 hexToBytes("040506")
             ]
@@ -227,8 +239,18 @@ const samples: Array<[string, Array<TypeNode | TypeGenerator>, Value[]]> = [
         [new PointerType(new ArrayType(tupleS_static), DataLocation.CallData)],
         [
             [
-                [-1n, 1n, true, Address.fromString("0xaE036c65C649172b43ef7156b009c6221B596B8b")],
-                [-2n, 2n, true, Address.fromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")]
+                [
+                    -1n,
+                    1n,
+                    true,
+                    createAddressFromString("0xaE036c65C649172b43ef7156b009c6221B596B8b")
+                ],
+                [
+                    -2n,
+                    2n,
+                    true,
+                    createAddressFromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")
+                ]
             ]
         ]
     ],
@@ -237,7 +259,12 @@ const samples: Array<[string, Array<TypeNode | TypeGenerator>, Value[]]> = [
         [new PointerType(new ArrayType(tupleS1), DataLocation.CallData)],
         [
             [
-                [-1n, 1n, true, [Address.fromString("0xaE036c65C649172b43ef7156b009c6221B596B8b")]],
+                [
+                    -1n,
+                    1n,
+                    true,
+                    [createAddressFromString("0xaE036c65C649172b43ef7156b009c6221B596B8b")]
+                ],
                 [-2n, 2n, false, []]
             ]
         ]
@@ -254,13 +281,13 @@ const samples: Array<[string, Array<TypeNode | TypeGenerator>, Value[]]> = [
                             -1n,
                             2n,
                             true,
-                            [Address.fromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")]
+                            [createAddressFromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")]
                         ],
                         [
                             -2n,
                             3n,
                             false,
-                            [Address.fromString("0xaE036c65C649172b43ef7156b009c6221B596B8b")]
+                            [createAddressFromString("0xaE036c65C649172b43ef7156b009c6221B596B8b")]
                         ]
                     ]
                 ]
@@ -287,7 +314,7 @@ const samples: Array<[string, Array<TypeNode | TypeGenerator>, Value[]]> = [
                 ["x", -128n],
                 ["y", 231n],
                 ["b", false],
-                ["addrs", Address.fromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")]
+                ["addrs", createAddressFromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")]
             ])
         ]
     ],
@@ -315,7 +342,10 @@ const samples: Array<[string, Array<TypeNode | TypeGenerator>, Value[]]> = [
                         ["x", -128n],
                         ["y", 37n],
                         ["b", true],
-                        ["addrs", Address.fromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")]
+                        [
+                            "addrs",
+                            createAddressFromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")
+                        ]
                     ])
                 ],
                 ["b", hexToBytes("040506")]
@@ -332,7 +362,7 @@ const samples: Array<[string, Array<TypeNode | TypeGenerator>, Value[]]> = [
                 return t;
             }
         ],
-        [Address.fromString("0x5FD6eB55D12E759a21C09eF703fe0CBa1DC9d88D")]
+        [createAddressFromString("0x5FD6eB55D12E759a21C09eF703fe0CBa1DC9d88D")]
     ],
     [
         "0x37048b0e0000000000000000000000000000000000000000000000000000000000000002",
@@ -374,7 +404,10 @@ const samples: Array<[string, Array<TypeNode | TypeGenerator>, Value[]]> = [
                     ["x", 2n],
                     ["y", 13n],
                     ["b", false],
-                    ["addrs", [Address.fromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")]]
+                    [
+                        "addrs",
+                        [createAddressFromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")]
+                    ]
                 ]),
                 new Struct([
                     ["x", 3n],
@@ -383,8 +416,8 @@ const samples: Array<[string, Array<TypeNode | TypeGenerator>, Value[]]> = [
                     [
                         "addrs",
                         [
-                            Address.fromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4"),
-                            Address.fromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")
+                            createAddressFromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4"),
+                            createAddressFromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")
                         ]
                     ]
                 ]),

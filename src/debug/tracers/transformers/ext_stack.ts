@@ -1,20 +1,13 @@
 import { InterpreterStep } from "@ethereumjs/evm";
 import { TypedTransaction } from "@ethereumjs/tx";
-import { Address, bytesToHex } from "@ethereumjs/util";
+import { Address } from "@ethereumjs/util";
 import { VM } from "@ethereumjs/vm";
 import { assert, FunctionDefinition, VariableDeclaration } from "solc-typed-ast";
 import { getCodeHash, getCreationCodeHash } from "../../../artifacts";
 import { mustReadMem, stackTop, wordToAddress, ZERO_ADDRESS } from "../../../utils/misc";
 import { ContractInfo, IArtifactManager } from "../../artifact_manager";
 import { createsContract, increasesDepth, OPCODES } from "../../opcodes";
-import {
-    CallFrame,
-    CreationFrame,
-    ExternalFrame,
-    FrameKind,
-    HexString,
-    UnprefixedHexString
-} from "../../types";
+import { CallFrame, CreationFrame, ExternalFrame, FrameKind, HexString } from "../../types";
 import { BasicStepInfo } from "./basic_info";
 import { View } from "../../decoding/view";
 import { buildMsgViews } from "../../abi";
@@ -51,15 +44,13 @@ function makeCallFrame(
     const contractInfo: ContractInfo | undefined =
         codeHash === undefined ? codeHash : artifactManager.getContractFromMDHash(codeHash);
 
-    const selector: UnprefixedHexString = bytesToHex(data.slice(0, 4)).slice(2);
-
     let callee: FunctionDefinition | VariableDeclaration | undefined;
     let args: Array<[string, View]> | undefined;
 
     if (contractInfo && contractInfo.ast) {
         const infer = artifactManager.infer(contractInfo.artifact.compilerVersion);
 
-        callee = artifactManager.findEntryPoint(selector, contractInfo);
+        callee = artifactManager.findEntryPoint(data, contractInfo);
 
         if (callee !== undefined) {
             try {
@@ -173,7 +164,7 @@ export async function addExternalFrame<T extends object & BasicStepInfo>(
         if (tx.to === undefined) {
             extFrame = makeCreationFrame(sender, tx.data, 0, artifactManager);
         } else {
-            const code = await vm.stateManager.getContractCode(tx.to);
+            const code = await vm.stateManager.getCode(tx.to);
 
             /// @todo remove - arbitrary restriction, only good for debugging
             assert(code.length > 0, "Missing code for address {0}", tx.to.toString());
@@ -235,7 +226,7 @@ export async function addExternalFrame<T extends object & BasicStepInfo>(
         } else {
             const [receiver, codeAddr, msgData] = decodeCall(lastStep);
 
-            const code = await vm.stateManager.getContractCode(codeAddr);
+            const code = await vm.stateManager.getCode(codeAddr);
             const codeHash = getCodeHash(code);
 
             extFrame = await makeCallFrame(

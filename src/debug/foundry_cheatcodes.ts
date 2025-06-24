@@ -1,4 +1,4 @@
-import { EVM, EvmError, EVMInterface, ExecResult, Message, PrecompileInput } from "@ethereumjs/evm";
+import { EVM, EVMError, EVMInterface, ExecResult, Message, PrecompileInput } from "@ethereumjs/evm";
 import {
     Account,
     Address,
@@ -10,6 +10,7 @@ import { keccak256 } from "ethereum-cryptography/keccak.js";
 import { bytesToHex, concatBytes, equalsBytes, utf8ToBytes } from "ethereum-cryptography/utils";
 import { ERROR, EvmErrorResult } from "../utils/ethereumjs_internal/exceptions";
 import { bigEndianBufToBigint, bigIntToBuf } from "../utils/misc";
+import { createAddressFromString } from "@ethereumjs/util";
 
 /// require("@ethereumjs/evm/dist/cjs/precompiles").PrecompileFunc
 type PrecompileFunc = any;
@@ -54,7 +55,7 @@ export function getFoundryCtx(evm: EVMInterface): FoundryContext | undefined {
 const { secp256k1 } = require("ethereum-cryptography/secp256k1");
 const ethABI = require("web3-eth-abi");
 
-export const FoundryCheatcodesAddress = Address.fromString(
+export const FoundryCheatcodesAddress = createAddressFromString(
     "0x7109709ECfa91a80626fF3989D68f67F5b1DD12D"
 );
 
@@ -355,7 +356,7 @@ export function makeFoundryCheatcodePrecompile(): [PrecompileFunc, FoundryContex
 
         if (equalsBytes(selector, LOAD_SELECTOR)) {
             //console.error(`load(${rawAddr}, ${rawLoc})`);
-            let value = await input._EVM.stateManager.getContractStorage(
+            let value = await input._EVM.stateManager.getStorage(
                 new Address(input.data.slice(16, 36)),
                 input.data.slice(36, 68)
             );
@@ -392,7 +393,7 @@ export function makeFoundryCheatcodePrecompile(): [PrecompileFunc, FoundryContex
                     );
                 }
             } else {
-                await input._EVM.stateManager.putContractStorage(addr, loc, value);
+                await input._EVM.stateManager.putStorage(addr, loc, value);
             }
 
             return {
@@ -448,7 +449,7 @@ export function makeFoundryCheatcodePrecompile(): [PrecompileFunc, FoundryContex
         if (equalsBytes(selector, PRANK_SELECTOR01)) {
             // Foundry doesn't allow multiple concurrent pranks
             if (ctx.getPendingPrank() !== undefined) {
-                return EvmErrorResult(new EvmError(ERROR.REVERT as any), 0n);
+                return EvmErrorResult(new EVMError(ERROR.REVERT as any), 0n);
             }
 
             ctx.setPendingPrank({
@@ -467,7 +468,7 @@ export function makeFoundryCheatcodePrecompile(): [PrecompileFunc, FoundryContex
         if (equalsBytes(selector, PRANK_SELECTOR02)) {
             // Foundry doesn't allow multiple concurrent pranks
             if (ctx.getPendingPrank() !== undefined) {
-                return EvmErrorResult(new EvmError(ERROR.REVERT as any), 0n);
+                return EvmErrorResult(new EVMError(ERROR.REVERT as any), 0n);
             }
 
             ctx.setPendingPrank({
@@ -491,7 +492,7 @@ export function makeFoundryCheatcodePrecompile(): [PrecompileFunc, FoundryContex
         if (equalsBytes(selector, START_PRANK_SELECTOR01)) {
             // Foundry doesn't allow multiple concurrent pranks
             if (ctx.getPendingPrank() !== undefined) {
-                return EvmErrorResult(new EvmError(ERROR.REVERT as any), 0n);
+                return EvmErrorResult(new EVMError(ERROR.REVERT as any), 0n);
             }
 
             ctx.setPendingPrank({
@@ -511,7 +512,7 @@ export function makeFoundryCheatcodePrecompile(): [PrecompileFunc, FoundryContex
         if (equalsBytes(selector, START_PRANK_SELECTOR02)) {
             // Foundry doesn't allow multiple concurrent pranks
             if (ctx.getPendingPrank() !== undefined) {
-                return EvmErrorResult(new EvmError(ERROR.REVERT as any), 0n);
+                return EvmErrorResult(new EVMError(ERROR.REVERT as any), 0n);
             }
 
             ctx.setPendingPrank({
@@ -556,7 +557,7 @@ export function makeFoundryCheatcodePrecompile(): [PrecompileFunc, FoundryContex
         if (equalsBytes(selector, EXPECT_REVERT_SELECTOR02)) {
             //console.error(`vm.expectRevert(bytes4);`);
             if (input.data.length < 8) {
-                return EvmErrorResult(new EvmError(ERROR.REVERT as any), 0n);
+                return EvmErrorResult(new EVMError(ERROR.REVERT as any), 0n);
             }
 
             const selector = input.data.slice(4, 8);
@@ -570,13 +571,13 @@ export function makeFoundryCheatcodePrecompile(): [PrecompileFunc, FoundryContex
 
         if (equalsBytes(selector, EXPECT_REVERT_SELECTOR03)) {
             if (input.data.length < 68) {
-                return EvmErrorResult(new EvmError(ERROR.REVERT as any), 0n);
+                return EvmErrorResult(new EVMError(ERROR.REVERT as any), 0n);
             }
 
             const len = Number(bigEndianBufToBigint(input.data.slice(36, 68)));
 
             if (input.data.length < 68 + len) {
-                return EvmErrorResult(new EvmError(ERROR.REVERT as any), 0n);
+                return EvmErrorResult(new EVMError(ERROR.REVERT as any), 0n);
             }
 
             const bytes = input.data.slice(68, 68 + len);

@@ -1,4 +1,4 @@
-import { EVMStateManagerInterface } from "@ethereumjs/common";
+import { StateManagerInterface } from "@ethereumjs/common";
 import { InterpreterStep } from "@ethereumjs/evm";
 import { RLP } from "@ethereumjs/rlp";
 import { Address, setLengthLeft } from "@ethereumjs/util";
@@ -10,12 +10,10 @@ import { bigIntToBuf } from "../../../utils/misc";
 import { EVMOpInfo, OPCODES, changesMemory } from "../../opcodes";
 import { Memory, Stack, Storage } from "../../types";
 import { OpInfo } from "./op";
+import { MerkleStateManager } from "@ethereumjs/statemanager";
 
-export async function getStorage(
-    manager: EVMStateManagerInterface,
-    addr: Address
-): Promise<Storage> {
-    const rawStorage = await manager.dumpStorage(addr);
+export async function getStorage(manager: StateManagerInterface, addr: Address): Promise<Storage> {
+    const rawStorage = await (manager as MerkleStateManager).dumpStorage(addr);
     const storageEntries: Array<[bigint, Uint8Array]> = [];
 
     for (const [keyStr, valStr] of Object.entries(rawStorage)) {
