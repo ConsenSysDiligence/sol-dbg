@@ -28,17 +28,39 @@ const samples: Array<[Stack, number, TypeNode, Value]> = [
 ];
 
 describe(`Stack Encoding Tests`, () => {
-    for (const [stack, offFromTop, type] of samples) {
+    for (const [stack, offFromTop, type, value] of samples) {
         const buf = new Uint8Array(32);
 
         it(`Sample ${type.pp()}`, () => {
             const simpleType = simplifyType(type, infer, DataLocation.Memory);
-            const view = makeStackView(simpleType, offFromTop);
-            const value = view.decode(stack);
-            expect(hasPoison(value)).toBeFalsy();
             const encView = makeStackView(simpleType, 0);
             encView.encode(value, [buf]);
             expect(bytesToHex(buf)).toEqual(bytesToHex(stack[stack.length - offFromTop - 1]));
+        });
+    }
+});
+
+const rttSamples: [TypeNode, Value][] = [
+    [bool, false],
+    [bool, true],
+    [uint8, 1n],
+    [uint16, 65536n],
+    [int128, -1n],
+    [address, createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")],
+    [bytes21, hexToBytes("cD6a42782d230D7c13A74ddec5dD140e55499Df900")]
+]
+
+describe(`Stack Encoding/Decoding RTT Tests`, () => {
+    for (const [type, value] of rttSamples) {
+        const buf = new Uint8Array(32);
+
+        it(`Sample ${type.pp()}`, () => {
+            const simpleType = simplifyType(type, infer, DataLocation.Memory);
+            const view = makeStackView(simpleType, 0);
+            view.encode(value, [buf]);
+            const newVal = view.decode([buf]);
+            expect(hasPoison(newVal)).toBeFalsy();
+            expect(newVal).toEqual(value);
         });
     }
 });

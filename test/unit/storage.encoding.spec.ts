@@ -6,14 +6,16 @@ import {
     MappingType,
     PointerType,
     StringType,
+    TypeNode,
 } from "solc-typed-ast";
-import { Struct, Value } from "../../src/debug/decoding/value";
+import { hasPoison, Struct, Value } from "../../src/debug/decoding/value";
 import { bytesToHex, hexToBytes } from "ethereum-cryptography/utils";
 import {
     bigEndianBufToBigint,
     ExpStructType,
     ImmMap,
     makeStorageView,
+    MapKeys,
     Storage,
     uint256
 } from "../../src";
@@ -651,12 +653,352 @@ const samples: Array<[StorageDesc, number, number, ExpStructType, Value]> = [
             ],
             ["v", 101n]
         ])
-    ]
-    /*
+    ],
     [
         CStorDesc,
         42,
         32,
+        CLayoutType,
+        new Struct([
+            ["a", 5678n],
+            ["e", [1n, 2n, 3n, 4n]],
+            ["f", new Map(
+                [
+                    [0n, new Struct([["x", 1n], ["y", true]])],
+                    [1n, new Struct([["x", 2n], ["y", false]])]
+                ]
+            )],
+            ["g", 34n],
+            ["h", 45n],
+            [
+                "s",
+                new Struct([
+                    ["x", 13n],
+                    ["y", true]
+                ])
+            ],
+            ["k", -127n],
+            ["l", hexToBytes("00000000000000000000000000000000000000002a")],
+            ["m", [1n, 2n, 3n, 4n, 5n, 6n, 7n, 8n, 9n, 10n, 0n, 0n]],
+            [
+                "n",
+                [
+                    hexToBytes("0000000000"),
+                    hexToBytes("0000000000"),
+                    hexToBytes("0000000000"),
+                    hexToBytes("0000000000"),
+                    hexToBytes("0000000023"),
+                    hexToBytes("0000000000"),
+                    hexToBytes("0000000000"),
+                    hexToBytes("0000000000")
+                ]
+            ],
+            ["o", hexToBytes("0000000035")]
+        ])
+    ],
+];
+
+function ppStorage(s: Storage): string {
+    let lines: string[] = [];
+
+    for (const [k, v] of s.entries()) {
+        lines.push(`${k}: ${bytesToHex(v)}`)
+    }
+
+    lines.sort();
+    return `{\n${lines.join(",\n")}\n}`
+}
+
+describe(`Storage Encoding Tests`, () => {
+    for (const [expectedStorageDesc, key, offset, type, value] of samples) {
+        const expStorage = toStorage(expectedStorageDesc);
+
+        it(`Sample ${type.name} `, () => {
+            const view = makeStorageView(type, [BigInt(key), offset]);
+            const initialStorage = ImmMap.fromEntries<bigint, Uint8Array>([]);
+            const actualStorage = view.encode(value, initialStorage);
+            expect(ppStorage(actualStorage)).toEqual(ppStorage(expStorage));
+        });
+    }
+
+});
+
+const rttSamples: [TypeNode, Value, bigint, MapKeys | undefined][] = [
+    [
+        MoreStructsLayoutType,
+        new Struct([
+            [
+                "st",
+                new Struct([
+                    ["a", -1n],
+                    ["b", 65535n],
+                    ["c", 123456n],
+                    ["d", true],
+                    ["e", createAddressFromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")],
+                    ["b1", hexToBytes("0102")],
+                    [
+                        "b2",
+                        hexToBytes(
+                            "0000000000000000000000000000000000000000000000000000000000abcdef"
+                        )
+                    ],
+                    ["en", 1n]
+                ])
+            ],
+            [
+                "s_static",
+                new Struct([
+                    ["x", -1n],
+                    ["y", 45678n],
+                    ["b", true],
+                    ["addrs", createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")]
+                ])
+            ],
+            [
+                "s1",
+                new Struct([
+                    ["x", -1n],
+                    ["y", 45678n],
+                    ["b", true],
+                    [
+                        "addrs",
+                        [
+                            createAddressFromString("0x0000000000000000000000000000000000000000"),
+                            createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
+                        ]
+                    ]
+                ])
+            ],
+            [
+                "s_nested_static_static",
+                new Struct([
+                    ["t", -1n],
+                    [
+                        "s",
+                        new Struct([
+                            ["x", -1n],
+                            ["y", 45678n],
+                            ["b", true],
+                            [
+                                "addrs",
+                                createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
+                            ]
+                        ])
+                    ],
+                    ["b", hexToBytes("040506")]
+                ])
+            ],
+            [
+                "s_nested_dynamic_static",
+                new Struct([
+                    ["t", []],
+                    [
+                        "s",
+                        new Struct([
+                            ["x", -1n],
+                            ["y", 45678n],
+                            ["b", true],
+                            [
+                                "addrs",
+                                createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
+                            ]
+                        ])
+                    ],
+                    ["b", hexToBytes("070809")]
+                ])
+            ],
+            [
+                "s_nested_static_dynamic",
+                new Struct([
+                    ["t", -1234n],
+                    [
+                        "s",
+                        new Struct([
+                            ["x", -1n],
+                            ["y", 45678n],
+                            ["b", true],
+                            [
+                                "addrs",
+                                [
+                                    createAddressFromString(
+                                        "0x0000000000000000000000000000000000000000"
+                                    ),
+                                    createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
+                                ]
+                            ]
+                        ])
+                    ],
+                    ["b", hexToBytes("020304")]
+                ])
+            ],
+            [
+                "s_struct_arr",
+                new Struct([
+                    ["x", -128n],
+                    [
+                        "sArr",
+                        [
+                            new Struct([
+                                ["x", -1n],
+                                ["y", 45678n],
+                                ["b", true],
+                                [
+                                    "addrs",
+                                    [
+                                        createAddressFromString(
+                                            "0x0000000000000000000000000000000000000000"
+                                        ),
+                                        createAddressFromString(
+                                            "0xcD6a42782d230D7c13A74ddec5dD140e55499Df9"
+                                        )
+                                    ]
+                                ]
+                            ]),
+                            new Struct([
+                                ["x", -2n],
+                                ["y", 45679n],
+                                ["b", false],
+                                ["addrs", []]
+                            ])
+                        ]
+                    ]
+                ])
+            ],
+            [
+                "at",
+                new Struct([
+                    ["a1", [12n, 13n, 14n]],
+                    ["a2", [-1n, -2n, -3n, -4n]]
+                ])
+            ]
+        ]),
+        0n,
+        undefined
+    ],
+    [
+        bytesLayoutType,
+        new Struct([
+            [
+                "smallB",
+                hexToBytes("000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e")
+            ],
+            [
+                "bigB",
+                hexToBytes("000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f")
+            ],
+            [
+                "biggerB",
+                hexToBytes(
+                    "000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f"
+                )
+            ],
+            ["smallS", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
+            ["bigS", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]
+        ]),
+        0n,
+        undefined
+    ],
+    [
+        miscLayoutType,
+        new Struct([
+            [
+                "x",
+                [
+                    [1n, 2n],
+                    [3n, 4n]
+                ]
+            ],
+            [
+                "y",
+                [
+                    [1n, 2n],
+                    [3n, 4n]
+                ]
+            ],
+            [
+                "z",
+                [
+                    [1n, 2n],
+                    [3n, 4n]
+                ]
+            ],
+            [
+                "p",
+                [
+                    new Struct([
+                        ["a", 1n],
+                        ["b", 2n]
+                    ]),
+                    new Struct([
+                        ["a", 3n],
+                        ["b", 4n]
+                    ])
+                ]
+            ],
+            [
+                "q",
+                [
+                    new Struct([
+                        ["a", 1n],
+                        ["b", 2n]
+                    ]),
+                    new Struct([
+                        ["a", 3n],
+                        ["b", 4n]
+                    ])
+                ]
+            ],
+            [
+                "r",
+                [
+                    new Struct([
+                        ["a", 1n],
+                        ["b", 2n]
+                    ]),
+                    new Struct([
+                        ["a", 3n],
+                        ["b", 4n]
+                    ])
+                ]
+            ],
+            [
+                "s",
+                [
+                    new Struct([
+                        ["a", 1n],
+                        ["c", 2n],
+                        ["b", 3n]
+                    ]),
+                    new Struct([
+                        ["a", 4n],
+                        ["c", 5n],
+                        ["b", 6n]
+                    ])
+                ]
+            ],
+            [
+                "t",
+                [
+                    new Struct([
+                        ["a", 1n],
+                        ["c", 2n],
+                        ["d", 3n],
+                        ["b", 4n]
+                    ]),
+                    new Struct([
+                        ["a", 5n],
+                        ["c", 6n],
+                        ["d", 7n],
+                        ["b", 8n]
+                    ])
+                ]
+            ],
+            ["v", 101n]
+        ]),
+        0n,
+        undefined
+    ],
+    [
         CLayoutType,
         new Struct([
             ["a", 5678n],
@@ -688,33 +1030,143 @@ const samples: Array<[StorageDesc, number, number, ExpStructType, Value]> = [
                 ]
             ],
             ["o", hexToBytes("0000000035")]
+        ]),
+        42n,
+        undefined
+    ],
+    [
+        CLayoutType,
+        new Struct([
+            ["a", 5678n],
+            ["e", [1n, 2n, 3n, 4n]],
+            ["f", new Map(
+                [
+                    [0n, new Struct([["x", 1n], ["y", true]])],
+                    [1n, new Struct([["x", 2n], ["y", false]])]
+                ]
+            )],
+            ["g", 34n],
+            ["h", 45n],
+            [
+                "s",
+                new Struct([
+                    ["x", 13n],
+                    ["y", true]
+                ])
+            ],
+            ["k", -127n],
+            ["l", hexToBytes("00000000000000000000000000000000000000002a")],
+            ["m", [1n, 2n, 3n, 4n, 5n, 6n, 7n, 8n, 9n, 10n, 0n, 0n]],
+            [
+                "n",
+                [
+                    hexToBytes("0000000000"),
+                    hexToBytes("0000000000"),
+                    hexToBytes("0000000000"),
+                    hexToBytes("0000000000"),
+                    hexToBytes("0000000023"),
+                    hexToBytes("0000000000"),
+                    hexToBytes("0000000000"),
+                    hexToBytes("0000000000")
+                ]
+            ],
+            ["o", hexToBytes("0000000035")]
+        ]),
+        42n,
+        new Map([
+            [
+                44n,
+                [
+                    [
+                        hexToBytes(
+                            "0000000000000000000000000000000000000000000000000000000000000000"
+                        ),
+                        0x4bd6275b77b7e49eb0792b10b407951644bbdba590ba83c6764fe2c9da0b9befn
+                    ],
+                    [
+                        hexToBytes(
+                            "0000000000000000000000000000000000000000000000000000000000000001"
+                        ),
+                        0xa1f88ee5f5d946e3956f6291445d84cd8aea2bf6c57f4f4ac349f7a338882643n
+                    ]
+                ]
+            ]
         ])
     ],
-    
-        */
-];
+]
 
-function ppStorage(s: Storage): string {
-    let lines: string[] = [];
+describe(`Storage Eecoding RTT Tests`, () => {
+    for (const [type, value, baseOff, m] of rttSamples) {
+        it(`Sample ${type instanceof ExpStructType ? type.name : type.pp()} `, () => {
+            const storage: Storage = ImmMap.fromEntries([]);
+            const view = makeStorageView(type, [baseOff, 32]);
+            const newStore = view.encode(value, storage);
 
-    for (const [k, v] of s.entries()) {
-        lines.push(`${k}: ${bytesToHex(v)}`)
-    }
-
-    lines.sort();
-    return `{\n${lines.join(",\n")}\n}`
-}
-
-describe(`Storage Decoding Tests`, () => {
-    for (const [expectedStorageDesc, key, offset, type, value] of samples) {
-        const expStorage = toStorage(expectedStorageDesc);
-
-        it(`Sample ${type.name} `, () => {
-            const view = makeStorageView(type, [BigInt(key), offset]);
-            const initialStorage = ImmMap.fromEntries<bigint, Uint8Array>([]);
-            const actualStorage = view.encode(value, initialStorage);
-            expect(ppStorage(actualStorage)).toEqual(ppStorage(expStorage));
+            const decVal = view.decode(newStore, m);
+            expect(hasPoison(decVal)).toBeFalsy();
+            expect(decVal).toEqual(value);
         });
     }
 
+    it(`Map encoding with complex keys`, () => {
+        const mapKeys: MapKeys = new Map([
+            [
+                0n,
+                [
+                    [
+                        hexToBytes("010203"),
+                        0xce4edd0c850af0ce44d5c79dd9354de666aa901a00d2111f49bd97f94cb8f6bbn
+                    ],
+                    [
+                        hexToBytes("010204"),
+                        0x8a03f525df54a7cbda74e29f15a3ba86a222d05788f5db224bb729a2a10080f4n
+                    ]
+                ]
+            ],
+            [
+                1n,
+                [
+                    [
+                        hexToBytes("616263"),
+                        0xac85c8cc1ac92e94a731b8df588044cbfd366c5ee08805d198cb1b094f3cacacn
+                    ],
+                    [
+                        hexToBytes("646566"),
+                        0x007190f0fed5dcd60b9b3a23e83c99c86ff19bc3d9b603c39d3faf6b4ed8c5dcn
+                    ]
+                ]
+            ]
+        ]);
+
+        const value = new Struct([
+            [
+                "m1",
+                new Map([
+                    ["010203", 1n],
+                    ["010204", 2n]
+                ])
+            ],
+            [
+                "m2",
+                new Map([
+                    ["abc", 3n],
+                    ["def", 4n]
+                ])
+            ],
+            ["mNoKeys", new Map([])]
+        ]);
+
+        const layout = new ExpStructType("MapWithComplexKeys", [
+            ["m1", new MappingType(new PointerType(new BytesType(), DataLocation.Memory), uint256)],
+            ["m2", new MappingType(new PointerType(new StringType(), DataLocation.Memory), uint256)],
+            ["mNoKeys", new MappingType(new PointerType(new StringType(), DataLocation.Memory), uint256)],
+        ])
+
+        const view = makeStorageView(layout, [0n, 32]);
+        const storage: Storage = ImmMap.fromEntries([]);
+        const newStore = view.encode(value, storage);
+        const decValue = view.decode(newStore, mapKeys) as Struct;
+        expect(hasPoison(decValue)).toBeFalsy();
+        expect(decValue).toEqual(decValue);
+    });
 });

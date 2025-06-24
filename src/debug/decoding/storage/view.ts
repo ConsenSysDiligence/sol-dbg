@@ -30,13 +30,13 @@ import {
     ZERO_BYTES32
 } from "../../../utils";
 import { keccak256 } from "ethereum-cryptography/keccak";
-import { Address, bytesToUtf8 } from "@ethereumjs/util";
+import { Address, bytesToUtf8, concatBytes } from "@ethereumjs/util";
 import { ExpStructType, MissingType } from "../exp_types";
 import { MapKeys } from "../../tracers";
 import { makeMemoryView } from "../memory";
 import { isFailure, isTypeStringStatic32BytesInStorage } from "../utils";
-import { BaseMemoryView } from "../memory/view";
-import { bytesToHex, equalsBytes } from "ethereum-cryptography/utils";
+import { BaseMemoryView, IntMemView } from "../memory/view";
+import { bytesToHex, equalsBytes, utf8ToBytes } from "ethereum-cryptography/utils";
 
 type StorageLocation = [bigint, number];
 
@@ -482,6 +482,21 @@ function decodeMapRefKey(type: TypeNode, data: Uint8Array): string {
     return type instanceof StringType ? bytesToUtf8(data) : bytesToHex(data);
 }
 
+function encodeMapKey(keyT: TypeNode, value: Value): Uint8Array {
+    if (keyT instanceof PointerType) {
+        if (!(keyT.to instanceof StringType || keyT.to instanceof BytesType)) {
+            throw new Error(`Invalid map reference key type ${keyT.pp()}`);
+        }
+
+        return keyT instanceof StringType ? utf8ToBytes(value as string) : value as Uint8Array
+    }
+
+    const buf = new Uint8Array(32);
+    const keyV = makeMemoryView(keyT, 0n);
+    keyV.encode(value, buf, undefined as any);
+    return buf;
+}
+
 export class MapStorageView extends BaseStorageView<Map<Value, Value>, MappingType> {
     constructor(type: MappingType, loc: StorageLocation) {
         super(type, loc);
@@ -530,9 +545,25 @@ export class MapStorageView extends BaseStorageView<Map<Value, Value>, MappingTy
         return res;
     }
 
-    encode(): Storage {
-        // Needs memory encodings first
-        nyi(`map encodings`)
+    encode(value: Map<Value, Value>, state: Storage): Storage {
+        // Encode the current slot in the buffer `slot`
+        const valueT = this.type.valueType
+        const slotBuf = new Uint8Array(32);
+        const memView = new IntMemView(uint256, 0n);
+        memView.encode(this.loc[0], slotBuf);
+
+        for (const [k, v] of value) {
+            // Compute the concatenation h(k) . p as per
+            // https://docs.soliditylang.org/en/latest/internals/layout_in_storage.html#mappings-and-dynamic-arrays
+            const keyBuf = encodeMapKey(this.type.keyType, k);
+            const combinedBuf = concatBytes(keyBuf, slotBuf);
+            const keySlot = bigEndianBufToBigint(keccak256(combinedBuf));
+
+            const valueView = makeStorageView(valueT, [keySlot, 32])
+            state = valueView.encode(v, state);
+        }
+
+        return state;
     }
 }
 
