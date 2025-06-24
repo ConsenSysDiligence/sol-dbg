@@ -501,7 +501,9 @@ const samples: Array<[StorageDesc, number, number, TypeNode | TypeGenerator, Val
                             ["b", true],
                             [
                                 "addrs",
-                                createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
+                                createAddressFromString(
+                                    "0xcD6a42782d230D7c13A74ddec5dD140e55499Df9"
+                                )
                             ]
                         ])
                     ],
@@ -520,7 +522,9 @@ const samples: Array<[StorageDesc, number, number, TypeNode | TypeGenerator, Val
                             ["b", true],
                             [
                                 "addrs",
-                                createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
+                                createAddressFromString(
+                                    "0xcD6a42782d230D7c13A74ddec5dD140e55499Df9"
+                                )
                             ]
                         ])
                     ],
@@ -543,7 +547,9 @@ const samples: Array<[StorageDesc, number, number, TypeNode | TypeGenerator, Val
                                     createAddressFromString(
                                         "0x0000000000000000000000000000000000000000"
                                     ),
-                                    createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
+                                    createAddressFromString(
+                                        "0xcD6a42782d230D7c13A74ddec5dD140e55499Df9"
+                                    )
                                 ]
                             ]
                         ])

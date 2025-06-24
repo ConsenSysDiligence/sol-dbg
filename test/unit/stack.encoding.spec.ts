@@ -40,7 +40,7 @@ describe(`Stack Encoding Tests`, () => {
     }
 });
 
-const rttSamples: [TypeNode, Value][] = [
+const rttSamples: Array<[TypeNode, Value]> = [
     [bool, false],
     [bool, true],
     [uint8, 1n],
@@ -48,7 +48,7 @@ const rttSamples: [TypeNode, Value][] = [
     [int128, -1n],
     [address, createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")],
     [bytes21, hexToBytes("cD6a42782d230D7c13A74ddec5dD140e55499Df900")]
-]
+];
 
 describe(`Stack Encoding/Decoding RTT Tests`, () => {
     for (const [type, value] of rttSamples) {

@@ -34,17 +34,17 @@ export abstract class BaseMemoryView<
     Val extends Value,
     Type extends TypeNode = TypeNode
 > extends View<Memory, Val, bigint, Type> {
-    protected writeMemAt(
-        value: Uint8Array,
-        off: bigint,
-        mem: Memory,
-    ): void {
+    protected writeMemAt(value: Uint8Array, off: bigint, mem: Memory): void {
         if (off < 0n || off + BigInt(value.length) > BigInt(mem.length)) {
-            console.error(`OoB writing mem at ${off} of length ${value.length} in memory of size ${mem.length}`)
-            throw new EncodingError(`OoB writing mem at ${off} of length ${value.length} in memory of size ${mem.length}`);
+            console.error(
+                `OoB writing mem at ${off} of length ${value.length} in memory of size ${mem.length}`
+            );
+            throw new EncodingError(
+                `OoB writing mem at ${off} of length ${value.length} in memory of size ${mem.length}`
+            );
         }
 
-        mem.set(value, Number(off))
+        mem.set(value, Number(off));
     }
 
     protected readMemAt(
@@ -104,7 +104,7 @@ export abstract class BaseMemoryView<
         this.writeMemAt(word, off, state);
     }
 
-    abstract encode(value: Val, state: Memory, alloc: Allocator): void
+    abstract encode(value: Val, state: Memory, alloc: Allocator): void;
 }
 
 export class IntMemView extends BaseMemoryView<bigint, IntType> {
@@ -125,9 +125,9 @@ export class AddressMemView extends BaseMemoryView<Address, AddressType> {
 
     encode(value: Address, state: Memory): void {
         // We write a full word to make sure the lower bytes are 0-ed out
-        const w = new Uint8Array(32)
+        const w = new Uint8Array(32);
         w.set(value.bytes, 12);
-        this.writeMemAt(w, this.loc, state)
+        this.writeMemAt(w, this.loc, state);
     }
 }
 
@@ -150,14 +150,17 @@ export class FixedBytesMemView extends BaseMemoryView<Uint8Array, FixedBytesType
         return this.readMemAt(this.loc, state, this.type.size);
     }
 
-    encode(value: Uint8Array<ArrayBufferLike>, state: Memory, alloc: Allocator): void {
+    encode(value: Uint8Array<ArrayBufferLike>, state: Memory): void {
         const w = new Uint8Array(32);
         w.set(value);
         this.writeMemAt(w, this.loc, state);
     }
 }
 
-export abstract class PackedArrayMemView<V extends Value, T extends TypeNode> extends BaseMemoryView<V, T> {
+export abstract class PackedArrayMemView<
+    V extends Value,
+    T extends TypeNode
+> extends BaseMemoryView<V, T> {
     protected decodeBytesAt(loc: bigint, state: Memory): Uint8Array | DecodingFailure {
         const len = this.decodeIntAt(loc, uint256, state);
 
@@ -184,7 +187,7 @@ export class BytesMemView extends PackedArrayMemView<Uint8Array, BytesType> {
     }
 
     encode(value: Uint8Array, state: Memory): void {
-        this.encodeBytesAt(value, this.loc, state)
+        this.encodeBytesAt(value, this.loc, state);
     }
 }
 
@@ -195,7 +198,7 @@ export class StringMemView extends PackedArrayMemView<string, StringType> {
     }
 
     encode(value: string, state: Memory): void {
-        this.encodeBytesAt(utf8ToBytes(value), this.loc, state)
+        this.encodeBytesAt(utf8ToBytes(value), this.loc, state);
     }
 }
 
@@ -233,14 +236,14 @@ export class ArrayMemView extends BaseMemoryView<Value[], ArrayType> {
     }
 
     encode(value: Value[], state: Memory, alloc: Allocator): void {
-        let off = this.loc
+        let off = this.loc;
 
         if (this.type.size === undefined) {
-            this.encodeIntAt(BigInt(value.length), off, state)
+            this.encodeIntAt(BigInt(value.length), off, state);
             off += 32n;
         }
 
-        for (let v of value) {
+        for (const v of value) {
             const view = makeMemoryView(this.type.elementT, off);
             view.encode(v, state, alloc);
             off += 32n;
@@ -294,7 +297,10 @@ export class PointerMemView extends BaseMemoryView<Value, PointerType> {
      */
     static allocSize(v: Value | undefined, t: TypeNode): number {
         if (t instanceof ArrayType) {
-            return (v as Value[]).length * PointerMemView.allocSize(undefined, t.elementT) + (t.size !== undefined ? 0 : 32);
+            return (
+                (v as Value[]).length * PointerMemView.allocSize(undefined, t.elementT) +
+                (t.size !== undefined ? 0 : 32)
+            );
         }
 
         if (t instanceof ExpStructType) {
@@ -307,17 +313,16 @@ export class PointerMemView extends BaseMemoryView<Value, PointerType> {
         }
 
         if (t instanceof PackedArrayType) {
-            return Buffer.from((v as Uint8Array | string)).length + 32;
+            return Buffer.from(v as Uint8Array | string).length + 32;
         }
 
         return 32;
     }
 
-
     encode(value: Value, state: Memory, alloc: Allocator): void {
-        const ptr = alloc.alloc(PointerMemView.allocSize(value, this.type.to))
+        const ptr = alloc.alloc(PointerMemView.allocSize(value, this.type.to));
         this.encodeIntAt(ptr, this.loc, state);
-        const view = makeMemoryView(this.type.to, ptr)
+        const view = makeMemoryView(this.type.to, ptr);
         view.encode(value, state, alloc);
     }
 }
@@ -330,7 +335,7 @@ export class MissingMemView extends BaseMemoryView<Value, MissingType> {
     }
 
     encode(): void {
-        throw new EncodingError(`Cannot encode missing type ${this.type.pp()}`)
+        throw new EncodingError(`Cannot encode missing type ${this.type.pp()}`);
     }
 }
 

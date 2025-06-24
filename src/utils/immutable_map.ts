@@ -54,7 +54,7 @@ export class ImmMap<KeyT, ValT> {
 
         const newInnerM = this.collectMap();
         newInnerM.delete(key);
-        let res = new ImmMap<KeyT, ValT>(undefined)
+        const res = new ImmMap<KeyT, ValT>(undefined);
         res.innerM = newInnerM;
 
         return res as this;
@@ -81,12 +81,12 @@ export class ImmMap<KeyT, ValT> {
     }
 
     collapseUntil(parent: ImmMap<KeyT, ValT>): this {
-        let newMap = new ImmMap<KeyT, ValT>(parent);
+        const newMap = new ImmMap<KeyT, ValT>(parent);
         let m: ImmMap<KeyT, ValT> | undefined = this;
 
         while (m !== parent && m !== undefined) {
             for (const [k, v] of m.innerM) {
-                newMap.innerM.set(k, v)
+                newMap.innerM.set(k, v);
             }
 
             m = m._next;

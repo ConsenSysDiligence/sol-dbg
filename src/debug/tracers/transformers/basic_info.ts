@@ -12,10 +12,7 @@ import { Memory, Stack, Storage } from "../../types";
 import { OpInfo } from "./op";
 import { MerkleStateManager } from "@ethereumjs/statemanager";
 
-export async function getStorage(
-    manager: StateManagerInterface,
-    addr: Address
-): Promise<Storage> {
+export async function getStorage(manager: StateManagerInterface, addr: Address): Promise<Storage> {
     const rawStorage = await (manager as MerkleStateManager).dumpStorage(addr);
     const storageEntries: Array<[bigint, Uint8Array]> = [];
 

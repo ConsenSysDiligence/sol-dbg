@@ -5,7 +5,9 @@ import { Memory, Stack } from "../types";
 export type StateArea = Memory | Stack | Storage;
 
 export class EncodingError extends Error {
-    constructor(public readonly reason: string) { super(); }
+    constructor(public readonly reason: string) {
+        super();
+    }
 }
 
 /**
@@ -21,7 +23,7 @@ export abstract class View<
     constructor(
         public readonly type: Type,
         protected loc: Loc
-    ) { }
+    ) {}
 
     /**
      * Decode a value from the given State

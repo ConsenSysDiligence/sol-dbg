@@ -7,13 +7,7 @@ import { getCodeHash, getCreationCodeHash } from "../../../artifacts";
 import { mustReadMem, stackTop, wordToAddress, ZERO_ADDRESS } from "../../../utils/misc";
 import { ContractInfo, IArtifactManager } from "../../artifact_manager";
 import { createsContract, increasesDepth, OPCODES } from "../../opcodes";
-import {
-    CallFrame,
-    CreationFrame,
-    ExternalFrame,
-    FrameKind,
-    HexString,
-} from "../../types";
+import { CallFrame, CreationFrame, ExternalFrame, FrameKind, HexString } from "../../types";
 import { BasicStepInfo } from "./basic_info";
 import { View } from "../../decoding/view";
 import { buildMsgViews } from "../../abi";
@@ -127,9 +121,9 @@ function decodeCall(step: BasicStepInfo): [Address, Address, Uint8Array] {
     const op = step.op;
     assert(
         op.opcode === OPCODES.CALL ||
-        op.opcode === OPCODES.CALLCODE ||
-        op.opcode === OPCODES.DELEGATECALL ||
-        op.opcode === OPCODES.STATICCALL,
+            op.opcode === OPCODES.CALLCODE ||
+            op.opcode === OPCODES.DELEGATECALL ||
+            op.opcode === OPCODES.STATICCALL,
         `Unexpected call instruction {0}`,
         op.mnemonic
     );

@@ -45,8 +45,8 @@ const valueTypeSamples: Array<[string, number, TypeNode | TypeGenerator, Value]>
         0,
         bytes32,
         hexToBytes("0000000000000000000000000000000000000000000000000000000000abcdef")
-    ],
-]
+    ]
+];
 
 const refTypeSamples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
     [
@@ -249,8 +249,12 @@ const refTypeSamples: Array<[string, number, TypeNode | TypeGenerator, Value]> =
                         [
                             "addrs",
                             [
-                                createAddressFromString("0x0000000000000000000000000000000000000000"),
-                                createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
+                                createAddressFromString(
+                                    "0x0000000000000000000000000000000000000000"
+                                ),
+                                createAddressFromString(
+                                    "0xcD6a42782d230D7c13A74ddec5dD140e55499Df9"
+                                )
                             ]
                         ]
                     ]),
@@ -303,12 +307,11 @@ describe(`Memory Value Types Encoding Tests`, () => {
     }
 });
 
-
 describe(`Memory Reference Types Encoding Tests`, () => {
     for (const [expectedMemoryStr, , typeDesc, value] of refTypeSamples) {
         const expectedMem = hexToBytes(expectedMemoryStr);
         it(`Sample ${ppType(typeDesc)}`, () => {
-            const alloc = new DefaultAllocator()
+            const alloc = new DefaultAllocator();
             const ptrOff = alloc.alloc(32);
             const type = simplifyType(
                 typeDesc instanceof TypeNode ? typeDesc : typeDesc(unit),
@@ -323,33 +326,16 @@ describe(`Memory Reference Types Encoding Tests`, () => {
     }
 });
 
-
-const rttSamples: [TypeNode | TypeGenerator, Value][] = [
-
+const rttSamples: Array<[TypeNode | TypeGenerator, Value]> = [
     [int8, -1n],
     [uint16, 65535n],
     [uint16, 123456n],
     [bool, true],
-    [
-        address,
-        createAddressFromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")
-    ],
-    [
-        bytes2,
-        hexToBytes("0102")
-    ],
-    [
-        bytes32,
-        hexToBytes("0000000000000000000000000000000000000000000000000000000000abcdef")
-    ],
-    [
-        new PointerType(new ArrayType(uint16), DataLocation.Memory),
-        [12n, 13n, 14n]
-    ],
-    [
-        new PointerType(new ArrayType(int128, 4n), DataLocation.Memory),
-        [-1n, -2n, -3n, -4n]
-    ],
+    [address, createAddressFromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")],
+    [bytes2, hexToBytes("0102")],
+    [bytes32, hexToBytes("0000000000000000000000000000000000000000000000000000000000abcdef")],
+    [new PointerType(new ArrayType(uint16), DataLocation.Memory), [12n, 13n, 14n]],
+    [new PointerType(new ArrayType(int128, 4n), DataLocation.Memory), [-1n, -2n, -3n, -4n]],
     [
         (unit) => {
             const decl = new XPath(unit).query(
@@ -524,8 +510,12 @@ const rttSamples: [TypeNode | TypeGenerator, Value][] = [
                         [
                             "addrs",
                             [
-                                createAddressFromString("0x0000000000000000000000000000000000000000"),
-                                createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
+                                createAddressFromString(
+                                    "0x0000000000000000000000000000000000000000"
+                                ),
+                                createAddressFromString(
+                                    "0xcD6a42782d230D7c13A74ddec5dD140e55499Df9"
+                                )
                             ]
                         ]
                     ]),
@@ -539,12 +529,12 @@ const rttSamples: [TypeNode | TypeGenerator, Value][] = [
             ]
         ])
     ]
-]
+];
 
 describe(`Memory encoding/decoding RTT tests`, () => {
     for (const [typeDesc, value] of rttSamples) {
         it(`Sample ${ppType(typeDesc)}`, () => {
-            const alloc = new DefaultAllocator()
+            const alloc = new DefaultAllocator();
             const type = simplifyType(
                 typeDesc instanceof TypeNode ? typeDesc : typeDesc(unit),
                 infer,

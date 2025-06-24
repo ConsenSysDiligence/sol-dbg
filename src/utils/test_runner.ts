@@ -2,7 +2,13 @@ import { Block, createBlock } from "@ethereumjs/block";
 import { Common, StateManagerInterface, Hardfork } from "@ethereumjs/common";
 import { MerkleStateManager } from "@ethereumjs/statemanager";
 import { TypedTransaction, TypedTxData } from "@ethereumjs/tx";
-import { Address, PrefixedHexString, createAccount, createAddressFromString, hexToBigInt } from "@ethereumjs/util";
+import {
+    Address,
+    PrefixedHexString,
+    createAccount,
+    createAddressFromString,
+    hexToBigInt
+} from "@ethereumjs/util";
 import { bytesToHex, hexToBytes } from "ethereum-cryptography/utils";
 import { assert } from "solc-typed-ast";
 import { IArtifactManager } from "../debug/artifact_manager/artifact_manager";
@@ -148,7 +154,8 @@ export class TxRunner {
         await state.checkpoint();
 
         for (const addressStr of Object.keys(initialState.accounts)) {
-            const { nonce, balance, code, storage } = initialState.accounts[addressStr as HexString];
+            const { nonce, balance, code, storage } =
+                initialState.accounts[addressStr as HexString];
 
             const address = createAddressFromString(addressStr);
             const codeBuf = hexToBytes(code.slice(2));
@@ -156,7 +163,7 @@ export class TxRunner {
             const acct = createAccount({
                 nonce: BigInt(nonce),
                 balance: BigInt(balance)
-            })
+            });
 
             await state.putAccount(address, acct);
 

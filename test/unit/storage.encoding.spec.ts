@@ -6,7 +6,7 @@ import {
     MappingType,
     PointerType,
     StringType,
-    TypeNode,
+    TypeNode
 } from "solc-typed-ast";
 import { hasPoison, Struct, Value } from "../../src/debug/decoding/value";
 import { bytesToHex, hexToBytes } from "ethereum-cryptography/utils";
@@ -437,7 +437,9 @@ const samples: Array<[StorageDesc, number, number, ExpStructType, Value]> = [
                             ["b", true],
                             [
                                 "addrs",
-                                createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
+                                createAddressFromString(
+                                    "0xcD6a42782d230D7c13A74ddec5dD140e55499Df9"
+                                )
                             ]
                         ])
                     ],
@@ -456,7 +458,9 @@ const samples: Array<[StorageDesc, number, number, ExpStructType, Value]> = [
                             ["b", true],
                             [
                                 "addrs",
-                                createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
+                                createAddressFromString(
+                                    "0xcD6a42782d230D7c13A74ddec5dD140e55499Df9"
+                                )
                             ]
                         ])
                     ],
@@ -479,7 +483,9 @@ const samples: Array<[StorageDesc, number, number, ExpStructType, Value]> = [
                                     createAddressFromString(
                                         "0x0000000000000000000000000000000000000000"
                                     ),
-                                    createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
+                                    createAddressFromString(
+                                        "0xcD6a42782d230D7c13A74ddec5dD140e55499Df9"
+                                    )
                                 ]
                             ]
                         ])
@@ -662,12 +668,25 @@ const samples: Array<[StorageDesc, number, number, ExpStructType, Value]> = [
         new Struct([
             ["a", 5678n],
             ["e", [1n, 2n, 3n, 4n]],
-            ["f", new Map(
-                [
-                    [0n, new Struct([["x", 1n], ["y", true]])],
-                    [1n, new Struct([["x", 2n], ["y", false]])]
-                ]
-            )],
+            [
+                "f",
+                new Map([
+                    [
+                        0n,
+                        new Struct([
+                            ["x", 1n],
+                            ["y", true]
+                        ])
+                    ],
+                    [
+                        1n,
+                        new Struct([
+                            ["x", 2n],
+                            ["y", false]
+                        ])
+                    ]
+                ])
+            ],
             ["g", 34n],
             ["h", 45n],
             [
@@ -695,18 +714,18 @@ const samples: Array<[StorageDesc, number, number, ExpStructType, Value]> = [
             ],
             ["o", hexToBytes("0000000035")]
         ])
-    ],
+    ]
 ];
 
 function ppStorage(s: Storage): string {
-    let lines: string[] = [];
+    const lines: string[] = [];
 
     for (const [k, v] of s.entries()) {
-        lines.push(`${k}: ${bytesToHex(v)}`)
+        lines.push(`${k}: ${bytesToHex(v)}`);
     }
 
     lines.sort();
-    return `{\n${lines.join(",\n")}\n}`
+    return `{\n${lines.join(",\n")}\n}`;
 }
 
 describe(`Storage Encoding Tests`, () => {
@@ -720,10 +739,9 @@ describe(`Storage Encoding Tests`, () => {
             expect(ppStorage(actualStorage)).toEqual(ppStorage(expStorage));
         });
     }
-
 });
 
-const rttSamples: [TypeNode, Value, bigint, MapKeys | undefined][] = [
+const rttSamples: Array<[TypeNode, Value, bigint, MapKeys | undefined]> = [
     [
         MoreStructsLayoutType,
         new Struct([
@@ -781,7 +799,9 @@ const rttSamples: [TypeNode, Value, bigint, MapKeys | undefined][] = [
                             ["b", true],
                             [
                                 "addrs",
-                                createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
+                                createAddressFromString(
+                                    "0xcD6a42782d230D7c13A74ddec5dD140e55499Df9"
+                                )
                             ]
                         ])
                     ],
@@ -800,7 +820,9 @@ const rttSamples: [TypeNode, Value, bigint, MapKeys | undefined][] = [
                             ["b", true],
                             [
                                 "addrs",
-                                createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
+                                createAddressFromString(
+                                    "0xcD6a42782d230D7c13A74ddec5dD140e55499Df9"
+                                )
                             ]
                         ])
                     ],
@@ -823,7 +845,9 @@ const rttSamples: [TypeNode, Value, bigint, MapKeys | undefined][] = [
                                     createAddressFromString(
                                         "0x0000000000000000000000000000000000000000"
                                     ),
-                                    createAddressFromString("0xcD6a42782d230D7c13A74ddec5dD140e55499Df9")
+                                    createAddressFromString(
+                                        "0xcD6a42782d230D7c13A74ddec5dD140e55499Df9"
+                                    )
                                 ]
                             ]
                         ])
@@ -1039,12 +1063,25 @@ const rttSamples: [TypeNode, Value, bigint, MapKeys | undefined][] = [
         new Struct([
             ["a", 5678n],
             ["e", [1n, 2n, 3n, 4n]],
-            ["f", new Map(
-                [
-                    [0n, new Struct([["x", 1n], ["y", true]])],
-                    [1n, new Struct([["x", 2n], ["y", false]])]
-                ]
-            )],
+            [
+                "f",
+                new Map([
+                    [
+                        0n,
+                        new Struct([
+                            ["x", 1n],
+                            ["y", true]
+                        ])
+                    ],
+                    [
+                        1n,
+                        new Struct([
+                            ["x", 2n],
+                            ["y", false]
+                        ])
+                    ]
+                ])
+            ],
             ["g", 34n],
             ["h", 45n],
             [
@@ -1092,8 +1129,8 @@ const rttSamples: [TypeNode, Value, bigint, MapKeys | undefined][] = [
                 ]
             ]
         ])
-    ],
-]
+    ]
+];
 
 describe(`Storage Eecoding RTT Tests`, () => {
     for (const [type, value, baseOff, m] of rttSamples) {
@@ -1158,9 +1195,15 @@ describe(`Storage Eecoding RTT Tests`, () => {
 
         const layout = new ExpStructType("MapWithComplexKeys", [
             ["m1", new MappingType(new PointerType(new BytesType(), DataLocation.Memory), uint256)],
-            ["m2", new MappingType(new PointerType(new StringType(), DataLocation.Memory), uint256)],
-            ["mNoKeys", new MappingType(new PointerType(new StringType(), DataLocation.Memory), uint256)],
-        ])
+            [
+                "m2",
+                new MappingType(new PointerType(new StringType(), DataLocation.Memory), uint256)
+            ],
+            [
+                "mNoKeys",
+                new MappingType(new PointerType(new StringType(), DataLocation.Memory), uint256)
+            ]
+        ]);
 
         const view = makeStorageView(layout, [0n, 32]);
         const storage: Storage = ImmMap.fromEntries([]);

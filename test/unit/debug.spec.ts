@@ -116,7 +116,8 @@ export function stackTracesEq(actualST: string, expectedST: string[]): boolean {
 
     if (actualSTLines.length !== expectedST.length) {
         console.error(
-            `Traces have different number of lines. Expected(${expectedST.length
+            `Traces have different number of lines. Expected(${
+                expectedST.length
             }): \n ${expectedST.join("\n")} \n Actual(${actualSTLines.length}): \n ${actualST}`
         );
 
