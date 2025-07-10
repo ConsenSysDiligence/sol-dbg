@@ -13,7 +13,7 @@ import {
 } from "solc-typed-ast";
 import { DecodingFailure, hasPoison, Value } from "../../src/debug/decoding/value";
 import { hexToBytes } from "ethereum-cryptography/utils";
-import { ArrayStorageView, BaseStorageView, bigEndianBufToBigint, BytesStorageView, FixedBytesStorageView, ImmMap, makeStorageView, MapStorageView, PointerStorageView, Storage } from "../../src";
+import { ArrayStorageView, BaseStorageView, bigEndianBufToBigint, BytesStorageView, FixedBytesStorageView, ImmMap, makeStorageView, MapStorageView, PointerStorageView, SingleByteStorageView, Storage } from "../../src";
 import { bytes5, uint8 } from "../utils";
 import { setLengthLeft } from "@ethereumjs/util";
 
@@ -152,5 +152,14 @@ describe(`Storage Indexing Tests`, () => {
         v = (m2View.toView() as MapStorageView).indexView("xxx");
         expect(v).not.toBeInstanceOf(DecodingFailure);
         expect((v as BaseStorageView<Value, TypeNode>).decode(storage)).toEqual(0n);
+    })
+
+    it("SignleByteStorageView encoding test", () => {
+        let storage = toStorage(simpleStorDesc);
+        const view = new FixedBytesStorageView(bytes5, [1n, 32]);
+        const elView = view.indexView(4n, storage); // ef
+        expect(elView).not.toBeInstanceOf(DecodingFailure);
+        storage = (elView as SingleByteStorageView).encode(1, storage);
+        expect(view.decode(storage)).toEqual(hexToBytes("0405060701"))
     })
 });
