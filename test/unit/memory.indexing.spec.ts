@@ -105,8 +105,8 @@ describe(`Memory Indexing Tests`, () => {
 
             assert(
                 view instanceof ArrayMemView ||
-                view instanceof BytesMemView ||
-                view instanceof FixedBytesMemView,
+                    view instanceof BytesMemView ||
+                    view instanceof FixedBytesMemView,
                 `Expected indexable view`
             );
 
@@ -125,11 +125,13 @@ describe(`Memory Indexing Tests`, () => {
     }
 
     it("SignleByteMemView encoding test", () => {
-        const mem = hexToBytes("0000000000000000000000000000000000000000000000000000000000abcdef")
+        const mem = hexToBytes("0000000000000000000000000000000000000000000000000000000000abcdef");
         const view = new FixedBytesMemView(bytes32, 0n);
-        const elView = view.indexView(31n, mem); // ef
+        const elView = view.indexView(31n); // ef
         expect(elView).not.toBeInstanceOf(DecodingFailure);
         (elView as SingleByteMemView).encode(1, mem);
-        expect(view.decode(mem)).toEqual(hexToBytes("0000000000000000000000000000000000000000000000000000000000abcd01"))
-    })
+        expect(view.decode(mem)).toEqual(
+            hexToBytes("0000000000000000000000000000000000000000000000000000000000abcd01")
+        );
+    });
 });

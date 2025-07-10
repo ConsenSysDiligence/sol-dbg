@@ -13,7 +13,7 @@ import {
     types
 } from "solc-typed-ast";
 import { Memory } from "../../types";
-import { EncodingError, IndexableView, PointerView, View } from "../view";
+import { EncodingError, IndexableView, PointerView, StructView, View } from "../view";
 import { DecodingFailure, Struct, Value } from "../value";
 import {
     bigEndianBufToBigint,
@@ -181,7 +181,7 @@ export class FixedBytesMemView
         this.writeMemAt(w, this.loc, state);
     }
 
-    indexView(key: bigint, state: Memory): DecodingFailure | SingleByteMemView {
+    indexView(key: bigint): DecodingFailure | SingleByteMemView {
         if (key >= this.type.size || key < 0n) {
             return new DecodingFailure(`Invalid index ${key} in ${this.type.pp()}`);
         }
@@ -327,7 +327,10 @@ export class ArrayMemView
     }
 }
 
-export class StructMemView extends BaseMemoryView<Struct, ExpStructType> {
+export class StructMemView
+    extends BaseMemoryView<Struct, ExpStructType>
+    implements StructView<Memory, BaseMemoryView<Value, TypeNode>>
+{
     decode(state: Memory): Struct {
         const entries: Array<[string, Value]> = [];
 
@@ -353,6 +356,20 @@ export class StructMemView extends BaseMemoryView<Struct, ExpStructType> {
             view.encode(value.entries[i][1], state, alloc);
             offset += 32n;
         }
+    }
+
+    fieldView(name: string): BaseMemoryView<Value, TypeNode> | DecodingFailure {
+        let offset = this.loc;
+
+        for (const [fieldName, type] of this.type.fields) {
+            if (fieldName === name) {
+                return makeMemoryView(type, offset);
+            }
+
+            offset += 32n;
+        }
+
+        return new DecodingFailure(`No such field ${name} on struct ${this.type.pp()}`);
     }
 }
 

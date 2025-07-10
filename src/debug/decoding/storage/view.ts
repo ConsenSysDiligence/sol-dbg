@@ -14,7 +14,7 @@ import {
     types
 } from "solc-typed-ast";
 import { DecodingFailure, Struct, Value } from "../value";
-import { EncodingError, IndexableView, PointerView, View } from "../view";
+import { EncodingError, IndexableView, PointerView, StructView, View } from "../view";
 import { Storage } from "../../types";
 import {
     address,
@@ -289,10 +289,10 @@ export class SingleByteStorageView extends BaseStorageView<number, FixedBytesTyp
     }
 }
 
-
 export class FixedBytesStorageView
     extends BaseStorageView<Uint8Array, FixedBytesType>
-    implements IndexableView<bigint, Storage, SingleByteStorageView> {
+    implements IndexableView<bigint, Storage, SingleByteStorageView>
+{
     decode(state: Storage): Uint8Array | DecodingFailure {
         if (this.endOffsetInWord < this.type.size) {
             return new DecodingFailure(
@@ -320,12 +320,15 @@ export class FixedBytesStorageView
         return this.setWord(this.key, word, state);
     }
 
-    indexView(key: bigint, state: Storage): DecodingFailure | SingleByteStorageView {
+    indexView(key: bigint): DecodingFailure | SingleByteStorageView {
         if (key >= this.type.size || key < 0n) {
             return new DecodingFailure(`Invalid index ${key} in ${this.type.pp()}`);
         }
 
-        return new SingleByteStorageView([this.key, this.endOffsetInWord - this.type.size + Number(key) + 1])
+        return new SingleByteStorageView([
+            this.key,
+            this.endOffsetInWord - this.type.size + Number(key) + 1
+        ]);
     }
 
     nextLoc(): StorageLocation {
@@ -335,7 +338,8 @@ export class FixedBytesStorageView
 
 export class PointerStorageView
     extends BaseStorageView<Value, PointerType>
-    implements PointerView<Storage, BaseStorageView<Value, TypeNode>> {
+    implements PointerView<Storage, BaseStorageView<Value, TypeNode>>
+{
     innerView: BaseStorageView<Value, TypeNode>;
     constructor(type: PointerType, loc: [bigint, number]) {
         super(type, loc);
@@ -368,7 +372,8 @@ function keccakOfAddr(addr: bigint): bigint {
 
 export class ArrayStorageView
     extends BaseStorageView<Value[], ArrayType>
-    implements IndexableView<bigint, Storage, BaseStorageView<Value, TypeNode>> {
+    implements IndexableView<bigint, Storage, BaseStorageView<Value, TypeNode>>
+{
     private _nextLoc: StorageLocation | undefined;
 
     /**
@@ -540,7 +545,10 @@ export class ArrayStorageView
     }
 }
 
-export class StructStorageView extends BaseStorageView<Struct, ExpStructType> {
+export class StructStorageView
+    extends BaseStorageView<Struct, ExpStructType>
+    implements StructView<Storage, BaseStorageView<Value, TypeNode>>
+{
     fieldViews: Array<[string, BaseStorageView<Value, TypeNode>]> = [];
     private _nextLoc: StorageLocation | undefined;
 
@@ -590,6 +598,15 @@ export class StructStorageView extends BaseStorageView<Struct, ExpStructType> {
 
         return s.collapseUntil(state);
     }
+
+    fieldView(name: string): BaseStorageView<Value, TypeNode> | DecodingFailure {
+        for (const [fieldName, fieldView] of this.fieldViews) {
+            if (name === fieldName) {
+                return fieldView;
+            }
+        }
+        return new DecodingFailure(`No field ${name} on type ${this.type.pp()}`);
+    }
 }
 
 function decodeMapRefKey(type: TypeNode, data: Uint8Array): string {
@@ -617,7 +634,8 @@ function encodeMapKey(keyT: TypeNode, value: Value): Uint8Array {
 
 export class MapStorageView
     extends BaseStorageView<Map<Value, Value>, MappingType>
-    implements IndexableView<Value, Storage, BaseStorageView<Value, TypeNode>> {
+    implements IndexableView<Value, Storage, BaseStorageView<Value, TypeNode>>
+{
     constructor(type: MappingType, loc: StorageLocation) {
         super(type, loc);
     }
@@ -786,7 +804,8 @@ export abstract class PackedArrayStorageView<
 
 export class BytesStorageView
     extends PackedArrayStorageView<Uint8Array, BytesType>
-    implements IndexableView<bigint, Storage, SingleByteStorageView> {
+    implements IndexableView<bigint, Storage, SingleByteStorageView>
+{
     decode(state: Storage): Uint8Array | DecodingFailure {
         return this.decodeBytes(state);
     }
@@ -807,7 +826,7 @@ export class BytesStorageView
         }
 
         if (size < 32) {
-            return new SingleByteStorageView([this.key, Number(key) + 1])
+            return new SingleByteStorageView([this.key, Number(key) + 1]);
         }
 
         const base = keccakOfAddr(this.key);

@@ -9,7 +9,7 @@ import {
     PointerType,
     SourceUnit,
     TupleType,
-    TypeNode,
+    TypeNode
 } from "solc-typed-ast";
 import { hasPoison, Value } from "../../src/debug/decoding/value";
 import { hexToBytes } from "ethereum-cryptography/utils";
@@ -25,10 +25,19 @@ import {
     int8x4,
     int8x4x2,
     int8x4xN,
-    int8xNx2,
+    int8xNx2
 } from "../utils";
 import { createAddressFromString } from "@ethereumjs/util";
-import { ArrayCalldataView, BaseCalldataView, BytesCalldataView, DecodingFailure, FixedBytesCalldataView, makeCalldataView, PointerCalldataView, simplifyType } from "../../src/debug/decoding/";
+import {
+    ArrayCalldataView,
+    BaseCalldataView,
+    BytesCalldataView,
+    DecodingFailure,
+    FixedBytesCalldataView,
+    makeCalldataView,
+    PointerCalldataView,
+    simplifyType
+} from "../../src/debug/decoding/";
 import fse from "fs-extra";
 
 const tupleS1 = new TupleType([
@@ -106,18 +115,8 @@ const samples: Array<[string, TypeNode | TypeGenerator, Value[] | Uint8Array]> =
         "0x0910fae300000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000002ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001000000000000000000000000ae036c65c649172b43ef7156b009c6221b596b8bfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000010000000000000000000000005b38da6a701c568545dcfcb03fcb875f56beddc4",
         new PointerType(new ArrayType(tupleS_static), DataLocation.CallData),
         [
-            [
-                -1n,
-                1n,
-                true,
-                createAddressFromString("0xaE036c65C649172b43ef7156b009c6221B596B8b")
-            ],
-            [
-                -2n,
-                2n,
-                true,
-                createAddressFromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")
-            ]
+            [-1n, 1n, true, createAddressFromString("0xaE036c65C649172b43ef7156b009c6221B596B8b")],
+            [-2n, 2n, true, createAddressFromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")]
         ]
     ],
     [
@@ -155,7 +154,7 @@ const samples: Array<[string, TypeNode | TypeGenerator, Value[] | Uint8Array]> =
                 ]
             ]
         ]
-    ],
+    ]
 ];
 
 let unit: SourceUnit;
@@ -183,8 +182,16 @@ describe(`Calldata Indexing Tests`, () => {
         const calldata = hexToBytes(calldataStr.slice(2));
 
         it(`Sample [${ppType(typeDesc)}]`, () => {
-            const type = simplifyType(typeDesc instanceof TypeNode ? typeDesc : typeDesc(unit), infer, DataLocation.CallData)
-            let view: BaseCalldataView<Value, TypeNode> | DecodingFailure = makeCalldataView(type, 0n, 4n);
+            const type = simplifyType(
+                typeDesc instanceof TypeNode ? typeDesc : typeDesc(unit),
+                infer,
+                DataLocation.CallData
+            );
+            let view: BaseCalldataView<Value, TypeNode> | DecodingFailure = makeCalldataView(
+                type,
+                0n,
+                4n
+            );
             const value = view.decode(calldata);
 
             expect(hasPoison(value)).toBeFalsy();
@@ -197,8 +204,8 @@ describe(`Calldata Indexing Tests`, () => {
 
             assert(
                 view instanceof ArrayCalldataView ||
-                view instanceof BytesCalldataView ||
-                view instanceof FixedBytesCalldataView,
+                    view instanceof BytesCalldataView ||
+                    view instanceof FixedBytesCalldataView,
                 `Expected indexable view`
             );
 

@@ -42,7 +42,7 @@ export interface IndexableView<
 }
 
 export interface StructView<State, FieldViewT extends View<State>> {
-    fieldView(name: string, state: State): FieldViewT;
+    fieldView(name: string): FieldViewT | DecodingFailure;
 }
 
 export interface PointerView<State, ToViewT extends View<State>> {
