@@ -3,24 +3,33 @@ import {
     ArrayType,
     assert,
     ASTReader,
+    BytesType,
     compileSourceString,
     DataLocation,
     InferType,
     PointerType,
     SourceUnit,
-    TypeNode,
+    TypeNode
 } from "solc-typed-ast";
-import { hasPoison,  Value } from "../../src/debug/decoding/value";
+import { hasPoison, Value } from "../../src/debug/decoding/value";
 import { hexToBytes } from "ethereum-cryptography/utils";
 import { single } from "../../src";
-import { int128, uint16 } from "../utils";
-import { ArrayMemView, BaseMemoryView, BytesMemView, DecodingFailure, makeMemoryView, PointerMemView, simplifyType } from "../../src/debug/decoding/";
+import { bytes2, bytes32, int128, uint16 } from "../utils";
+import {
+    ArrayMemView,
+    BaseMemoryView,
+    BytesMemView,
+    DecodingFailure,
+    FixedBytesMemView,
+    makeMemoryView,
+    PointerMemView,
+    simplifyType
+} from "../../src/debug/decoding/";
 import fse from "fs-extra";
 
 const infer = new InferType("0.8.29");
 type TypeGenerator = (unit: SourceUnit) => TypeNode;
-const samples: Array<[string, number, TypeNode | TypeGenerator, Value[]]> = [
-    /*
+const samples: Array<[string, number, TypeNode | TypeGenerator, Value[] | Uint8Array]> = [
     [
         "0102000000000000000000000000000000000000000000000000000000000000",
         0,
@@ -33,7 +42,13 @@ const samples: Array<[string, number, TypeNode | TypeGenerator, Value[]]> = [
         bytes32,
         hexToBytes("0000000000000000000000000000000000000000000000000000000000abcdef")
     ],
-    */
+    [
+        "000000000000000000000000000000000000000000000000000000000000000a0102030405060708090a00000000000000000000000000000000000000000000",
+        0,
+        new BytesType(),
+        hexToBytes("0102030405060708090a")
+    ],
+
     [
         "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001c0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000000d000000000000000000000000000000000000000000000000000000000000000efffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffdfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc0000000000000000000000000000000000000000000000000000000000000080",
         128,
@@ -45,7 +60,7 @@ const samples: Array<[string, number, TypeNode | TypeGenerator, Value[]]> = [
         160,
         new PointerType(new ArrayType(int128, 4n), DataLocation.Memory),
         [-1n, -2n, -3n, -4n]
-    ],
+    ]
 ];
 
 let unit: SourceUnit;
@@ -77,21 +92,33 @@ describe(`Memory Indexing Tests`, () => {
                 infer,
                 DataLocation.Memory
             );
-            let view: BaseMemoryView<Value, TypeNode> | DecodingFailure = makeMemoryView(type, BigInt(offset));
+            let view: BaseMemoryView<Value, TypeNode> | DecodingFailure = makeMemoryView(
+                type,
+                BigInt(offset)
+            );
+
             if (view instanceof PointerMemView) {
-                view = view.toView(memory)
+                view = view.toView(memory);
                 assert(!(view instanceof DecodingFailure), ``);
             }
 
-            assert(view  instanceof ArrayMemView || view instanceof BytesMemView, `Expected indexable view`);
+            assert(
+                view instanceof ArrayMemView ||
+                view instanceof BytesMemView ||
+                view instanceof FixedBytesMemView,
+                `Expected indexable view`
+            );
 
             const value = view.decode(memory);
             expect(hasPoison(value)).toBeFalsy();
             expect(value).toEqual(expectedValue);
+
             for (let i = 0; i < expectedValue.length; i++) {
-                const idxView = view.indexView(BigInt(i), memory)
+                const idxView = view.indexView(BigInt(i), memory);
                 expect(idxView).not.toBeInstanceOf(DecodingFailure);
-                expect((idxView as BaseMemoryView<Value, TypeNode>).decode(memory)).toEqual(expectedValue[i])
+                expect((idxView as BaseMemoryView<Value, TypeNode>).decode(memory)).toEqual(
+                    expectedValue[i]
+                );
             }
         });
     }

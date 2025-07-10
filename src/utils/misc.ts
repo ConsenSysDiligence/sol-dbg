@@ -11,12 +11,7 @@ import {
     IntType,
     assert
 } from "solc-typed-ast";
-import {
-    HexString,
-    Stack,
-    Storage,
-    UnprefixedHexString
-} from "../debug/types";
+import { HexString, Stack, Storage, UnprefixedHexString } from "../debug/types";
 
 export const ZERO_ADDRESS_STRING: HexString = "0x0000000000000000000000000000000000000000";
 export const ZERO_ADDRESS = createAddressFromString(ZERO_ADDRESS_STRING);

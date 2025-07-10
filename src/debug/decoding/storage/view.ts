@@ -253,7 +253,46 @@ export class AddressStorageView extends BaseStorageView<Address, AddressType> {
     }
 }
 
-export class FixedBytesStorageView extends BaseStorageView<Uint8Array, FixedBytesType> {
+/**
+ * For consisntency with Memory views, add a SingleByteStorage view that returns a number
+ */
+export class SingleByteStorageView extends BaseStorageView<number, FixedBytesType> {
+    constructor(loc: [bigint, number]) {
+        super(types.byte, loc);
+    }
+
+    decode(state: Storage): number | DecodingFailure {
+        if (this.endOffsetInWord < this.type.size) {
+            return new DecodingFailure(
+                `Unalighed Read: Can't decode ${this.type.pp()} starting at offset ${this.endOffsetInWord} in word ${this.key}`
+            );
+        }
+
+        const byte = this.fetchBytes(
+            this.key,
+            this.endOffsetInWord - this.type.size,
+            this.type.size,
+            state
+        );
+
+        return Number(byte[0]);
+    }
+
+    encode(value: number, state: Storage): Storage {
+        const word = this.fetchWord(this.key, state);
+        word[this.endOffsetInWord - this.type.size] = value;
+        return this.setWord(this.key, word, state);
+    }
+
+    nextLoc(): StorageLocation {
+        return move(this.loc, this.type.size);
+    }
+}
+
+
+export class FixedBytesStorageView
+    extends BaseStorageView<Uint8Array, FixedBytesType>
+    implements IndexableView<bigint, Storage, SingleByteStorageView> {
     decode(state: Storage): Uint8Array | DecodingFailure {
         if (this.endOffsetInWord < this.type.size) {
             return new DecodingFailure(
@@ -281,12 +320,22 @@ export class FixedBytesStorageView extends BaseStorageView<Uint8Array, FixedByte
         return this.setWord(this.key, word, state);
     }
 
+    indexView(key: bigint, state: Storage): DecodingFailure | SingleByteStorageView {
+        if (key >= this.type.size || key < 0n) {
+            return new DecodingFailure(`Invalid index ${key} in ${this.type.pp()}`);
+        }
+
+        return new SingleByteStorageView([this.key, this.endOffsetInWord - this.type.size + Number(key) + 1])
+    }
+
     nextLoc(): StorageLocation {
         return move(this.loc, this.type.size);
     }
 }
 
-export class PointerStorageView extends BaseStorageView<Value, PointerType> implements PointerView<Storage, BaseStorageView<Value, TypeNode>> {
+export class PointerStorageView
+    extends BaseStorageView<Value, PointerType>
+    implements PointerView<Storage, BaseStorageView<Value, TypeNode>> {
     innerView: BaseStorageView<Value, TypeNode>;
     constructor(type: PointerType, loc: [bigint, number]) {
         super(type, loc);
@@ -317,14 +366,16 @@ function keccakOfAddr(addr: bigint): bigint {
     return bigEndianBufToBigint(hashBuf);
 }
 
-export class ArrayStorageView extends BaseStorageView<Value[], ArrayType> implements IndexableView<bigint, Storage, BaseStorageView<Value, TypeNode>> {
+export class ArrayStorageView
+    extends BaseStorageView<Value[], ArrayType>
+    implements IndexableView<bigint, Storage, BaseStorageView<Value, TypeNode>> {
     private _nextLoc: StorageLocation | undefined;
 
     /**
      * Helper to compute how many words elements "take". This is not straightforward, as we may pack multiple
      * elements per word, or one element may take multiple words. So we return two values - nEls nad nWords.
      * I.e. we state that we can fit `nEls` elements in `nWords`, where this is the smalles "package" possible.
-     * @param elT 
+     * @param elT
      */
     static computeElmentSize(elT: TypeNode): [bigint, bigint] | undefined {
         let tmpL: StorageLocation | undefined = [0n, 32];
@@ -450,8 +501,8 @@ export class ArrayStorageView extends BaseStorageView<Value[], ArrayType> implem
     }
 
     indexView(key: bigint, state: Storage): DecodingFailure | BaseStorageView<Value, TypeNode> {
-        let size: bigint | DecodingFailure
-        let addr: bigint
+        let size: bigint | DecodingFailure;
+        let addr: bigint;
 
         if (this.type.size) {
             size = this.type.size;
@@ -466,13 +517,13 @@ export class ArrayStorageView extends BaseStorageView<Value[], ArrayType> implem
             addr = keccakOfAddr(this.key);
         }
 
-        if (key >= size|| key < 0n) {
+        if (key >= size || key < 0n) {
             return new DecodingFailure(`Invalid index ${key} in array of size ${size}`);
         }
 
         // @todo I should cache this
         const elSizeDesc = ArrayStorageView.computeElmentSize(this.type.elementT);
-        
+
         if (elSizeDesc === undefined) {
             return new DecodingFailure(`Couldnt determine element size`);
         }
@@ -483,7 +534,7 @@ export class ArrayStorageView extends BaseStorageView<Value[], ArrayType> implem
 
         const elByteSize = staticSize(this.type.elementT);
         const endOffsetInWord = 32 - Number(key % nEls) * elByteSize;
-        assert(endOffsetInWord >= elByteSize, `Invalid end offset ${endOffsetInWord}`)
+        assert(endOffsetInWord >= elByteSize, `Invalid end offset ${endOffsetInWord}`);
 
         return makeStorageView(this.type.elementT, [word, endOffsetInWord]);
     }
@@ -555,7 +606,7 @@ function encodeMapKey(keyT: TypeNode, value: Value): Uint8Array {
             throw new Error(`Invalid map reference key type ${keyT.pp()}`);
         }
 
-        return keyT instanceof StringType ? utf8ToBytes(value as string) : (value as Uint8Array);
+        return keyT.to instanceof StringType ? utf8ToBytes(value as string) : (value as Uint8Array);
     }
 
     const buf = new Uint8Array(32);
@@ -564,7 +615,9 @@ function encodeMapKey(keyT: TypeNode, value: Value): Uint8Array {
     return buf;
 }
 
-export class MapStorageView extends BaseStorageView<Map<Value, Value>, MappingType> implements IndexableView<Value, Storage, BaseStorageView<Value, TypeNode>> {
+export class MapStorageView
+    extends BaseStorageView<Map<Value, Value>, MappingType>
+    implements IndexableView<Value, Storage, BaseStorageView<Value, TypeNode>> {
     constructor(type: MappingType, loc: StorageLocation) {
         super(type, loc);
     }
@@ -633,7 +686,7 @@ export class MapStorageView extends BaseStorageView<Map<Value, Value>, MappingTy
         return state;
     }
 
-    indexView(key: Value, state: Storage): DecodingFailure | BaseStorageView<Value, TypeNode> {
+    indexView(key: Value): DecodingFailure | BaseStorageView<Value, TypeNode> {
         const slotBuf = new Uint8Array(32);
         const memView = new IntMemView(uint256, 0n);
         memView.encode(this.loc[0], slotBuf);
@@ -641,7 +694,6 @@ export class MapStorageView extends BaseStorageView<Map<Value, Value>, MappingTy
         const combinedBuf = concatBytes(keyBuf, slotBuf);
         const keySlot = bigEndianBufToBigint(keccak256(combinedBuf));
         return makeStorageView(this.type.valueType, [keySlot, 32]);
-
     }
 }
 
@@ -662,7 +714,7 @@ export abstract class PackedArrayStorageView<
             return BigInt(lByte / 2);
         }
 
-        let len = this.decodeIntAt(this.key, this.endOffsetInWord, uint256, state);
+        const len = this.decodeIntAt(this.key, this.endOffsetInWord, uint256, state);
 
         if (isFailure(len)) {
             return len;
@@ -732,7 +784,9 @@ export abstract class PackedArrayStorageView<
     }
 }
 
-export class BytesStorageView extends PackedArrayStorageView<Uint8Array, BytesType> implements IndexableView<bigint, Storage, FixedBytesStorageView> {
+export class BytesStorageView
+    extends PackedArrayStorageView<Uint8Array, BytesType>
+    implements IndexableView<bigint, Storage, SingleByteStorageView> {
     decode(state: Storage): Uint8Array | DecodingFailure {
         return this.decodeBytes(state);
     }
@@ -741,7 +795,7 @@ export class BytesStorageView extends PackedArrayStorageView<Uint8Array, BytesTy
         return this.encodeBytesAt(value, this.key, state);
     }
 
-    indexView(key: bigint, state: Storage): DecodingFailure | FixedBytesStorageView {
+    indexView(key: bigint, state: Storage): DecodingFailure | SingleByteStorageView {
         const size = this.getSize(state);
 
         if (isFailure(size)) {
@@ -753,14 +807,14 @@ export class BytesStorageView extends PackedArrayStorageView<Uint8Array, BytesTy
         }
 
         if (size < 32) {
-            return makeStorageView(types.uint8, [this.key, Number(key) + 1]) as FixedBytesStorageView
+            return new SingleByteStorageView([this.key, Number(key) + 1])
         }
 
         const base = keccakOfAddr(this.key);
-        const word = base + (key / 32n) * 32n;
-        const endOffsetInWord = 32 - Number(key % 32n)
+        const word = base + key / 32n;
+        const endOffsetInWord = Number(key % 32n) + 1;
 
-        return makeStorageView(types.uint8, [word, endOffsetInWord]) as FixedBytesStorageView
+        return new SingleByteStorageView([word, endOffsetInWord]);
     }
 }
 

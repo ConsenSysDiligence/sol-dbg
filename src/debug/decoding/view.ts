@@ -33,14 +33,18 @@ export abstract class View<
     abstract pp(): string;
 }
 
-export interface IndexableView<IdxType extends Value, State extends StateArea, KeyViewT extends View<State>> {
-    indexView(key: IdxType, state: State): KeyViewT | DecodingFailure
+export interface IndexableView<
+    IdxType extends Value,
+    State extends StateArea,
+    KeyViewT extends View<State>
+> {
+    indexView(key: IdxType, state: State): KeyViewT | DecodingFailure;
 }
 
 export interface StructView<State, FieldViewT extends View<State>> {
-    fieldView(name: string, state: State): FieldViewT
+    fieldView(name: string, state: State): FieldViewT;
 }
 
 export interface PointerView<State, ToViewT extends View<State>> {
-    toView(state: State): ToViewT | DecodingFailure
+    toView(state: State): ToViewT | DecodingFailure;
 }

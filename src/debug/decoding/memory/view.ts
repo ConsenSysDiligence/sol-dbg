@@ -37,9 +37,6 @@ export abstract class BaseMemoryView<
 > extends View<Memory, Val, bigint, Type> {
     protected writeMemAt(value: Uint8Array, off: bigint, mem: Memory): void {
         if (off < 0n || off + BigInt(value.length) > BigInt(mem.length)) {
-            console.error(
-                `OoB writing mem at ${off} of length ${value.length} in memory of size ${mem.length}`
-            );
             throw new EncodingError(
                 `OoB writing mem at ${off} of length ${value.length} in memory of size ${mem.length}`
             );
@@ -146,7 +143,34 @@ export class BoolMemView extends BaseMemoryView<boolean, BoolType> {
     }
 }
 
-export class FixedBytesMemView extends BaseMemoryView<Uint8Array, FixedBytesType> {
+/**
+ * We need a special SingleByteMemView for FixedBytesMemView's indexView() method.
+ * We cannot just re-use FixedBytesMemView, since even for a single byte, that will
+ * write 32 bytes with padded zeroes.
+ */
+export class SingleByteMemView extends BaseMemoryView<number, FixedBytesType> {
+    constructor(loc: bigint) {
+        super(types.byte, loc);
+    }
+
+    decode(state: Memory): number | DecodingFailure {
+        if (this.loc < 0 || this.loc > state.length) {
+            return new DecodingFailure(`OoB byte access at ${this.loc}`);
+        }
+
+        return state[Number(this.loc)];
+    }
+
+    encode(value: number, state: Memory): void {
+        const w = new Uint8Array([value]);
+        this.writeMemAt(w, this.loc, state);
+    }
+}
+
+export class FixedBytesMemView
+    extends BaseMemoryView<Uint8Array, FixedBytesType>
+    implements IndexableView<bigint, Memory, SingleByteMemView>
+{
     decode(state: Memory): Uint8Array | DecodingFailure {
         return this.readMemAt(this.loc, state, this.type.size);
     }
@@ -155,6 +179,14 @@ export class FixedBytesMemView extends BaseMemoryView<Uint8Array, FixedBytesType
         const w = new Uint8Array(32);
         w.set(value);
         this.writeMemAt(w, this.loc, state);
+    }
+
+    indexView(key: bigint, state: Memory): DecodingFailure | SingleByteMemView {
+        if (key >= this.type.size || key < 0n) {
+            return new DecodingFailure(`Invalid index ${key} in ${this.type.pp()}`);
+        }
+
+        return new SingleByteMemView(this.loc + key);
     }
 }
 
@@ -182,7 +214,10 @@ export abstract class PackedArrayMemView<
     }
 }
 
-export class BytesMemView extends PackedArrayMemView<Uint8Array, BytesType> implements IndexableView<bigint, Memory, FixedBytesMemView> {
+export class BytesMemView
+    extends PackedArrayMemView<Uint8Array, BytesType>
+    implements IndexableView<bigint, Memory, SingleByteMemView>
+{
     decode(state: Memory): Uint8Array | DecodingFailure {
         return this.decodeBytesAt(this.loc, state);
     }
@@ -191,18 +226,18 @@ export class BytesMemView extends PackedArrayMemView<Uint8Array, BytesType> impl
         this.encodeBytesAt(value, this.loc, state);
     }
 
-    indexView(key: bigint, state: Memory): DecodingFailure | FixedBytesMemView {
+    indexView(key: bigint, state: Memory): DecodingFailure | SingleByteMemView {
         const len = this.decodeIntAt(this.loc, uint256, state);
 
         if (isFailure(len)) {
             return len;
         }
 
-        if (key >= len|| key < 0n) {
+        if (key >= len || key < 0n) {
             return new DecodingFailure(`Invalid index ${key} in bytes of size ${len}`);
         }
 
-        return makeMemoryView(types.uint8, this.loc + key) as FixedBytesMemView;
+        return new SingleByteMemView(this.loc + 32n + key);
     }
 }
 
@@ -217,7 +252,10 @@ export class StringMemView extends PackedArrayMemView<string, StringType> {
     }
 }
 
-export class ArrayMemView extends BaseMemoryView<Value[], ArrayType> implements IndexableView<bigint, Memory, BaseMemoryView<Value, TypeNode>>{
+export class ArrayMemView
+    extends BaseMemoryView<Value[], ArrayType>
+    implements IndexableView<bigint, Memory, BaseMemoryView<Value, TypeNode>>
+{
     decode(state: Memory): Value[] | DecodingFailure {
         let sizeBigint: bigint | DecodingFailure;
         let addr = this.loc;
@@ -318,7 +356,10 @@ export class StructMemView extends BaseMemoryView<Struct, ExpStructType> {
     }
 }
 
-export class PointerMemView extends BaseMemoryView<Value, PointerType> implements PointerView<Memory, BaseMemoryView<Value, TypeNode>> {
+export class PointerMemView
+    extends BaseMemoryView<Value, PointerType>
+    implements PointerView<Memory, BaseMemoryView<Value, TypeNode>>
+{
     decode(state: Memory): Value | DecodingFailure {
         const view = this.toView(state);
 

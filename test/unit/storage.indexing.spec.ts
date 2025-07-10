@@ -1,0 +1,156 @@
+import expect from "expect";
+import {
+    ArrayType,
+    assert,
+    BytesType,
+    DataLocation,
+    IntType,
+    MappingType,
+    PointerType,
+    StringType,
+    TypeNode,
+    types
+} from "solc-typed-ast";
+import { DecodingFailure, hasPoison, Value } from "../../src/debug/decoding/value";
+import { hexToBytes } from "ethereum-cryptography/utils";
+import { ArrayStorageView, BaseStorageView, bigEndianBufToBigint, BytesStorageView, FixedBytesStorageView, ImmMap, makeStorageView, MapStorageView, PointerStorageView, Storage } from "../../src";
+import { bytes5, uint8 } from "../utils";
+import { setLengthLeft } from "@ethereumjs/util";
+
+type StorageDesc = { [key: string]: string };
+
+function toStorage(s: StorageDesc): Storage {
+    return ImmMap.fromEntries(
+        Object.entries(s).map(([k, v]) => [
+            bigEndianBufToBigint(hexToBytes(k.slice(2))),
+            setLengthLeft(hexToBytes(v.slice(2)), 32)
+        ])
+    );
+}
+
+const simpleStorDesc = {
+    "0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563":
+        "0xcd6a42782d230d7c13a74ddec5dd140e55499df90180000000000001e240",
+    "0x405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5ace": "0x4342",
+    "0xb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6": "0x0405060708",
+    "0xc2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85b": "0x44"
+};
+const arrStorDesc = { '0x036b6384b5eca791c62761152d0c79bb0604c104a5fb6f4eb0703f3154bb3db0': '0x69', '0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563': '0x05', '0x405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5ace': '0x66', '0x510e4e770828ddbf7f7b00ab00a9f6adaf81c0dc9cc85f1f8249c256942d61d9': '0x07000006000005000004000003', '0x8a35acfbc15ff81a39ae7d344fd709f28e8600b4aa8c65c6b64bfe7fe36bd19b': '0x68', '0xb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6': '0x65', '0xc2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85b': '0x67' }
+const bytesStorDesc = {
+    "0x1ab0c6948a275349ae45a06aad66a8bd65ac18074615d53676c09b67809099e0":
+        "0x0102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f",
+    "0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563":
+        "0x0102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e3e",
+    "0x2f2149d90beac0570c7f26368e4bc897ca24bba51b1a0f4960d358f764f11f31":
+        "0x0102030405060708090a0b0c0d0e0f00000000000000000000000000000000",
+    "0x405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5ace": "0x61",
+    "0x8a35acfbc15ff81a39ae7d344fd709f28e8600b4aa8c65c6b64bfe7fe36bd19b": "0x41",
+    "0xb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6": "0x41",
+    "0xb5d9d894133a730aa651ef62d26b0ffa846233c74177a591a4a896adfda97d22":
+        "0x0102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f",
+    "0xc167b0e3c82238f4f2d1a50a8b3a44f96311d77b148c30dc0ef863e1a060dcb6":
+        "0x6161616161616161616161616161616161616161616161616161616161616161",
+    "0xc2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85b":
+        "0x616161616161616161616161616161616161616161616161616161616161613e"
+};
+const mapWithComplexKeysStorDesc = {
+    "0x134266f27b803cd76c24f211c4457379daae4fac618eaef4ab979796508e0c3e": "0x03",
+    "0x6b561827e89dd864e82f1287442a6f56c5408b1313c5133c7dacd8fed2fbd375": "0x04",
+    "0xcb85c6f413feb024aaf9fe6ef133f21422160ad679b1000921a475400fde1ef5": "0x02",
+    "0xe2fe0e2425d2aed896ad86c3e2c0ea7d679d08e1a849442d22f76adef98bbd97": "0x01"
+};
+
+
+const uint8x2 = new PointerType(new ArrayType(uint8, 2n), DataLocation.Storage);
+
+const samples: Array<[StorageDesc, bigint, number, TypeNode, Value[] | Uint8Array]> = [
+    [simpleStorDesc, 1n, 32, bytes5, hexToBytes("0405060708")],
+    [simpleStorDesc, 2n, 32, uint8x2, [0x42n, 0x43n]],
+    [
+        arrStorDesc,
+        0n,
+        32,
+        new PointerType(new ArrayType(new IntType(24, false)), DataLocation.Storage),
+        [3n, 4n, 5n, 6n, 7n]
+    ],
+    [
+        arrStorDesc,
+        1n,
+        32,
+        new PointerType(new ArrayType(types.uint160, 5n), DataLocation.Storage),
+        [101n, 102n, 103n, 104n, 105n]
+    ],
+    [
+        bytesStorDesc,
+        0n,
+        32,
+        new PointerType(new BytesType(), DataLocation.Storage),
+        hexToBytes("000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e")
+    ],
+    [
+        bytesStorDesc,
+        1n,
+        32,
+        new PointerType(new BytesType(), DataLocation.Storage),
+        hexToBytes("000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f")
+    ],
+    [
+        bytesStorDesc,
+        2n,
+        32,
+        new PointerType(new BytesType(), DataLocation.Storage),
+        hexToBytes("000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f")
+    ],
+];
+
+describe(`Storage Indexing Tests`, () => {
+    for (const [storageDesc, key, offset, type, expectedValue] of samples) {
+        const storage = toStorage(storageDesc);
+
+        it(`Sample ${type.pp()}`, () => {
+            const view = makeStorageView(type, [BigInt(key), offset]);
+            const value = view.decode(storage);
+
+            assert(
+                view instanceof FixedBytesStorageView ||
+                (view instanceof PointerStorageView && (
+                    view.toView() instanceof ArrayStorageView ||
+                    view.toView() instanceof BytesStorageView
+                )),
+                `Expected indexable view`
+            );
+
+            expect(hasPoison(value)).toBeFalsy();
+            expect(value).toEqual(expectedValue);
+
+            for (let i = 0; i < expectedValue.length; i++) {
+                const idxView = ((view instanceof PointerStorageView ? view.toView() : view) as any).indexView(BigInt(i), storage);
+                expect(idxView).not.toBeInstanceOf(DecodingFailure);
+                expect((idxView as BaseStorageView<Value, TypeNode>).decode(storage)).toEqual(
+                    expectedValue[i]
+                );
+            }
+        });
+    }
+
+    it("Map with complex keys", () => {
+        const m1View = makeStorageView(new PointerType(new MappingType(new PointerType(new BytesType(), DataLocation.Memory), types.uint256), DataLocation.Storage), [0n, 32]) as PointerStorageView;
+        const m2View = makeStorageView(new PointerType(new MappingType(new PointerType(new StringType(), DataLocation.Memory), types.uint256), DataLocation.Storage), [1n, 32]) as PointerStorageView;
+        const storage = toStorage(mapWithComplexKeysStorDesc);
+
+        let v = (m1View.toView() as MapStorageView).indexView(hexToBytes("010203"));
+        expect(v).not.toBeInstanceOf(DecodingFailure);
+        expect((v as BaseStorageView<Value, TypeNode>).decode(storage)).toEqual(1n);
+        v = (m1View.toView() as MapStorageView).indexView(hexToBytes("010205"));
+        expect(v).not.toBeInstanceOf(DecodingFailure);
+        expect((v as BaseStorageView<Value, TypeNode>).decode(storage)).toEqual(0n);
+
+        v = (m2View.toView() as MapStorageView).indexView("abc");
+        expect(v).not.toBeInstanceOf(DecodingFailure);
+        expect((v as BaseStorageView<Value, TypeNode>).decode(storage)).toEqual(3n);
+
+        v = (m2View.toView() as MapStorageView).indexView("xxx");
+        expect(v).not.toBeInstanceOf(DecodingFailure);
+        expect((v as BaseStorageView<Value, TypeNode>).decode(storage)).toEqual(0n);
+    })
+});

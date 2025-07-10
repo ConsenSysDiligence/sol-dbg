@@ -287,3 +287,10 @@ contract MapWithComplexKeys {
 
     function foo() public {}
 }
+
+contract Arrays {
+    uint24[] a = [3,4,5,6,7];
+    uint160[5] b = [101,102,103,104,105];
+
+    function foo() public {}
+}
