@@ -12,9 +12,6 @@ import {
     assert
 } from "solc-typed-ast";
 import {
-    DataLocation,
-    DataLocationKind,
-    DataView,
     HexString,
     Stack,
     Storage,
@@ -111,26 +108,6 @@ export function fits(val: bigint, typ: IntType): boolean {
     const [min, max] = limits(typ);
 
     return val >= min && val <= max;
-}
-
-/* istanbul ignore next */
-export function ppLoc(loc: DataLocation): string {
-    return `{kind: ${loc.kind}, ${
-        loc.kind === DataLocationKind.Stack ? "offsetFromTop" : "address"
-    }: ${loc.kind === DataLocationKind.Stack ? loc.offsetFromTop : loc.address.toString(16)}${
-        loc.kind === DataLocationKind.Storage
-            ? `, offsetInWord: ${loc.endOffsetInWord}`
-            : loc.kind === DataLocationKind.CallData
-              ? `, base: ${loc.base}`
-              : ""
-    }}`;
-}
-
-/* istanbul ignore next */
-export function ppView(view: DataView): string {
-    return `{type: ${view.type.pp()}, abiType: ${
-        view.abiType ? view.abiType.pp() : "undefined"
-    }, loc: ${ppLoc(view.loc)}}`;
 }
 
 /* istanbul ignore next */

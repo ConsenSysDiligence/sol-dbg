@@ -1,1 +1,2 @@
-export { makeMemoryView } from "./view";
+export * from "./view";
+export * from "./allocator";

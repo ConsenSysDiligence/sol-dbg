@@ -1,1 +1,1 @@
-export { makeCalldataViews } from "./view";
+export * from "./view";
