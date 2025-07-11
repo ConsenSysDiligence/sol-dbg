@@ -251,7 +251,7 @@ describe(`Storage Indexing Tests`, () => {
     it("Struct field test", () => {
         const storage = toStorage(CStorDesc);
         const view = makeStorageView(CLayoutType, [42n, 32]) as StructStorageView;
-        
+
         // a
         let fView = view.fieldView("a");
         expect(fView).not.toBeInstanceOf(DecodingFailure);
@@ -259,10 +259,17 @@ describe(`Storage Indexing Tests`, () => {
         // e
         fView = view.fieldView("e");
         expect(fView).not.toBeInstanceOf(DecodingFailure);
-        expect((fView as BaseStorageView<Value, TypeNode>).decode(storage)).toEqual([1n, 2n, 3n, 4n]);
-        
-        fView = ((view.fieldView("s") as PointerStorageView).toView() as StructStorageView).fieldView("x");
+        expect((fView as BaseStorageView<Value, TypeNode>).decode(storage)).toEqual([
+            1n,
+            2n,
+            3n,
+            4n
+        ]);
+
+        fView = (
+            (view.fieldView("s") as PointerStorageView).toView() as StructStorageView
+        ).fieldView("x");
         expect(fView).not.toBeInstanceOf(DecodingFailure);
         expect((fView as BaseStorageView<Value, TypeNode>).decode(storage)).toEqual(13n);
-    })
+    });
 });

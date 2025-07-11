@@ -537,7 +537,9 @@ export class ArrayStorageView
 
         const word = addr + (key / nEls) * nWords;
 
-        const endOffsetInWord = typeStartsInNewWord(this.type.elementT) ? 32 : 32 - Number(key % nEls) * staticSize(this.type.elementT);
+        const endOffsetInWord = typeStartsInNewWord(this.type.elementT)
+            ? 32
+            : 32 - Number(key % nEls) * staticSize(this.type.elementT);
         return makeStorageView(this.type.elementT, [word, endOffsetInWord]);
     }
 }

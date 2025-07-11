@@ -38,7 +38,17 @@ import {
     uint8
 } from "../utils";
 import { createAddressFromString } from "@ethereumjs/util";
-import { ArrayCalldataView, BaseCalldataView, BytesCalldataView, DecodingFailure, FixedBytesCalldataView, makeCalldataViews, PointerCalldataView, simplifyType, StructCalldataView } from "../../src/debug/decoding/";
+import {
+    ArrayCalldataView,
+    BaseCalldataView,
+    BytesCalldataView,
+    DecodingFailure,
+    FixedBytesCalldataView,
+    makeCalldataViews,
+    PointerCalldataView,
+    simplifyType,
+    StructCalldataView
+} from "../../src/debug/decoding/";
 import fse from "fs-extra";
 
 const tupleS1 = new TupleType([
@@ -466,20 +476,31 @@ describe(`Calldata Decoding Tests`, () => {
             expect(hasPoison(value)).toBeFalsy();
             expect(value).toEqual(expectedValues);
             for (let i = 0; i < views.length; i++) {
-                expect(recCheckViewDecodesTo(views[i], expectedValues[i], calldata))
+                expect(recCheckViewDecodesTo(views[i], expectedValues[i], calldata));
             }
         });
     }
 });
 
-
-function recCheckViewDecodesTo(v: BaseCalldataView<Value, TypeNode>, value: Value, state: Memory): boolean {
+function recCheckViewDecodesTo(
+    v: BaseCalldataView<Value, TypeNode>,
+    value: Value,
+    state: Memory
+): boolean {
     if (v instanceof PointerCalldataView) {
-        return recCheckViewDecodesTo(v.toView(state) as BaseCalldataView<Value, TypeNode>, value, state)
+        return recCheckViewDecodesTo(
+            v.toView(state) as BaseCalldataView<Value, TypeNode>,
+            value,
+            state
+        );
     }
 
     // Check indexing
-    if (v instanceof ArrayCalldataView || v instanceof BytesCalldataView || v instanceof FixedBytesCalldataView) {
+    if (
+        v instanceof ArrayCalldataView ||
+        v instanceof BytesCalldataView ||
+        v instanceof FixedBytesCalldataView
+    ) {
         if (!(value instanceof Array || value instanceof Uint8Array)) {
             console.error(`Expected indexable of type ${v.type.pp()} not ${value}`);
             return false;
@@ -520,12 +541,12 @@ function recCheckViewDecodesTo(v: BaseCalldataView<Value, TypeNode>, value: Valu
         }
     }
 
-    // Simple case 
+    // Simple case
     const got = String(v.decode(state));
-    const expected = String(value)
+    const expected = String(value);
 
     if (got !== expected) {
-        console.error(`Got: ${got} expected ${expected}`)
+        console.error(`Got: ${got} expected ${expected}`);
     }
     return got === expected;
 }

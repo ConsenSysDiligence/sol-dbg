@@ -15,7 +15,17 @@ import { hasPoison, Struct, Value } from "../../src/debug/decoding/value";
 import { hexToBytes } from "ethereum-cryptography/utils";
 import { Memory, single } from "../../src";
 import { address, bool, bytes2, bytes32, int128, int8, uint16 } from "../utils";
-import { ArrayMemView, BaseMemoryView, BytesMemView, DecodingFailure, FixedBytesMemView, makeMemoryView, PointerMemView, simplifyType, StructMemView } from "../../src/debug/decoding/";
+import {
+    ArrayMemView,
+    BaseMemoryView,
+    BytesMemView,
+    DecodingFailure,
+    FixedBytesMemView,
+    makeMemoryView,
+    PointerMemView,
+    simplifyType,
+    StructMemView
+} from "../../src/debug/decoding/";
 import fse from "fs-extra";
 import { createAddressFromString } from "@ethereumjs/util";
 
@@ -303,9 +313,17 @@ describe(`Memory Decoding Tests`, () => {
     }
 });
 
-function recCheckViewDecodesTo(v: BaseMemoryView<Value, TypeNode>, value: Value, state: Memory): boolean {
+function recCheckViewDecodesTo(
+    v: BaseMemoryView<Value, TypeNode>,
+    value: Value,
+    state: Memory
+): boolean {
     if (v instanceof PointerMemView) {
-        return recCheckViewDecodesTo(v.toView(state) as BaseMemoryView<Value, TypeNode>, value, state)
+        return recCheckViewDecodesTo(
+            v.toView(state) as BaseMemoryView<Value, TypeNode>,
+            value,
+            state
+        );
     }
 
     // Check indexing
@@ -350,12 +368,12 @@ function recCheckViewDecodesTo(v: BaseMemoryView<Value, TypeNode>, value: Value,
         }
     }
 
-    // Simple case 
+    // Simple case
     const got = String(v.decode(state));
-    const expected = String(value)
+    const expected = String(value);
 
     if (got !== expected) {
-        console.error(`Got: ${got} expected ${expected}`)
+        console.error(`Got: ${got} expected ${expected}`);
     }
     return got === expected;
 }

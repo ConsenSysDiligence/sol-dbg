@@ -810,7 +810,13 @@ describe(`Storage Decoding Tests`, () => {
         expect(hasPoison(value)).toBeFalsy();
         expect(value.field("f")).toEqual(expected);
 
-        expect(recCheckViewDecodesTo((view as StructStorageView).fieldView("f") as BaseStorageView<Value, TypeNode>, expected, storage)).toBeTruthy();
+        expect(
+            recCheckViewDecodesTo(
+                (view as StructStorageView).fieldView("f") as BaseStorageView<Value, TypeNode>,
+                expected,
+                storage
+            )
+        ).toBeTruthy();
     });
 
     it(`Map decoding with complex keys`, () => {
@@ -896,13 +902,21 @@ describe(`Contract Layout Type Tests`, () => {
     }
 });
 
-function recCheckViewDecodesTo(v: BaseStorageView<Value, TypeNode>, value: Value, storage: Storage): boolean {
+function recCheckViewDecodesTo(
+    v: BaseStorageView<Value, TypeNode>,
+    value: Value,
+    storage: Storage
+): boolean {
     if (v instanceof PointerStorageView) {
-        return recCheckViewDecodesTo(v.toView(), value, storage)
+        return recCheckViewDecodesTo(v.toView(), value, storage);
     }
 
     // Check indexing
-    if (v instanceof ArrayStorageView || v instanceof BytesStorageView || v instanceof FixedBytesStorageView) {
+    if (
+        v instanceof ArrayStorageView ||
+        v instanceof BytesStorageView ||
+        v instanceof FixedBytesStorageView
+    ) {
         if (!(value instanceof Array || value instanceof Uint8Array)) {
             console.error(`Expected indexable of type ${v.type.pp()} not ${value}`);
             return false;
@@ -928,7 +942,7 @@ function recCheckViewDecodesTo(v: BaseStorageView<Value, TypeNode>, value: Value
             return false;
         }
 
-        for (const [key,] of value) {
+        for (const [key] of value) {
             const idxView = v.indexView(key);
 
             if (idxView instanceof DecodingFailure) {
@@ -963,12 +977,12 @@ function recCheckViewDecodesTo(v: BaseStorageView<Value, TypeNode>, value: Value
         }
     }
 
-    // Simple case 
+    // Simple case
     const got = String(v.decode(storage));
-    const expected = String(value)
+    const expected = String(value);
 
     if (got !== expected) {
-        console.error(`Got: ${got} expected ${expected}`)
+        console.error(`Got: ${got} expected ${expected}`);
     }
     return got === expected;
 }

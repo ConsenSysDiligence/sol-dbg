@@ -28,7 +28,7 @@ import {
     int8x4,
     int8x4x2,
     int8x4xN,
-    int8xNx2,
+    int8xNx2
 } from "../utils";
 import { createAddressFromString } from "@ethereumjs/util";
 import {
@@ -225,26 +225,47 @@ describe(`Calldata Indexing Tests`, () => {
     }
 
     it("Struct field test", () => {
-        const cd = hexToBytes("b28be7570000000000000000000000000000000000000000000000000000000000000020ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000600708090000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff800000000000000000000000000000000000000000000000000000000000000065000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000000")
-        const view = makeCalldataView(new PointerType(new ExpStructType("", [
-            ["t", int16],
-            ["s", new PointerType(new ExpStructType("", [
-                ["x", int8],
-                ["y", uint256],
-                ["b", bool],
-                ["addrs", new PointerType(new ArrayType(new AddressType(false)), DataLocation.CallData)]
-            ]), DataLocation.CallData)],
-            ["b", bytes3]
-        ]), DataLocation.CallData), 0n, 4n) as PointerCalldataView 
-        
+        const cd = hexToBytes(
+            "b28be7570000000000000000000000000000000000000000000000000000000000000020ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000600708090000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff800000000000000000000000000000000000000000000000000000000000000065000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000000"
+        );
+        const view = makeCalldataView(
+            new PointerType(
+                new ExpStructType("", [
+                    ["t", int16],
+                    [
+                        "s",
+                        new PointerType(
+                            new ExpStructType("", [
+                                ["x", int8],
+                                ["y", uint256],
+                                ["b", bool],
+                                [
+                                    "addrs",
+                                    new PointerType(
+                                        new ArrayType(new AddressType(false)),
+                                        DataLocation.CallData
+                                    )
+                                ]
+                            ]),
+                            DataLocation.CallData
+                        )
+                    ],
+                    ["b", bytes3]
+                ]),
+                DataLocation.CallData
+            ),
+            0n,
+            4n
+        ) as PointerCalldataView;
+
         let sView = view.toView(cd) as StructCalldataView;
         // t
-        let fView = sView.fieldView("t") as BaseCalldataView<Value, TypeNode>
+        let fView = sView.fieldView("t") as BaseCalldataView<Value, TypeNode>;
         expect(fView.decode(cd)).toEqual(-1n);
-        fView = sView.fieldView("b") as BaseCalldataView<Value, TypeNode>
+        fView = sView.fieldView("b") as BaseCalldataView<Value, TypeNode>;
         expect(fView.decode(cd)).toEqual(hexToBytes("0x070809"));
         sView = (sView.fieldView("s") as PointerCalldataView).toView(cd) as StructCalldataView;
-        fView = sView.fieldView("y") as BaseCalldataView<Value, TypeNode>
+        fView = sView.fieldView("y") as BaseCalldataView<Value, TypeNode>;
         expect(fView.decode(cd)).toEqual(101n);
-    })
+    });
 });
