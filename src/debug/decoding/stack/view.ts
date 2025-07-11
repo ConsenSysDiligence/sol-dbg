@@ -157,7 +157,7 @@ export class PointerStackView extends BaseStackView<PointerValue, PointerType> {
         }
 
         if (this.type.location === DataLocation.CallData) {
-            return makeCalldataView(this.type.to, off, 0n);
+            return makeCalldataView(this.type.to, 0n, off);
         }
 
         if (this.type.location === DataLocation.Memory) {

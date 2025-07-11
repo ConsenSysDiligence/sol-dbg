@@ -220,14 +220,7 @@ export abstract class BaseCalldataView<
         return this.readMemAt(loc + 32n, state, len);
     }
 
-    decodeTupleAt(loc: bigint, curBase: bigint, type: TupleType, state: Memory): Value[] {
-        let base = curBase;
-
-        if (isTypeDynamic(type)) {
-            base = loc + curBase;
-            loc = 0n;
-        }
-
+    decodeTupleAt(loc: bigint, base: bigint, type: TupleType, state: Memory): Value[] {
         const res: Value[] = [];
         let failRemaining = false;
 
@@ -377,15 +370,19 @@ export class StringCalldataView extends BaseCalldataView<string, BytesType> {
 export class TupleCalldataView extends BaseCalldataView<Value[], TupleType> {
     decode(state: Memory): Value[] | DecodingFailure {
         let offset: bigint | DecodingFailure = this.loc;
+        let base = this.base;
 
         if (isTypeDynamic(this.type)) {
             offset = this.decodeIntAt(offset, uint256, state);
             if (isFailure(offset)) {
                 return offset;
             }
+
+            base = offset + this.base;
+            offset = 0n;
         }
 
-        return this.decodeTupleAt(offset, this.base, this.type, state);
+        return this.decodeTupleAt(offset, base, this.type, state);
     }
 }
 
@@ -517,9 +514,10 @@ export class StructCalldataView
     implements StructView<Memory, BaseCalldataView<Value, TypeNode>>
 {
     decode(state: Memory): Struct {
-        const offset = this.loc;
+        // A StructCalldataView should be wrapped in a PointerCalldataView. So translating
+        // the base should be handled by PointerCalldataView.decode
         const values = this.decodeTupleAt(
-            offset,
+            this.loc,
             this.base,
             new TupleType(this.type.fields.map(([, type]) => type)),
             state
@@ -584,6 +582,8 @@ export class PointerCalldataView
             if (isFailure(off)) {
                 return off;
             }
+
+            return makeCalldataView(this.type.to, 0n, this.base + off);
         }
 
         return makeCalldataView(this.type.to, off, this.base);

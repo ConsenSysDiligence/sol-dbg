@@ -18,15 +18,18 @@ import {
     BaseStorageView,
     bigEndianBufToBigint,
     BytesStorageView,
+    ExpStructType,
     FixedBytesStorageView,
     ImmMap,
     makeStorageView,
     MapStorageView,
     PointerStorageView,
     SingleByteStorageView,
-    Storage
+    Storage,
+    StructStorageView,
+    uint256
 } from "../../src";
-import { bytes5, uint8 } from "../utils";
+import { bool, bytes21, bytes5, int32, int8, uint16, uint8 } from "../utils";
 import { setLengthLeft } from "@ethereumjs/util";
 
 type StorageDesc = { [key: string]: string };
@@ -80,6 +83,47 @@ const mapWithComplexKeysStorDesc = {
     "0xcb85c6f413feb024aaf9fe6ef133f21422160ad679b1000921a475400fde1ef5": "0x02",
     "0xe2fe0e2425d2aed896ad86c3e2c0ea7d679d08e1a849442d22f76adef98bbd97": "0x01"
 };
+const CStorDesc = {
+    "0x028b9bace4e6c7d3310bd31a6a3810bcc4ffceb5c4e4242dbb19dacc27a59f72": "0x02",
+    "0x11c44e4875b74d31ff9fd779bf2566af7bd15b87fc985d01f5094b89e3669e4f": "0x04",
+    "0x37fa166cbdbfbb1561ccd9ea985ec0218b5e68502e230525f544285b2bdf3d7e": "0x010000000d",
+    "0x4a2cc91ee622da3bc833a54c37ffcb6f3ec23b7793efc5eaf5e71b7b406c5c06": "0x2d0022",
+    "0x6ff97a59c90d62cc7236ba3a37cd85351bf564556780cf8c1157a220f31f0cbb": "0x0a090807060504030201",
+    "0x82a75bdeeae8604d839476ae9efd8b0e15aa447e21bfd7f41283bb54e22c9a82": "0x35",
+    "0xa813484aef6fb598f9f753daf162068ff39ccea4075cb95e1a30f86995b5b7ee": "0x2a81",
+    "0xbeced09521047d05b8960b7e7bcc1d1292cf3e4b2a6b63f48335cbde5f7545d2": "0x162e",
+    "0xc54045fa7c6ec765e825df7f9e9bf9dec12c5cef146f93a5eee56772ee647fbc":
+        "0x230000000000000000000000000000000000000000",
+    "0xc9b370bcd3a6b8dd1220b7a7faea196be095b68db0e96af1b734f26b58075de4": "0x04030201",
+    "0xde857217eaef9a2f6b2dade6c3e435fdb07f23d3e6a6109ea1626de7e649c81a": "0x0100000001"
+};
+const S = new ExpStructType("S", [
+    ["x", int32],
+    ["y", bool]
+]);
+const CLayoutType = new ExpStructType(
+    "C",
+    [
+        ["a", uint256],
+        ["e", new PointerType(new ArrayType(uint8), DataLocation.Storage)],
+        [
+            "f",
+            new PointerType(
+                new MappingType(uint256, new PointerType(S, DataLocation.Storage)),
+                DataLocation.Storage
+            )
+        ],
+        ["g", uint16],
+        ["h", uint16],
+        ["s", new PointerType(S, DataLocation.Storage)],
+        ["k", int8],
+        ["l", bytes21],
+        ["m", new PointerType(new ArrayType(uint8, 12n), DataLocation.Storage)],
+        ["n", new PointerType(new ArrayType(bytes5, 8n), DataLocation.Storage)],
+        ["o", bytes5]
+    ],
+    undefined
+);
 
 const uint8x2 = new PointerType(new ArrayType(uint8, 2n), DataLocation.Storage);
 
@@ -203,4 +247,22 @@ describe(`Storage Indexing Tests`, () => {
         storage = (elView as SingleByteStorageView).encode(1, storage);
         expect(view.decode(storage)).toEqual(hexToBytes("0405060701"));
     });
+
+    it("Struct field test", () => {
+        const storage = toStorage(CStorDesc);
+        const view = makeStorageView(CLayoutType, [42n, 32]) as StructStorageView;
+        
+        // a
+        let fView = view.fieldView("a");
+        expect(fView).not.toBeInstanceOf(DecodingFailure);
+        expect((fView as BaseStorageView<Value, TypeNode>).decode(storage)).toEqual(5678n);
+        // e
+        fView = view.fieldView("e");
+        expect(fView).not.toBeInstanceOf(DecodingFailure);
+        expect((fView as BaseStorageView<Value, TypeNode>).decode(storage)).toEqual([1n, 2n, 3n, 4n]);
+        
+        fView = ((view.fieldView("s") as PointerStorageView).toView() as StructStorageView).fieldView("x");
+        expect(fView).not.toBeInstanceOf(DecodingFailure);
+        expect((fView as BaseStorageView<Value, TypeNode>).decode(storage)).toEqual(13n);
+    })
 });

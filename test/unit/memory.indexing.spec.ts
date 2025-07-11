@@ -9,22 +9,24 @@ import {
     InferType,
     PointerType,
     SourceUnit,
-    TypeNode
+    TypeNode,
 } from "solc-typed-ast";
 import { hasPoison, Value } from "../../src/debug/decoding/value";
 import { hexToBytes } from "ethereum-cryptography/utils";
-import { single } from "../../src";
-import { bytes2, bytes32, int128, uint16 } from "../utils";
+import { single, uint256 } from "../../src";
+import { address, bool, bytes2, bytes3, bytes32, int128, int8, uint16 } from "../utils";
 import {
     ArrayMemView,
     BaseMemoryView,
     BytesMemView,
     DecodingFailure,
+    ExpStructType,
     FixedBytesMemView,
     makeMemoryView,
     PointerMemView,
     simplifyType,
-    SingleByteMemView
+    SingleByteMemView,
+    StructMemView
 } from "../../src/debug/decoding/";
 import fse from "fs-extra";
 
@@ -134,4 +136,27 @@ describe(`Memory Indexing Tests`, () => {
             hexToBytes("0000000000000000000000000000000000000000000000000000000000abcd01")
         );
     });
+
+    it("Struct field test", () => {
+        const mem = hexToBytes("000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000180000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000010007080900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000b26e0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000cd6a42782d230d7c13a74ddec5dd140e55499df9")
+        const view = makeMemoryView(new ExpStructType("", [
+            ["t", new PointerType(new ArrayType(uint16), DataLocation.Memory)],
+            ["s", new PointerType(new ExpStructType("", [
+                ["x", int8],
+                ["y", uint256],
+                ["b", bool],
+                ["addrs", address]
+            ]), DataLocation.Memory)],
+            ["b", bytes3]
+        ]), 128n) as StructMemView
+        
+        // t
+        let fView = view.fieldView("t") as BaseMemoryView<Value, TypeNode>
+        expect(fView.decode(mem)).toEqual([]);
+        fView = view.fieldView("b") as BaseMemoryView<Value, TypeNode>
+        expect(fView.decode(mem)).toEqual(hexToBytes("0x070809"));
+        let sView = (view.fieldView("s") as PointerMemView).toView(mem) as StructMemView;
+        fView = sView.fieldView("y") as BaseMemoryView<Value, TypeNode>
+        expect(fView.decode(mem)).toEqual(45678n);
+    })
 });
