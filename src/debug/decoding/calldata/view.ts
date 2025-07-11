@@ -9,11 +9,12 @@ import {
     PointerType,
     StringType,
     TupleType,
-    TypeNode
+    TypeNode,
+    types
 } from "solc-typed-ast";
 import { Memory } from "../../types";
 import { DecodingFailure, Struct, Value } from "../value";
-import { View } from "../view";
+import { IndexableView, PointerView, StructView, View } from "../view";
 import {
     bigEndianBufToBigint,
     fits,
@@ -219,14 +220,7 @@ export abstract class BaseCalldataView<
         return this.readMemAt(loc + 32n, state, len);
     }
 
-    decodeTupleAt(loc: bigint, curBase: bigint, type: TupleType, state: Memory): Value[] {
-        let base = curBase;
-
-        if (isTypeDynamic(type)) {
-            base = loc + curBase;
-            loc = 0n;
-        }
-
+    decodeTupleAt(loc: bigint, base: bigint, type: TupleType, state: Memory): Value[] {
         const res: Value[] = [];
         let failRemaining = false;
 
@@ -298,17 +292,66 @@ export class AddressCalldataView extends BaseCalldataView<Address, AddressType> 
 }
 
 /**
- * View to an FixedBytes in calldata
+ * We need a special SingleByteMemView for FixedBytesMemView's indexView() method.
+ * We cannot just re-use FixedBytesMemView, since even for a single byte, that will
+ * write 32 bytes with padded zeroes.
  */
-export class FixedBytesCalldataView extends BaseCalldataView<Uint8Array, FixedBytesType> {
-    decode(state: Memory): Uint8Array | DecodingFailure {
-        return this.readMemAt(this.loc, state, this.type.size);
+export class SingleByteCalldataView extends BaseCalldataView<number, FixedBytesType> {
+    constructor(loc: bigint, base: bigint) {
+        super(types.byte, loc, base);
+    }
+
+    decode(state: Memory): number | DecodingFailure {
+        const off = this.loc + this.base;
+
+        if (off < 0 || off > state.length) {
+            return new DecodingFailure(`OoB byte access at ${off}`);
+        }
+
+        return state[Number(off)];
     }
 }
 
-export class BytesCalldataView extends BaseCalldataView<Uint8Array, BytesType> {
+/**
+ * View to an FixedBytes in calldata
+ */
+export class FixedBytesCalldataView
+    extends BaseCalldataView<Uint8Array, FixedBytesType>
+    implements IndexableView<bigint, Memory, SingleByteCalldataView>
+{
+    decode(state: Memory): Uint8Array | DecodingFailure {
+        return this.readMemAt(this.loc, state, this.type.size);
+    }
+
+    indexView(key: bigint): DecodingFailure | SingleByteCalldataView {
+        if (key >= this.type.size || key < 0n) {
+            return new DecodingFailure(`Invalid index ${key} in ${this.type.pp()}`);
+        }
+
+        return new SingleByteCalldataView(this.loc + key, this.base);
+    }
+}
+
+export class BytesCalldataView
+    extends BaseCalldataView<Uint8Array, BytesType>
+    implements IndexableView<bigint, Memory, SingleByteCalldataView>
+{
     decode(state: Memory): Uint8Array | DecodingFailure {
         return this.decodeBytesAt(this.loc, state);
+    }
+
+    indexView(key: bigint, state: Memory): DecodingFailure | SingleByteCalldataView {
+        const len = this.decodeIntAt(this.loc, uint256, state);
+
+        if (isFailure(len)) {
+            return len;
+        }
+
+        if (key >= len || key < 0n) {
+            return new DecodingFailure(`Invalid index ${key} in bytes of len ${len}`);
+        }
+
+        return new SingleByteCalldataView(this.loc + 32n + key, this.base);
     }
 }
 
@@ -327,19 +370,26 @@ export class StringCalldataView extends BaseCalldataView<string, BytesType> {
 export class TupleCalldataView extends BaseCalldataView<Value[], TupleType> {
     decode(state: Memory): Value[] | DecodingFailure {
         let offset: bigint | DecodingFailure = this.loc;
+        let base = this.base;
 
         if (isTypeDynamic(this.type)) {
             offset = this.decodeIntAt(offset, uint256, state);
             if (isFailure(offset)) {
                 return offset;
             }
+
+            base = offset + this.base;
+            offset = 0n;
         }
 
-        return this.decodeTupleAt(offset, this.base, this.type, state);
+        return this.decodeTupleAt(offset, base, this.type, state);
     }
 }
 
-export abstract class BaseArrayCalldataView extends BaseCalldataView<Value[], ArrayType> {
+export abstract class BaseArrayCalldataView
+    extends BaseCalldataView<Value[], ArrayType>
+    implements IndexableView<bigint, Memory, BaseCalldataView<Value, TypeNode>>
+{
     decodeArray(baseOff: bigint, bigIntSize: bigint, state: Memory): Value[] | DecodingFailure {
         if (!inRange(bigIntSize, 0, MAX_ARR_DECODE_LIMIT)) {
             return new DecodingFailure(`Array too large ${bigIntSize}`);
@@ -366,6 +416,31 @@ export abstract class BaseArrayCalldataView extends BaseCalldataView<Value[], Ar
 
         return res;
     }
+
+    protected _indexView(
+        key: bigint,
+        baseOff: bigint,
+        size: bigint
+    ): BaseCalldataView<Value, TypeNode> | DecodingFailure {
+        if (key >= size || key < 0n) {
+            return new DecodingFailure(`Invalid index ${key} in array of size ${size}`);
+        }
+
+        const newBase = baseOff + this.base;
+        const hs = headSize(this.type.elementT);
+
+        if (hs === undefined) {
+            return new DecodingFailure(`Can't compute head size of ${this.type.elementT.pp()}`);
+        }
+
+        const elSize = BigInt(hs);
+        return makeCalldataView(this.type.elementT, elSize * key, newBase);
+    }
+
+    abstract indexView(
+        key: bigint,
+        state: Memory
+    ): BaseCalldataView<Value, TypeNode> | DecodingFailure;
 }
 
 export class ArrayCalldataView extends BaseArrayCalldataView {
@@ -389,6 +464,27 @@ export class ArrayCalldataView extends BaseArrayCalldataView {
 
         return this.decodeArray(baseOff, bigintSize, state);
     }
+
+    indexView(key: bigint, state: Memory): BaseCalldataView<Value, TypeNode> | DecodingFailure {
+        let baseOff: bigint = this.loc;
+
+        // Dynamic sized arrays have length at the start. Fixed sized arrays do
+        // not.
+        let size: bigint | DecodingFailure;
+        if (this.type.size !== undefined) {
+            size = this.type.size;
+        } else {
+            size = this.decodeIntAt(baseOff, uint256, state);
+
+            if (isFailure(size)) {
+                return size;
+            }
+
+            baseOff += 32n;
+        }
+
+        return this._indexView(key, baseOff, size);
+    }
 }
 
 /**
@@ -400,19 +496,28 @@ export class ArraySliceCalldataView extends BaseArrayCalldataView {
         loc: bigint,
         protected len: bigint
     ) {
+        // Note: The base is 0n on purpose here since this is created from stack values?
         super(type, loc, 0n);
     }
 
     decode(state: Memory): Value[] | DecodingFailure {
         return this.decodeArray(this.loc, this.len, state);
     }
+
+    indexView(key: bigint): BaseCalldataView<Value, TypeNode> | DecodingFailure {
+        return this._indexView(key, this.loc, this.len);
+    }
 }
 
-export class StructCalldataView extends BaseCalldataView<Struct, ExpStructType> {
+export class StructCalldataView
+    extends BaseCalldataView<Struct, ExpStructType>
+    implements StructView<Memory, BaseCalldataView<Value, TypeNode>>
+{
     decode(state: Memory): Struct {
-        const offset = this.loc;
+        // A StructCalldataView should be wrapped in a PointerCalldataView. So translating
+        // the base should be handled by PointerCalldataView.decode
         const values = this.decodeTupleAt(
-            offset,
+            this.loc,
             this.base,
             new TupleType(this.type.fields.map(([, type]) => type)),
             state
@@ -424,10 +529,51 @@ export class StructCalldataView extends BaseCalldataView<Struct, ExpStructType> 
             )
         );
     }
+
+    fieldView(name: string): DecodingFailure | BaseCalldataView<Value, TypeNode> {
+        let base = this.base;
+        let loc = this.loc;
+
+        if (isTypeDynamic(this.type)) {
+            base = loc + this.base;
+            loc = 0n;
+        }
+
+        for (const [fieldName, fieldType] of this.type.fields) {
+            if (name === fieldName) {
+                return makeCalldataView(fieldType, loc, base);
+            }
+
+            const tSize = headSize(fieldType);
+
+            if (tSize === undefined) {
+                return new DecodingFailure(
+                    `Couldn't compute head size for field ${fieldName} in ${this.type.name}`
+                );
+            }
+
+            loc += BigInt(tSize);
+        }
+
+        return new DecodingFailure(`No field ${name} on type ${this.type.pp()}`);
+    }
 }
 
-export class PointerCalldataView extends BaseCalldataView<Value, PointerType> {
+export class PointerCalldataView
+    extends BaseCalldataView<Value, PointerType>
+    implements PointerView<Memory, BaseCalldataView<Value, TypeNode>>
+{
     decode(state: Memory): Value | DecodingFailure {
+        const innerView = this.toView(state);
+
+        if (isFailure(innerView)) {
+            return innerView;
+        }
+
+        return innerView.decode(state);
+    }
+
+    toView(state: Memory): DecodingFailure | BaseCalldataView<Value, TypeNode> {
         let off: bigint | DecodingFailure = this.loc;
 
         if (isTypeDynamic(this.type.to)) {
@@ -436,10 +582,11 @@ export class PointerCalldataView extends BaseCalldataView<Value, PointerType> {
             if (isFailure(off)) {
                 return off;
             }
+
+            return makeCalldataView(this.type.to, 0n, this.base + off);
         }
 
-        const innerView = makeCalldataView(this.type.to, off, this.base);
-        return innerView.decode(state);
+        return makeCalldataView(this.type.to, off, this.base);
     }
 }
 

@@ -15,17 +15,24 @@ import {
     TypeNode,
     XPath
 } from "solc-typed-ast";
-import { hasPoison, Struct, Value } from "../../src/debug/decoding/value";
+import { DecodingFailure, hasPoison, Struct, Value } from "../../src/debug/decoding/value";
 import { hexToBytes } from "ethereum-cryptography/utils";
 import {
+    ArrayStorageView,
+    BaseStorageView,
     bigEndianBufToBigint,
+    BytesStorageView,
     ExpStructType,
+    FixedBytesStorageView,
     getContractLayoutType,
     ImmMap,
     makeStorageView,
     MapKeys,
+    MapStorageView,
+    PointerStorageView,
     single,
     Storage,
+    StructStorageView,
     uint256
 } from "../../src";
 import {
@@ -755,6 +762,7 @@ describe(`Storage Decoding Tests`, () => {
             const value = view.decode(storage);
             expect(hasPoison(value)).toBeFalsy();
             expect(value).toEqual(expectedValue);
+            expect(recCheckViewDecodesTo(view, expectedValue, storage)).toBeTruthy();
         });
     }
 
@@ -796,10 +804,19 @@ describe(`Storage Decoding Tests`, () => {
             ]
         ]);
 
+        const storage = toStorage(CStorDesc);
         const view = makeStorageView(CLayoutType, [42n, 32]);
-        const value = view.decode(toStorage(CStorDesc), mapKeys) as Struct;
+        const value = view.decode(storage, mapKeys) as Struct;
         expect(hasPoison(value)).toBeFalsy();
         expect(value.field("f")).toEqual(expected);
+
+        expect(
+            recCheckViewDecodesTo(
+                (view as StructStorageView).fieldView("f") as BaseStorageView<Value, TypeNode>,
+                expected,
+                storage
+            )
+        ).toBeTruthy();
     });
 
     it(`Map decoding with complex keys`, () => {
@@ -855,7 +872,8 @@ describe(`Storage Decoding Tests`, () => {
         assert(complete, `Unexpected incomplete layout of ${decl.name}`);
 
         const view = makeStorageView(layout, [0n, 32]);
-        const value = view.decode(toStorage(mapWithComplexKeysStorDesc), mapKeys) as Struct;
+        const storage = toStorage(mapWithComplexKeysStorDesc);
+        const value = view.decode(storage, mapKeys) as Struct;
         expect(hasPoison(value)).toBeFalsy();
         expect(value).toEqual(expected);
     });
@@ -883,3 +901,88 @@ describe(`Contract Layout Type Tests`, () => {
         });
     }
 });
+
+function recCheckViewDecodesTo(
+    v: BaseStorageView<Value, TypeNode>,
+    value: Value,
+    storage: Storage
+): boolean {
+    if (v instanceof PointerStorageView) {
+        return recCheckViewDecodesTo(v.toView(), value, storage);
+    }
+
+    // Check indexing
+    if (
+        v instanceof ArrayStorageView ||
+        v instanceof BytesStorageView ||
+        v instanceof FixedBytesStorageView
+    ) {
+        if (!(value instanceof Array || value instanceof Uint8Array)) {
+            console.error(`Expected indexable of type ${v.type.pp()} not ${value}`);
+            return false;
+        }
+
+        for (let i = 0; i < value.length; i++) {
+            const idxView = v.indexView(BigInt(i), storage);
+
+            if (idxView instanceof DecodingFailure) {
+                console.error(`Couldnt make index ${i} of indexable of type ${v.type.pp()}`);
+                return false;
+            }
+
+            if (!recCheckViewDecodesTo(idxView, value[i], storage)) {
+                return false;
+            }
+        }
+    }
+
+    if (v instanceof MapStorageView) {
+        if (!(value instanceof Map)) {
+            console.error(`Expected map of type ${v.type.pp()} not ${value}`);
+            return false;
+        }
+
+        for (const [key] of value) {
+            const idxView = v.indexView(key);
+
+            if (idxView instanceof DecodingFailure) {
+                console.error(`Couldnt make index ${key} of indexable of type ${v.type.pp()}`);
+                return false;
+            }
+
+            if (!recCheckViewDecodesTo(idxView, value.get(key) as Value, storage)) {
+                return false;
+            }
+        }
+    }
+
+    // Check field views
+    if (v instanceof StructStorageView) {
+        if (!(value instanceof Struct)) {
+            console.error(`Expected object of type ${v.type.pp()} not ${value}`);
+            return false;
+        }
+
+        for (const [name] of v.fieldViews) {
+            const fieldView = v.fieldView(name);
+
+            if (fieldView instanceof DecodingFailure) {
+                console.error(`Couldnt make field ${name} of struct of type ${v.type.pp()}`);
+                return false;
+            }
+
+            if (!recCheckViewDecodesTo(fieldView, value.field(name), storage)) {
+                return false;
+            }
+        }
+    }
+
+    // Simple case
+    const got = String(v.decode(storage));
+    const expected = String(value);
+
+    if (got !== expected) {
+        console.error(`Got: ${got} expected ${expected}`);
+    }
+    return got === expected;
+}

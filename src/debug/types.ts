@@ -107,55 +107,6 @@ export function isFrame(a: any): a is Frame {
     );
 }
 
-export enum DataLocationKind {
-    Stack = "stack",
-    Memory = "memory",
-    Storage = "storage",
-    CallData = "calldata"
-}
-
-export type MemoryLocationKind =
-    | DataLocationKind.Memory
-    | DataLocationKind.CallData
-    | DataLocationKind.Storage;
-
-export interface BaseDataLocation {
-    kind: DataLocationKind;
-}
-
-export interface StackLocation extends BaseDataLocation {
-    kind: DataLocationKind.Stack;
-    offsetFromTop: number;
-}
-
-export interface BaseMemoryLocation extends BaseDataLocation {
-    address: bigint;
-}
-
-export interface CalldataLocation extends BaseMemoryLocation {
-    kind: DataLocationKind.CallData;
-    base: bigint;
-}
-
-export interface LinearMemoryLocation extends BaseMemoryLocation {
-    kind: DataLocationKind.Memory;
-}
-
-export interface StorageLocation extends BaseMemoryLocation {
-    kind: DataLocationKind.Storage;
-    endOffsetInWord: number;
-}
-
-export type ByteAddressableMemoryLocation = CalldataLocation | LinearMemoryLocation;
-export type MemoryLocation = ByteAddressableMemoryLocation | StorageLocation;
-export type DataLocation = StackLocation | MemoryLocation;
-
-export interface DataView {
-    type: sol.TypeNode;
-    abiType?: sol.TypeNode;
-    loc: DataLocation;
-}
-
 export type Memory = Uint8Array;
 export type Stack = Uint8Array[];
 export type Storage = ImmMap<bigint, Uint8Array>;

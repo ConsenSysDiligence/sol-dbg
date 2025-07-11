@@ -1,1 +1,1 @@
-export { makeStorageView } from "./view";
+export * from "./view";

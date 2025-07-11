@@ -1,4 +1,17 @@
 contract Foo {
+    function bytesTest() public returns (uint) {
+        bytes memory s = hex"0102030405060708090a";
+
+        uint256 offset;
+
+        assembly {
+            offset := s
+        }
+
+        return offset;
+
+    }
+
     struct SimpleTypes {
         int8 a;
         uint16 b;
