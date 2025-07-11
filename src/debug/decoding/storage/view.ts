@@ -537,10 +537,7 @@ export class ArrayStorageView
 
         const word = addr + (key / nEls) * nWords;
 
-        const elByteSize = staticSize(this.type.elementT);
-        const endOffsetInWord = 32 - Number(key % nEls) * elByteSize;
-        assert(endOffsetInWord >= elByteSize, `Invalid end offset ${endOffsetInWord}`);
-
+        const endOffsetInWord = typeStartsInNewWord(this.type.elementT) ? 32 : 32 - Number(key % nEls) * staticSize(this.type.elementT);
         return makeStorageView(this.type.elementT, [word, endOffsetInWord]);
     }
 }

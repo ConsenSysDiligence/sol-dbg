@@ -14,7 +14,7 @@ import {
 } from "solc-typed-ast";
 import { hasPoison, Struct, Value } from "../../src/debug/decoding/value";
 import { hexToBytes } from "ethereum-cryptography/utils";
-import { single, uint256 } from "../../src";
+import { Memory, single, uint256 } from "../../src";
 import {
     address,
     bool,
@@ -38,7 +38,7 @@ import {
     uint8
 } from "../utils";
 import { createAddressFromString } from "@ethereumjs/util";
-import { makeCalldataViews, simplifyType } from "../../src/debug/decoding/";
+import { ArrayCalldataView, BaseCalldataView, BytesCalldataView, DecodingFailure, FixedBytesCalldataView, makeCalldataViews, PointerCalldataView, simplifyType, StructCalldataView } from "../../src/debug/decoding/";
 import fse from "fs-extra";
 
 const tupleS1 = new TupleType([
@@ -465,6 +465,67 @@ describe(`Calldata Decoding Tests`, () => {
 
             expect(hasPoison(value)).toBeFalsy();
             expect(value).toEqual(expectedValues);
+            for (let i = 0; i < views.length; i++) {
+                expect(recCheckViewDecodesTo(views[i], expectedValues[i], calldata))
+            }
         });
     }
 });
+
+
+function recCheckViewDecodesTo(v: BaseCalldataView<Value, TypeNode>, value: Value, state: Memory): boolean {
+    if (v instanceof PointerCalldataView) {
+        return recCheckViewDecodesTo(v.toView(state) as BaseCalldataView<Value, TypeNode>, value, state)
+    }
+
+    // Check indexing
+    if (v instanceof ArrayCalldataView || v instanceof BytesCalldataView || v instanceof FixedBytesCalldataView) {
+        if (!(value instanceof Array || value instanceof Uint8Array)) {
+            console.error(`Expected indexable of type ${v.type.pp()} not ${value}`);
+            return false;
+        }
+
+        for (let i = 0; i < value.length; i++) {
+            const idxView = v.indexView(BigInt(i), state);
+
+            if (idxView instanceof DecodingFailure) {
+                console.error(`Couldnt make index ${i} of indexable of type ${v.type.pp()}`);
+                return false;
+            }
+
+            if (!recCheckViewDecodesTo(idxView, value[i], state)) {
+                return false;
+            }
+        }
+    }
+
+    // Check field views
+    if (v instanceof StructCalldataView) {
+        if (!(value instanceof Struct)) {
+            console.error(`Expected object of type ${v.type.pp()} not ${value}`);
+            return false;
+        }
+
+        for (const [name] of value.entries) {
+            const fieldView = v.fieldView(name);
+
+            if (fieldView instanceof DecodingFailure) {
+                console.error(`Couldnt make field ${name} of struct of type ${v.type.pp()}`);
+                return false;
+            }
+
+            if (!recCheckViewDecodesTo(fieldView, value.field(name), state)) {
+                return false;
+            }
+        }
+    }
+
+    // Simple case 
+    const got = String(v.decode(state));
+    const expected = String(value)
+
+    if (got !== expected) {
+        console.error(`Got: ${got} expected ${expected}`)
+    }
+    return got === expected;
+}

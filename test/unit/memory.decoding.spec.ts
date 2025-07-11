@@ -13,9 +13,9 @@ import {
 } from "solc-typed-ast";
 import { hasPoison, Struct, Value } from "../../src/debug/decoding/value";
 import { hexToBytes } from "ethereum-cryptography/utils";
-import { single } from "../../src";
+import { Memory, single } from "../../src";
 import { address, bool, bytes2, bytes32, int128, int8, uint16 } from "../utils";
-import { makeMemoryView, simplifyType } from "../../src/debug/decoding/";
+import { ArrayMemView, BaseMemoryView, BytesMemView, DecodingFailure, FixedBytesMemView, makeMemoryView, PointerMemView, simplifyType, StructMemView } from "../../src/debug/decoding/";
 import fse from "fs-extra";
 import { createAddressFromString } from "@ethereumjs/util";
 
@@ -298,6 +298,64 @@ describe(`Memory Decoding Tests`, () => {
             const value = view.decode(memory);
             expect(hasPoison(value)).toBeFalsy();
             expect(value).toEqual(expectedValue);
+            expect(recCheckViewDecodesTo(view, expectedValue, memory)).toBeTruthy();
         });
     }
 });
+
+function recCheckViewDecodesTo(v: BaseMemoryView<Value, TypeNode>, value: Value, state: Memory): boolean {
+    if (v instanceof PointerMemView) {
+        return recCheckViewDecodesTo(v.toView(state) as BaseMemoryView<Value, TypeNode>, value, state)
+    }
+
+    // Check indexing
+    if (v instanceof ArrayMemView || v instanceof BytesMemView || v instanceof FixedBytesMemView) {
+        if (!(value instanceof Array || value instanceof Uint8Array)) {
+            console.error(`Expected indexable of type ${v.type.pp()} not ${value}`);
+            return false;
+        }
+
+        for (let i = 0; i < value.length; i++) {
+            const idxView = v.indexView(BigInt(i), state);
+
+            if (idxView instanceof DecodingFailure) {
+                console.error(`Couldnt make index ${i} of indexable of type ${v.type.pp()}`);
+                return false;
+            }
+
+            if (!recCheckViewDecodesTo(idxView, value[i], state)) {
+                return false;
+            }
+        }
+    }
+
+    // Check field views
+    if (v instanceof StructMemView) {
+        if (!(value instanceof Struct)) {
+            console.error(`Expected object of type ${v.type.pp()} not ${value}`);
+            return false;
+        }
+
+        for (const [name] of value.entries) {
+            const fieldView = v.fieldView(name);
+
+            if (fieldView instanceof DecodingFailure) {
+                console.error(`Couldnt make field ${name} of struct of type ${v.type.pp()}`);
+                return false;
+            }
+
+            if (!recCheckViewDecodesTo(fieldView, value.field(name), state)) {
+                return false;
+            }
+        }
+    }
+
+    // Simple case 
+    const got = String(v.decode(state));
+    const expected = String(value)
+
+    if (got !== expected) {
+        console.error(`Got: ${got} expected ${expected}`)
+    }
+    return got === expected;
+}
