@@ -13,7 +13,7 @@ import {
     types
 } from "solc-typed-ast";
 import { Memory } from "../../types";
-import { EncodingError, IndexableView, PointerView, StructView, View } from "../view";
+import { ArrayLikeView, EncodingError, PointerView, StructView, View } from "../view";
 import { DecodingFailure, Struct, Value } from "../value";
 import {
     bigEndianBufToBigint,
@@ -30,6 +30,13 @@ import { ExpStructType, MissingType } from "../exp_types";
 import { isFailure } from "../utils";
 import { Allocator } from "./allocator";
 import { utf8ToBytes } from "ethereum-cryptography/utils";
+
+interface ArrayLikeMemView<ValViewT extends BaseMemoryView<Value, TypeNode>>
+    extends ArrayLikeView<Memory, ValViewT> {}
+
+export function isArrayLikeMemView(v: any): v is ArrayLikeMemView<BaseMemoryView<Value, TypeNode>> {
+    return v instanceof FixedBytesMemView || v instanceof ArrayMemView || v instanceof BytesMemView;
+}
 
 export abstract class BaseMemoryView<
     Val extends Value,
@@ -169,7 +176,7 @@ export class SingleByteMemView extends BaseMemoryView<number, FixedBytesType> {
 
 export class FixedBytesMemView
     extends BaseMemoryView<Uint8Array, FixedBytesType>
-    implements IndexableView<bigint, Memory, SingleByteMemView>
+    implements ArrayLikeMemView<SingleByteMemView>
 {
     decode(state: Memory): Uint8Array | DecodingFailure {
         return this.readMemAt(this.loc, state, this.type.size);
@@ -187,6 +194,10 @@ export class FixedBytesMemView
         }
 
         return new SingleByteMemView(this.loc + key);
+    }
+
+    size(): bigint {
+        return BigInt(this.type.size);
     }
 }
 
@@ -216,7 +227,7 @@ export abstract class PackedArrayMemView<
 
 export class BytesMemView
     extends PackedArrayMemView<Uint8Array, BytesType>
-    implements IndexableView<bigint, Memory, SingleByteMemView>
+    implements ArrayLikeMemView<SingleByteMemView>
 {
     decode(state: Memory): Uint8Array | DecodingFailure {
         return this.decodeBytesAt(this.loc, state);
@@ -239,6 +250,10 @@ export class BytesMemView
 
         return new SingleByteMemView(this.loc + 32n + key);
     }
+
+    size(state: Memory): bigint | DecodingFailure {
+        return this.decodeIntAt(this.loc, uint256, state);
+    }
 }
 
 export class StringMemView extends PackedArrayMemView<string, StringType> {
@@ -254,7 +269,7 @@ export class StringMemView extends PackedArrayMemView<string, StringType> {
 
 export class ArrayMemView
     extends BaseMemoryView<Value[], ArrayType>
-    implements IndexableView<bigint, Memory, BaseMemoryView<Value, TypeNode>>
+    implements ArrayLikeMemView<BaseMemoryView<Value, TypeNode>>
 {
     decode(state: Memory): Value[] | DecodingFailure {
         let sizeBigint: bigint | DecodingFailure;
@@ -324,6 +339,14 @@ export class ArrayMemView
         }
 
         return makeMemoryView(this.type.elementT, addr + key * 32n);
+    }
+
+    size(state: Memory): bigint | DecodingFailure {
+        if (this.type.size !== undefined) {
+            return this.type.size;
+        }
+
+        return this.decodeIntAt(this.loc, uint256, state);
     }
 }
 

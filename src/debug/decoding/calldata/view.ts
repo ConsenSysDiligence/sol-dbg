@@ -14,7 +14,7 @@ import {
 } from "solc-typed-ast";
 import { Memory } from "../../types";
 import { DecodingFailure, Struct, Value } from "../value";
-import { IndexableView, PointerView, StructView, View } from "../view";
+import { ArrayLikeView, PointerView, StructView, View } from "../view";
 import {
     bigEndianBufToBigint,
     fits,
@@ -27,6 +27,19 @@ import {
 import { Address, bytesToUtf8 } from "@ethereumjs/util";
 import { inRange, isFailure, isTypeStringDynamicArray } from "../utils";
 import { ExpStructType, MissingType } from "../exp_types";
+
+interface ArrayLikeCalldataView<ValViewT extends BaseCalldataView<Value, TypeNode>>
+    extends ArrayLikeView<Memory, ValViewT> {}
+
+export function isArrayLikeCalldataView(
+    v: any
+): v is ArrayLikeCalldataView<BaseCalldataView<Value, TypeNode>> {
+    return (
+        v instanceof FixedBytesCalldataView ||
+        v instanceof ArrayCalldataView ||
+        v instanceof BytesCalldataView
+    );
+}
 
 /**
  * Return true IFF the given type is "dynamic". I,e. its size is not statically known.
@@ -317,7 +330,7 @@ export class SingleByteCalldataView extends BaseCalldataView<number, FixedBytesT
  */
 export class FixedBytesCalldataView
     extends BaseCalldataView<Uint8Array, FixedBytesType>
-    implements IndexableView<bigint, Memory, SingleByteCalldataView>
+    implements ArrayLikeCalldataView<SingleByteCalldataView>
 {
     decode(state: Memory): Uint8Array | DecodingFailure {
         return this.readMemAt(this.loc, state, this.type.size);
@@ -330,11 +343,15 @@ export class FixedBytesCalldataView
 
         return new SingleByteCalldataView(this.loc + key, this.base);
     }
+
+    size(): bigint | DecodingFailure {
+        return BigInt(this.type.size);
+    }
 }
 
 export class BytesCalldataView
     extends BaseCalldataView<Uint8Array, BytesType>
-    implements IndexableView<bigint, Memory, SingleByteCalldataView>
+    implements ArrayLikeCalldataView<SingleByteCalldataView>
 {
     decode(state: Memory): Uint8Array | DecodingFailure {
         return this.decodeBytesAt(this.loc, state);
@@ -352,6 +369,10 @@ export class BytesCalldataView
         }
 
         return new SingleByteCalldataView(this.loc + 32n + key, this.base);
+    }
+
+    size(state: Memory): bigint | DecodingFailure {
+        return this.decodeIntAt(this.loc, uint256, state);
     }
 }
 
@@ -388,7 +409,7 @@ export class TupleCalldataView extends BaseCalldataView<Value[], TupleType> {
 
 export abstract class BaseArrayCalldataView
     extends BaseCalldataView<Value[], ArrayType>
-    implements IndexableView<bigint, Memory, BaseCalldataView<Value, TypeNode>>
+    implements ArrayLikeCalldataView<BaseCalldataView<Value, TypeNode>>
 {
     decodeArray(baseOff: bigint, bigIntSize: bigint, state: Memory): Value[] | DecodingFailure {
         if (!inRange(bigIntSize, 0, MAX_ARR_DECODE_LIMIT)) {
@@ -441,6 +462,7 @@ export abstract class BaseArrayCalldataView
         key: bigint,
         state: Memory
     ): BaseCalldataView<Value, TypeNode> | DecodingFailure;
+    abstract size(state: Memory): bigint | DecodingFailure;
 }
 
 export class ArrayCalldataView extends BaseArrayCalldataView {
@@ -485,6 +507,14 @@ export class ArrayCalldataView extends BaseArrayCalldataView {
 
         return this._indexView(key, baseOff, size);
     }
+
+    size(state: Memory): bigint | DecodingFailure {
+        if (this.type.size !== undefined) {
+            return BigInt(this.type.size);
+        }
+
+        return this.decodeIntAt(this.loc, uint256, state);
+    }
 }
 
 /**
@@ -506,6 +536,10 @@ export class ArraySliceCalldataView extends BaseArrayCalldataView {
 
     indexView(key: bigint): BaseCalldataView<Value, TypeNode> | DecodingFailure {
         return this._indexView(key, this.loc, this.len);
+    }
+
+    size(): bigint | DecodingFailure {
+        return this.len;
     }
 }
 

@@ -14,7 +14,14 @@ import {
     types
 } from "solc-typed-ast";
 import { DecodingFailure, Struct, Value } from "../value";
-import { EncodingError, IndexableView, PointerView, StructView, View } from "../view";
+import {
+    ArrayLikeView,
+    EncodingError,
+    IndexableView,
+    PointerView,
+    StructView,
+    View
+} from "../view";
 import { Storage } from "../../types";
 import {
     address,
@@ -39,7 +46,19 @@ import { isFailure, isTypeStringStatic32BytesInStorage } from "../utils";
 import { BaseMemoryView, IntMemView } from "../memory/view";
 import { bytesToHex, equalsBytes, utf8ToBytes } from "ethereum-cryptography/utils";
 
+interface ArrayLikeStorageView<ValViewT extends BaseStorageView<Value, TypeNode>>
+    extends ArrayLikeView<Storage, ValViewT> {}
 type StorageLocation = [bigint, number];
+
+export function isArrayLikeStorageView(
+    v: any
+): v is ArrayLikeStorageView<BaseStorageView<Value, TypeNode>> {
+    return (
+        v instanceof FixedBytesStorageView ||
+        v instanceof ArrayStorageView ||
+        v instanceof BytesStorageView
+    );
+}
 
 function move(loc: StorageLocation, byBytes: number): StorageLocation {
     const [key, endOffsetInWord] = loc;
@@ -291,7 +310,7 @@ export class SingleByteStorageView extends BaseStorageView<number, FixedBytesTyp
 
 export class FixedBytesStorageView
     extends BaseStorageView<Uint8Array, FixedBytesType>
-    implements IndexableView<bigint, Storage, SingleByteStorageView>
+    implements ArrayLikeStorageView<SingleByteStorageView>
 {
     decode(state: Storage): Uint8Array | DecodingFailure {
         if (this.endOffsetInWord < this.type.size) {
@@ -334,6 +353,10 @@ export class FixedBytesStorageView
     nextLoc(): StorageLocation {
         return move(this.loc, this.type.size);
     }
+
+    size(): bigint | DecodingFailure {
+        return BigInt(this.type.size);
+    }
 }
 
 export class PointerStorageView
@@ -372,7 +395,7 @@ function keccakOfAddr(addr: bigint): bigint {
 
 export class ArrayStorageView
     extends BaseStorageView<Value[], ArrayType>
-    implements IndexableView<bigint, Storage, BaseStorageView<Value, TypeNode>>
+    implements ArrayLikeStorageView<BaseStorageView<Value, TypeNode>>
 {
     private _nextLoc: StorageLocation | undefined;
 
@@ -541,6 +564,14 @@ export class ArrayStorageView
             ? 32
             : 32 - Number(key % nEls) * staticSize(this.type.elementT);
         return makeStorageView(this.type.elementT, [word, endOffsetInWord]);
+    }
+
+    size(state: Storage): bigint | DecodingFailure {
+        if (this.type.size) {
+            return this.type.size;
+        }
+
+        return this.decodeIntAt(this.key, this.endOffsetInWord, uint256, state);
     }
 }
 

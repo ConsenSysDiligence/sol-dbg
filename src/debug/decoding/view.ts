@@ -36,9 +36,14 @@ export abstract class View<
 export interface IndexableView<
     IdxType extends Value,
     State extends StateArea,
-    KeyViewT extends View<State>
+    ValViewT extends View<State>
 > {
-    indexView(key: IdxType, state: State): KeyViewT | DecodingFailure;
+    indexView(key: IdxType, state: State): ValViewT | DecodingFailure;
+}
+
+export interface ArrayLikeView<State extends StateArea, KeyViewT extends View<State>>
+    extends IndexableView<bigint, State, KeyViewT> {
+    size(state: State): bigint | DecodingFailure;
 }
 
 export interface StructView<State, FieldViewT extends View<State>> {

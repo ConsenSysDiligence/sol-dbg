@@ -6,11 +6,12 @@ import {
     FixedBytesType,
     IntType,
     PointerType,
-    TypeNode
+    TypeNode,
+    types
 } from "solc-typed-ast";
 import { Stack } from "../../types";
 import { DecodingFailure, Value } from "../value";
-import { EncodingError, View } from "../view";
+import { ArrayLikeView, EncodingError, View } from "../view";
 import {
     bigEndianBufToBigint,
     encodeBigintInBigEndianBuf,
@@ -119,7 +120,34 @@ export class AddressStackView extends BaseStackView<Address, AddressType> {
     }
 }
 
-export class FixedBytesStackView extends BaseStackView<Uint8Array, FixedBytesType> {
+export class SingleByteStackView extends BaseStackView<number, FixedBytesType> {
+    constructor(
+        loc: number,
+        public readonly byteOffset: number
+    ) {
+        super(types.byte, loc);
+    }
+
+    decode(state: Stack): number | DecodingFailure {
+        const w = this.fetchStackWord(this.loc, state);
+        return isFailure(w) ? w : w[this.byteOffset];
+    }
+
+    encode(value: number, state: Stack): void {
+        const w = this.fetchStackWord(this.loc, state);
+
+        if (isFailure(w)) {
+            throw new EncodingError(w.reason);
+        }
+
+        w[this.byteOffset] = value;
+    }
+}
+
+export class FixedBytesStackView
+    extends BaseStackView<Uint8Array, FixedBytesType>
+    implements ArrayLikeView<Stack, SingleByteStackView>
+{
     decode(state: Stack): Uint8Array | DecodingFailure {
         const w = this.fetchStackWord(this.loc, state);
         return isFailure(w) ? w : w.slice(0, this.type.size);
@@ -132,6 +160,18 @@ export class FixedBytesStackView extends BaseStackView<Uint8Array, FixedBytesTyp
         }
 
         w.set(value);
+    }
+
+    size(): bigint | DecodingFailure {
+        return BigInt(this.type.size);
+    }
+
+    indexView(key: bigint): DecodingFailure | SingleByteStackView {
+        if (key >= this.type.size || key < 0n) {
+            return new DecodingFailure(`Invalid index ${key} in ${this.type.pp()}`);
+        }
+
+        return new SingleByteStackView(this.loc, Number(key));
     }
 }
 
