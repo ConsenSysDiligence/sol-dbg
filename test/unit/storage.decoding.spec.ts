@@ -18,17 +18,16 @@ import {
 import { DecodingFailure, hasPoison, Struct, Value } from "../../src/debug/decoding/value";
 import { hexToBytes } from "ethereum-cryptography/utils";
 import {
-    ArrayStorageView,
     BaseStorageView,
     bigEndianBufToBigint,
-    BytesStorageView,
     ExpStructType,
-    FixedBytesStorageView,
     getContractLayoutType,
     ImmMap,
+    isArrayLikeStorageView,
     makeStorageView,
     MapKeys,
     MapStorageView,
+    MAX_ARR_DECODE_LIMIT,
     PointerStorageView,
     single,
     Storage,
@@ -905,32 +904,35 @@ describe(`Contract Layout Type Tests`, () => {
 function recCheckViewDecodesTo(
     v: BaseStorageView<Value, TypeNode>,
     value: Value,
-    storage: Storage
+    state: Storage
 ): boolean {
     if (v instanceof PointerStorageView) {
-        return recCheckViewDecodesTo(v.toView(), value, storage);
+        return recCheckViewDecodesTo(v.toView(), value, state);
     }
 
     // Check indexing
-    if (
-        v instanceof ArrayStorageView ||
-        v instanceof BytesStorageView ||
-        v instanceof FixedBytesStorageView
-    ) {
+    if (isArrayLikeStorageView(v)) {
         if (!(value instanceof Array || value instanceof Uint8Array)) {
             console.error(`Expected indexable of type ${v.type.pp()} not ${value}`);
             return false;
         }
 
-        for (let i = 0; i < value.length; i++) {
-            const idxView = v.indexView(BigInt(i), storage);
+        const size = v.size(state);
+
+        if (size instanceof DecodingFailure || size > MAX_ARR_DECODE_LIMIT) {
+            console.error(`Couldn't get size of ${v.type.pp()}`);
+            return false;
+        }
+
+        for (let i = 0; i < Number(size); i++) {
+            const idxView = v.indexView(BigInt(i), state);
 
             if (idxView instanceof DecodingFailure) {
                 console.error(`Couldnt make index ${i} of indexable of type ${v.type.pp()}`);
                 return false;
             }
 
-            if (!recCheckViewDecodesTo(idxView, value[i], storage)) {
+            if (!recCheckViewDecodesTo(idxView, value[i], state)) {
                 return false;
             }
         }
@@ -950,7 +952,7 @@ function recCheckViewDecodesTo(
                 return false;
             }
 
-            if (!recCheckViewDecodesTo(idxView, value.get(key) as Value, storage)) {
+            if (!recCheckViewDecodesTo(idxView, value.get(key) as Value, state)) {
                 return false;
             }
         }
@@ -971,14 +973,14 @@ function recCheckViewDecodesTo(
                 return false;
             }
 
-            if (!recCheckViewDecodesTo(fieldView, value.field(name), storage)) {
+            if (!recCheckViewDecodesTo(fieldView, value.field(name), state)) {
                 return false;
             }
         }
     }
 
     // Simple case
-    const got = String(v.decode(storage));
+    const got = String(v.decode(state));
     const expected = String(value);
 
     if (got !== expected) {

@@ -2,7 +2,13 @@ import expect from "expect";
 import { DataLocation, InferType, TypeNode } from "solc-typed-ast";
 import { hasPoison, Value } from "../../src/debug/decoding/value";
 import { Stack } from "../../src";
-import { makeStackView, simplifyType } from "../../src/debug/decoding/";
+import {
+    DecodingFailure,
+    FixedBytesStackView,
+    makeStackView,
+    simplifyType,
+    SingleByteStackView
+} from "../../src/debug/decoding/";
 import { hexToBytes } from "ethereum-cryptography/utils";
 import { address, bool, bytes21, int128, uint16, uint8 } from "../utils";
 import { createAddressFromString } from "@ethereumjs/util";
@@ -37,4 +43,15 @@ describe(`Stack Decoding Tests`, () => {
             expect(value).toEqual(expectedValue);
         });
     }
+
+    it("Fixed bytes indexing", () => {
+        const fbView = makeStackView(bytes21, 5) as FixedBytesStackView;
+        const bView = fbView.indexView(1n) as SingleByteStackView;
+        expect(bView).not.toBeInstanceOf(DecodingFailure);
+        expect(bView.decode(stack)).toEqual(0x6a);
+        bView.encode(0x01, stack);
+        expect(fbView.decode(stack)).toEqual(
+            hexToBytes("cD0142782d230D7c13A74ddec5dD140e55499Df900")
+        );
+    });
 });

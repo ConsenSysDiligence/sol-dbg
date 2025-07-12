@@ -834,7 +834,7 @@ export abstract class PackedArrayStorageView<
 
 export class BytesStorageView
     extends PackedArrayStorageView<Uint8Array, BytesType>
-    implements IndexableView<bigint, Storage, SingleByteStorageView>
+    implements ArrayLikeStorageView<SingleByteStorageView>
 {
     decode(state: Storage): Uint8Array | DecodingFailure {
         return this.decodeBytes(state);
@@ -864,6 +864,10 @@ export class BytesStorageView
         const endOffsetInWord = Number(key % 32n) + 1;
 
         return new SingleByteStorageView([word, endOffsetInWord]);
+    }
+
+    size(state: Storage): bigint | DecodingFailure {
+        return this.getSize(state);
     }
 }
 

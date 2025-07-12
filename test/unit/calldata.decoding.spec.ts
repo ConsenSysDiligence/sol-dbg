@@ -14,7 +14,7 @@ import {
 } from "solc-typed-ast";
 import { hasPoison, Struct, Value } from "../../src/debug/decoding/value";
 import { hexToBytes } from "ethereum-cryptography/utils";
-import { Memory, single, uint256 } from "../../src";
+import { MAX_ARR_DECODE_LIMIT, Memory, single, uint256 } from "../../src";
 import {
     address,
     bool,
@@ -39,11 +39,9 @@ import {
 } from "../utils";
 import { createAddressFromString } from "@ethereumjs/util";
 import {
-    ArrayCalldataView,
     BaseCalldataView,
-    BytesCalldataView,
     DecodingFailure,
-    FixedBytesCalldataView,
+    isArrayLikeCalldataView,
     makeCalldataViews,
     PointerCalldataView,
     simplifyType,
@@ -496,17 +494,20 @@ function recCheckViewDecodesTo(
     }
 
     // Check indexing
-    if (
-        v instanceof ArrayCalldataView ||
-        v instanceof BytesCalldataView ||
-        v instanceof FixedBytesCalldataView
-    ) {
+    if (isArrayLikeCalldataView(v)) {
         if (!(value instanceof Array || value instanceof Uint8Array)) {
             console.error(`Expected indexable of type ${v.type.pp()} not ${value}`);
             return false;
         }
 
-        for (let i = 0; i < value.length; i++) {
+        const size = v.size(state);
+
+        if (size instanceof DecodingFailure || size > MAX_ARR_DECODE_LIMIT) {
+            console.error(`Couldn't get size of ${v.type.pp()}`);
+            return false;
+        }
+
+        for (let i = 0; i < Number(size); i++) {
             const idxView = v.indexView(BigInt(i), state);
 
             if (idxView instanceof DecodingFailure) {
