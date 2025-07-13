@@ -6,6 +6,11 @@ import {
     TypeNode
 } from "solc-typed-ast";
 import { DecodingFailure, Value } from "./value";
+import { PointerView, View } from "./view";
+import { PointerCalldataView } from "./calldata";
+import { PointerMemView } from "./memory";
+import { PointerStorageView } from "./storage";
+import { PointerStackView } from "./stack";
 
 export function isCalldataArrayType(typ: TypeNode): boolean {
     return (
@@ -45,4 +50,13 @@ export function isTypeStringStruct(t: string): boolean {
 
 export function isTypeStringStatic32BytesInStorage(t: string): boolean {
     return isTypeStringDynamicArray(t) || isTypeStringMapping(t);
+}
+
+export function isPointerView(v: any): v is PointerView<any, View> {
+    return (
+        v instanceof PointerCalldataView ||
+        v instanceof PointerMemView ||
+        v instanceof PointerStorageView ||
+        v instanceof PointerStackView
+    );
 }

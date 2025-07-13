@@ -119,8 +119,12 @@ describe(`Memory Indexing Tests`, () => {
             for (let i = 0; i < expectedValue.length; i++) {
                 const idxView = view.indexView(BigInt(i), memory);
                 expect(idxView).not.toBeInstanceOf(DecodingFailure);
+                let expectedIdxVal = expectedValue[i];
+                expectedIdxVal =
+                    typeof expectedIdxVal === "number" ? BigInt(expectedIdxVal) : expectedIdxVal;
+
                 expect((idxView as BaseMemoryView<Value, TypeNode>).decode(memory)).toEqual(
-                    expectedValue[i]
+                    expectedIdxVal
                 );
             }
         });
@@ -131,7 +135,7 @@ describe(`Memory Indexing Tests`, () => {
         const view = new FixedBytesMemView(bytes32, 0n);
         const elView = view.indexView(31n); // ef
         expect(elView).not.toBeInstanceOf(DecodingFailure);
-        (elView as SingleByteMemView).encode(1, mem);
+        (elView as SingleByteMemView).encode(1n, mem);
         expect(view.decode(mem)).toEqual(
             hexToBytes("0000000000000000000000000000000000000000000000000000000000abcd01")
         );

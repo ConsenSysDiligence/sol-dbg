@@ -193,8 +193,11 @@ describe(`Storage Indexing Tests`, () => {
                     (view instanceof PointerStorageView ? view.toView() : view) as any
                 ).indexView(BigInt(i), storage);
                 expect(idxView).not.toBeInstanceOf(DecodingFailure);
+                let expectedIdxVal = expectedValue[i];
+                expectedIdxVal =
+                    typeof expectedIdxVal === "number" ? BigInt(expectedIdxVal) : expectedIdxVal;
                 expect((idxView as BaseStorageView<Value, TypeNode>).decode(storage)).toEqual(
-                    expectedValue[i]
+                    expectedIdxVal
                 );
             }
         });
@@ -244,7 +247,7 @@ describe(`Storage Indexing Tests`, () => {
         const view = new FixedBytesStorageView(bytes5, [1n, 32]);
         const elView = view.indexView(4n); // ef
         expect(elView).not.toBeInstanceOf(DecodingFailure);
-        storage = (elView as SingleByteStorageView).encode(1, storage);
+        storage = (elView as SingleByteStorageView).encode(1n, storage);
         expect(view.decode(storage)).toEqual(hexToBytes("0405060701"));
     });
 

@@ -120,7 +120,7 @@ export class AddressStackView extends BaseStackView<Address, AddressType> {
     }
 }
 
-export class SingleByteStackView extends BaseStackView<number, FixedBytesType> {
+export class SingleByteStackView extends BaseStackView<bigint, FixedBytesType> {
     constructor(
         loc: number,
         public readonly byteOffset: number
@@ -128,19 +128,23 @@ export class SingleByteStackView extends BaseStackView<number, FixedBytesType> {
         super(types.byte, loc);
     }
 
-    decode(state: Stack): number | DecodingFailure {
+    decode(state: Stack): bigint | DecodingFailure {
         const w = this.fetchStackWord(this.loc, state);
-        return isFailure(w) ? w : w[this.byteOffset];
+        return isFailure(w) ? w : BigInt(w[this.byteOffset]);
     }
 
-    encode(value: number, state: Stack): void {
+    encode(value: bigint, state: Stack): void {
         const w = this.fetchStackWord(this.loc, state);
+
+        if (value < 0n || value >= 256) {
+            throw new EncodingError(`${value} not in byte range [0, 255]`);
+        }
 
         if (isFailure(w)) {
             throw new EncodingError(w.reason);
         }
 
-        w[this.byteOffset] = value;
+        w[this.byteOffset] = Number(value);
     }
 }
 

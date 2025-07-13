@@ -327,7 +327,7 @@ export function repeat<T>(x: T, n: number): T[] {
 }
 
 export function nyi(s: string): never {
-    assert(false, s);
+    assert(false, `NYI: ${s}`);
 }
 
 export function single<T>(a: T[]): T {

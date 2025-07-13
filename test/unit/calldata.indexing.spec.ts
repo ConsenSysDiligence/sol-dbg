@@ -217,8 +217,11 @@ describe(`Calldata Indexing Tests`, () => {
             for (let i = 0; i < expectedValue.length; i++) {
                 const idxView = view.indexView(BigInt(i), calldata);
                 expect(idxView).not.toBeInstanceOf(DecodingFailure);
+                let expectedIdxVal = expectedValue[i];
+                expectedIdxVal =
+                    typeof expectedIdxVal === "number" ? BigInt(expectedIdxVal) : expectedIdxVal;
                 expect((idxView as BaseCalldataView<Value, TypeNode>).decode(calldata)).toEqual(
-                    expectedValue[i]
+                    expectedIdxVal
                 );
             }
         });
