@@ -217,14 +217,18 @@ export function bigEndianBufToNumber(buf: Uint8Array): number {
     return bigIntToNum(bigEndianBufToBigint(buf));
 }
 
+const MIN_SAFE_INTEGER_N = BigInt(Number.MIN_SAFE_INTEGER);
+const MAX_SAFE_INTEGER_N = BigInt(Number.MAX_SAFE_INTEGER);
+
 /**
  * Convert a bigint to a number, fail if its OoB
  */
-export function bigIntToNum(n: bigint): number {
-    assert(
-        n >= BigInt(Number.MIN_SAFE_INTEGER) && n <= BigInt(Number.MAX_SAFE_INTEGER),
-        `Bigint ${n} doesn't fit in number`
-    );
+export function bigIntToNum(
+    n: bigint,
+    min: bigint = MIN_SAFE_INTEGER_N,
+    max: bigint = MAX_SAFE_INTEGER_N
+): number {
+    assert(n >= min && n <= max, `Bigint {0} doesn't fit in [{1}:{2}]`, n, min, max);
 
     return Number(n);
 }

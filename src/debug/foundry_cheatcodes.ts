@@ -9,7 +9,7 @@ import {
 import { keccak256 } from "ethereum-cryptography/keccak.js";
 import { bytesToHex, concatBytes, equalsBytes, utf8ToBytes } from "ethereum-cryptography/utils";
 import { ERROR, EvmErrorResult } from "../utils/ethereumjs_internal/exceptions";
-import { bigEndianBufToBigint, bigIntToBuf } from "../utils/misc";
+import { bigEndianBufToBigint, bigIntToBuf, bigIntToNum } from "../utils/misc";
 import { createAddressFromString } from "@ethereumjs/util";
 
 /// require("@ethereumjs/evm/dist/cjs/precompiles").PrecompileFunc
@@ -574,7 +574,7 @@ export function makeFoundryCheatcodePrecompile(): [PrecompileFunc, FoundryContex
                 return EvmErrorResult(new EVMError(ERROR.REVERT as any), 0n);
             }
 
-            const len = Number(bigEndianBufToBigint(input.data.slice(36, 68)));
+            const len = bigIntToNum(bigEndianBufToBigint(input.data.slice(36, 68)));
 
             if (input.data.length < 68 + len) {
                 return EvmErrorResult(new EVMError(ERROR.REVERT as any), 0n);

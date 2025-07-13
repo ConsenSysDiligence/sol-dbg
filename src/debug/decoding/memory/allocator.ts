@@ -2,6 +2,7 @@ import { assert } from "solc-typed-ast";
 import { Memory } from "../../types";
 import { IntMemView, makeMemoryView } from "./view";
 import { uint256 } from "../../../utils";
+import { inRange } from "../utils";
 
 export interface Allocator {
     alloc(size: number): bigint;
@@ -40,7 +41,7 @@ export class DefaultAllocator implements Allocator {
      * @param newMemSize
      */
     grow(newMemSize: number | bigint): void {
-        assert(BigInt(newMemSize) <= MAX_MEM_LIMIT, `Memory grew too large: ${newMemSize}`);
+        assert(inRange(newMemSize, 0n, MAX_MEM_LIMIT), `Memory grew too large: ${newMemSize}`);
         this.buf.resize(Number(newMemSize));
     }
 

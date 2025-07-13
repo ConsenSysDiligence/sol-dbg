@@ -17,6 +17,7 @@ import { ArrayLikeView, EncodingError, PointerView, StructView, View } from "../
 import { DecodingFailure, Struct, Value } from "../value";
 import {
     bigEndianBufToBigint,
+    bigIntToNum,
     encodeBigintInBigEndianBuf,
     fits,
     MAX_ARR_DECODE_LIMIT,
@@ -27,7 +28,7 @@ import {
 } from "../../../utils";
 import { Address, bytesToUtf8 } from "@ethereumjs/util";
 import { ExpStructType, MissingType } from "../exp_types";
-import { isFailure } from "../utils";
+import { inRange, isFailure } from "../utils";
 import { Allocator } from "./allocator";
 import { utf8ToBytes } from "ethereum-cryptography/utils";
 
@@ -43,7 +44,7 @@ export abstract class BaseMemoryView<
     Type extends TypeNode = TypeNode
 > extends View<Memory, Val, bigint, Type> {
     protected writeMemAt(value: Uint8Array, off: bigint, mem: Memory): void {
-        if (off < 0n || off + BigInt(value.length) > BigInt(mem.length)) {
+        if (!inRange(off, 0n, mem.length - value.length)) {
             throw new EncodingError(
                 `OoB writing mem at ${off} of length ${value.length} in memory of size ${mem.length}`
             );
@@ -161,7 +162,7 @@ export class SingleByteMemView extends BaseMemoryView<bigint, FixedBytesType> {
     }
 
     decode(state: Memory): bigint | DecodingFailure {
-        if (this.loc < 0 || this.loc > state.length) {
+        if (!inRange(this.loc, 0, state.length)) {
             return new DecodingFailure(`OoB byte access at ${this.loc}`);
         }
 
@@ -169,7 +170,7 @@ export class SingleByteMemView extends BaseMemoryView<bigint, FixedBytesType> {
     }
 
     encode(value: bigint, state: Memory): void {
-        if (value < 0n || value >= 256) {
+        if (!inRange(value, 0, 255)) {
             throw new EncodingError(`${value} not in byte range [0, 255]`);
         }
 
@@ -216,7 +217,7 @@ export abstract class PackedArrayMemView<
             return len;
         }
 
-        if (len >= MAX_ARR_DECODE_LIMIT) {
+        if (!inRange(len, 0n, MAX_ARR_DECODE_LIMIT)) {
             return new DecodingFailure(`Bytes to decode too large - ${len}`);
         }
 
@@ -291,7 +292,7 @@ export class ArrayMemView
             sizeBigint = this.type.size;
         }
 
-        if (sizeBigint >= MAX_ARR_DECODE_LIMIT) {
+        if (!inRange(sizeBigint, 0n, MAX_ARR_DECODE_LIMIT)) {
             return new DecodingFailure(`Array too large to decode: ${sizeBigint}`);
         }
 
@@ -436,6 +437,46 @@ export class PointerMemView
 
         if (t instanceof PackedArrayType) {
             return Buffer.from(v as Uint8Array | string).length + 32;
+        }
+
+        return 32;
+    }
+
+    /**
+     * Helper to compute how much memory we need to allocate for a type `t` with a known static size.
+     * Return `undefined` if the size of t is unkown at compile time.
+     */
+    static staticTypeAllocSize(t: TypeNode): number | undefined {
+        if (t instanceof ArrayType) {
+            if (t.size === undefined) {
+                return undefined;
+            }
+
+            const elT = PointerMemView.staticTypeAllocSize(t.elementT);
+            return elT === undefined ? elT : bigIntToNum(t.size) * elT;
+        }
+
+        if (t instanceof ExpStructType) {
+            let size = 0;
+            for (let i = 0; i < t.fields.length; i++) {
+                const fieldSize = PointerMemView.staticTypeAllocSize(t.fields[i][1]);
+
+                if (fieldSize === undefined) {
+                    return undefined;
+                }
+
+                size += fieldSize;
+            }
+
+            return size;
+        }
+
+        if (t instanceof PackedArrayType) {
+            return undefined;
+        }
+
+        if (t instanceof PointerType) {
+            return PointerMemView.staticTypeAllocSize(t.to);
         }
 
         return 32;

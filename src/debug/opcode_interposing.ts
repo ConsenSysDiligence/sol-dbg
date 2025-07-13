@@ -2,7 +2,7 @@ import { Common } from "@ethereumjs/common";
 import { Address, bigIntToBytes, setLengthLeft } from "@ethereumjs/util";
 import { createAddressFromStackBigInt, trap, writeCallOutput } from "../utils/ethereumjs_internal";
 import { ERROR } from "../utils/ethereumjs_internal/exceptions";
-import { bigEndianBufToBigint } from "../utils/misc";
+import { bigEndianBufToBigint, bigIntToNum } from "../utils/misc";
 import {
     FoundryCheatcodesAddress,
     FoundryContext,
@@ -99,7 +99,7 @@ export function foundryInterposedOps(opcodes: any, foundryCtx: FoundryContext): 
 
                 if (
                     common.isActivatedEIP(3860) &&
-                    length > Number(common.param("maxInitCodeSize")) &&
+                    length > bigIntToNum(common.param("maxInitCodeSize")) &&
                     !runState.interpreter._evm.allowUnlimitedInitCodeSize
                 ) {
                     trap(ERROR.INITCODE_SIZE_VIOLATION);
@@ -110,7 +110,7 @@ export function foundryInterposedOps(opcodes: any, foundryCtx: FoundryContext): 
 
                 let data = new Uint8Array(0);
                 if (length !== BigInt(0)) {
-                    data = runState.memory.read(Number(offset), Number(length), true);
+                    data = runState.memory.read(bigIntToNum(offset), bigIntToNum(length), true);
                 }
 
                 const ret = await runState.interpreter.create(gasLimit, value, data);
@@ -131,7 +131,7 @@ export function foundryInterposedOps(opcodes: any, foundryCtx: FoundryContext): 
 
                 if (
                     common.isActivatedEIP(3860) &&
-                    length > Number(common.param("maxInitCodeSize")) &&
+                    length > bigIntToNum(common.param("maxInitCodeSize")) &&
                     !runState.interpreter._evm.allowUnlimitedInitCodeSize
                 ) {
                     trap(ERROR.INITCODE_SIZE_VIOLATION);
@@ -142,7 +142,7 @@ export function foundryInterposedOps(opcodes: any, foundryCtx: FoundryContext): 
 
                 let data = new Uint8Array(0);
                 if (length !== BigInt(0)) {
-                    data = runState.memory.read(Number(offset), Number(length), true);
+                    data = runState.memory.read(bigIntToNum(offset), bigIntToNum(length), true);
                 }
 
                 const ret = await runState.interpreter.create2(
@@ -167,7 +167,7 @@ export function foundryInterposedOps(opcodes: any, foundryCtx: FoundryContext): 
 
                 let data = new Uint8Array(0);
                 if (inLength !== BigInt(0)) {
-                    data = runState.memory.read(Number(inOffset), Number(inLength), true);
+                    data = runState.memory.read(bigIntToNum(inOffset), bigIntToNum(inLength), true);
                 }
 
                 const gasLimit = runState.messageGasLimit!;
@@ -204,7 +204,7 @@ export function foundryInterposedOps(opcodes: any, foundryCtx: FoundryContext): 
 
                 let data = new Uint8Array(0);
                 if (inLength !== BigInt(0)) {
-                    data = runState.memory.read(Number(inOffset), Number(inLength), true);
+                    data = runState.memory.read(bigIntToNum(inOffset), bigIntToNum(inLength), true);
                 }
 
                 const ret = await runState.interpreter.callCode(gasLimit, toAddress, value, data);
@@ -223,7 +223,7 @@ export function foundryInterposedOps(opcodes: any, foundryCtx: FoundryContext): 
 
                 let data = new Uint8Array(0);
                 if (inLength !== BigInt(0)) {
-                    data = runState.memory.read(Number(inOffset), Number(inLength), true);
+                    data = runState.memory.read(bigIntToNum(inOffset), bigIntToNum(inLength), true);
                 }
 
                 const gasLimit = runState.messageGasLimit!;
@@ -253,7 +253,7 @@ export function foundryInterposedOps(opcodes: any, foundryCtx: FoundryContext): 
 
                 let data = new Uint8Array(0);
                 if (inLength !== BigInt(0)) {
-                    data = runState.memory.read(Number(inOffset), Number(inLength), true);
+                    data = runState.memory.read(bigIntToNum(inOffset), bigIntToNum(inLength), true);
                 }
 
                 const ret = await runState.interpreter.callStatic(gasLimit, toAddress, value, data);
@@ -273,7 +273,7 @@ export function foundryInterposedOps(opcodes: any, foundryCtx: FoundryContext): 
 
                 if (expectedRevert === undefined) {
                     if (length !== BigInt(0)) {
-                        returnData = runState.memory.read(Number(offset), Number(length));
+                        returnData = runState.memory.read(bigIntToNum(offset), bigIntToNum(length));
                     }
                     runState.interpreter.finish(returnData);
                 } else {
@@ -318,7 +318,7 @@ function handleReturn(
         ret = 0n;
     } else {
         // Otherwise we match the expected revert, so return all 0s
-        runState.returnBytes = new Uint8Array(outLength !== 0n ? Number(outLength) : 32 * 128);
+        runState.returnBytes = new Uint8Array(outLength !== 0n ? bigIntToNum(outLength) : 32 * 128);
         ret = 1n;
     }
 

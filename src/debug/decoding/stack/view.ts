@@ -23,7 +23,7 @@ import {
 } from "../../../utils";
 import { Address } from "@ethereumjs/util";
 import { makeStorageView } from "../storage";
-import { isCalldataArrayType, isFailure } from "../utils";
+import { inRange, isCalldataArrayType, isFailure } from "../utils";
 import { ArraySliceCalldataView, BaseCalldataView, makeCalldataView } from "../calldata/view";
 import { makeMemoryView } from "../memory";
 import { BaseStorageView } from "../storage/view";
@@ -136,7 +136,7 @@ export class SingleByteStackView extends BaseStackView<bigint, FixedBytesType> {
     encode(value: bigint, state: Stack): void {
         const w = this.fetchStackWord(this.loc, state);
 
-        if (value < 0n || value >= 256) {
+        if (!inRange(value, 0n, 255n)) {
             throw new EncodingError(`${value} not in byte range [0, 255]`);
         }
 
@@ -171,7 +171,7 @@ export class FixedBytesStackView
     }
 
     indexView(key: bigint): DecodingFailure | SingleByteStackView {
-        if (key >= this.type.size || key < 0n) {
+        if (!inRange(key, 0, this.type.size - 1)) {
             return new DecodingFailure(`Invalid index ${key} in ${this.type.pp()}`);
         }
 

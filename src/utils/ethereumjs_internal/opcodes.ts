@@ -8,6 +8,7 @@ import {
     setLengthLeft,
     setLengthRight
 } from "@ethereumjs/util";
+import { bigIntToNum } from "../misc";
 
 /**
  * The following code has been copied from
@@ -40,9 +41,9 @@ export function getDataSlice(data: Uint8Array, offset: bigint, length: bigint): 
         end = len;
     }
 
-    data = data.subarray(Number(offset), Number(end));
+    data = data.subarray(bigIntToNum(offset), bigIntToNum(end));
     // Right-pad with zeros to fill dataLength bytes
-    data = setLengthRight(data, Number(length));
+    data = setLengthRight(data, bigIntToNum(length));
 
     return data;
 }
@@ -53,8 +54,8 @@ export function getDataSlice(data: Uint8Array, offset: bigint, length: bigint): 
 export function writeCallOutput(runState: any, outOffset: bigint, outLength: bigint): void {
     const returnData = runState.interpreter.getReturnData();
     if (returnData.length > 0) {
-        const memOffset = Number(outOffset);
-        let dataLength = Number(outLength);
+        const memOffset = bigIntToNum(outOffset);
+        let dataLength = bigIntToNum(outLength);
         if (BigInt(returnData.length) < dataLength) {
             dataLength = returnData.length;
         }

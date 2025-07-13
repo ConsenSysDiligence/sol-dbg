@@ -42,7 +42,7 @@ import { Address, bytesToUtf8, concatBytes } from "@ethereumjs/util";
 import { ExpStructType, MissingType } from "../exp_types";
 import { MapKeys } from "../../tracers";
 import { makeMemoryView } from "../memory";
-import { isFailure, isTypeStringStatic32BytesInStorage } from "../utils";
+import { inRange, isFailure, isTypeStringStatic32BytesInStorage } from "../utils";
 import { BaseMemoryView, IntMemView } from "../memory/view";
 import { bytesToHex, equalsBytes, utf8ToBytes } from "ethereum-cryptography/utils";
 
@@ -300,7 +300,7 @@ export class SingleByteStorageView extends BaseStorageView<bigint, FixedBytesTyp
     encode(value: bigint, state: Storage): Storage {
         const word = this.fetchWord(this.key, state);
 
-        if (value < 0n || value >= 256) {
+        if (!inRange(value, 0, 255)) {
             throw new EncodingError(`${value} not in byte range [0, 255]`);
         }
 
@@ -345,7 +345,7 @@ export class FixedBytesStorageView
     }
 
     indexView(key: bigint): DecodingFailure | SingleByteStorageView {
-        if (key >= this.type.size || key < 0n) {
+        if (!inRange(key, 0, this.type.size)) {
             return new DecodingFailure(`Invalid index ${key} in ${this.type.pp()}`);
         }
 
@@ -479,7 +479,7 @@ export class ArrayStorageView
             contentsKey = keccakOfAddr(this.key);
         }
 
-        if (sizeBigint > MAX_ARR_DECODE_LIMIT) {
+        if (!inRange(sizeBigint, 0n, MAX_ARR_DECODE_LIMIT)) {
             return new DecodingFailure(`Array too large to decode ${sizeBigint}`);
         }
 
@@ -550,7 +550,7 @@ export class ArrayStorageView
             addr = keccakOfAddr(this.key);
         }
 
-        if (key >= size || key < 0n) {
+        if (!inRange(key, 0n, size - 1n)) {
             return new DecodingFailure(`Invalid index ${key} in array of size ${size}`);
         }
 
@@ -796,7 +796,7 @@ export abstract class PackedArrayStorageView<
 
         len = (len - 1n) / 2n;
 
-        if (len > MAX_ARR_DECODE_LIMIT) {
+        if (!inRange(len, 0n, MAX_ARR_DECODE_LIMIT)) {
             return new DecodingFailure(`${this.type.pp()} too large - ${len}`);
         }
 

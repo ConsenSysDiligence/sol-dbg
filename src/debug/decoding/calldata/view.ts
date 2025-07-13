@@ -17,6 +17,7 @@ import { DecodingFailure, Struct, Value } from "../value";
 import { ArrayLikeView, PointerView, StructView, View } from "../view";
 import {
     bigEndianBufToBigint,
+    bigIntToNum,
     fits,
     MAX_ARR_DECODE_LIMIT,
     nyi,
@@ -116,7 +117,7 @@ function headSize(t: TypeNode): number | undefined {
             return undefined;
         }
 
-        return elSize * Number(t.size);
+        return elSize * bigIntToNum(t.size);
     }
 
     if (t instanceof ExpStructType) {
@@ -226,7 +227,7 @@ export abstract class BaseCalldataView<
             return len;
         }
 
-        if (len >= MAX_ARR_DECODE_LIMIT) {
+        if (!inRange(len, 0n, MAX_ARR_DECODE_LIMIT)) {
             return new DecodingFailure(`Bytes to decode too large - ${len}`);
         }
 
@@ -317,7 +318,7 @@ export class SingleByteCalldataView extends BaseCalldataView<bigint, FixedBytesT
     decode(state: Memory): bigint | DecodingFailure {
         const off = this.loc + this.base;
 
-        if (off < 0 || off > state.length) {
+        if (!inRange(off, 0, state.length - 1)) {
             return new DecodingFailure(`OoB byte access at ${off}`);
         }
 
