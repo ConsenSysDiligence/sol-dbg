@@ -932,7 +932,8 @@ function recCheckViewDecodesTo(
                 return false;
             }
 
-            if (!recCheckViewDecodesTo(idxView, value[i], state)) {
+            const el = value[i];
+            if (!recCheckViewDecodesTo(idxView, typeof el === "number" ? BigInt(el) : el, state)) {
                 return false;
             }
         }

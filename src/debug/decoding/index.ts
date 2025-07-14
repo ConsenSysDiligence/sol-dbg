@@ -6,3 +6,4 @@ export * from "./storage";
 export * from "./exp_types";
 export * from "./value";
 export * from "./view";
+export { isPointerView, inRange } from "./utils";

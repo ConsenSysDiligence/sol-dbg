@@ -115,20 +115,30 @@ export function hasPoison(v: Value): boolean {
 /**
  * Typescript types corresponding to various Solidity types.
  * Includes both primitive (value) types and compound types
+ * `PrimitiveValue`s are those that can be held in a local on the stack. In general they
+ * correspond to what can *fit* in a single word.
+ * A notable exception is `Slice` which corresponds to 2 words (offset and length).
+ * Also `View` here corresponds to an EVM Pointer.
+ * Also `Uint8Array` appears here as we use it to represent FixedBytesType
  */
-export type Value =
-    | bigint // int/uint
+export type PrimitiveValue =
+    | bigint // int/uint/enum
     | boolean // bool
-    | Uint8Array // byte, bytesN, bytes
-    | string // string
-    | number // enum
+    | Uint8Array // byte, bytesN
     | Address // address
     | FunctionValue // function types
-    | Value[] // sized and unsized arrays
     | Slice // array slices
+    | View<any, Value, any, TypeNode> // Pointer Values
+    | Poison; // Unitialized variables, null tuple components, and other "undefined" values
+
+/**
+ * A complex value corrseponds to Solidity bytes, strings, arrays, tuples, structs and maps.
+ */
+export type ComplexValue =
+    | Uint8Array // bytes
+    | string // string
+    | Value[] // sized, unsized arrays and tuples
     | Struct // Structs
-    | Map<Value, Value> // Mappings
-    // Stack is the only state type that may have pointers into other areas.
-    // Therefore decoding stack data may return a data view into another area
-    | View<any, Value, any, TypeNode>
-    | Poison;
+    | Map<Value, Value>; // Mappings
+
+export type Value = PrimitiveValue | ComplexValue;
