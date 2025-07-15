@@ -25,7 +25,7 @@ import {
     uint256,
     zip
 } from "../../../utils";
-import { Address, bytesToUtf8 } from "@ethereumjs/util";
+import { Address, bigIntToHex, bytesToUtf8 } from "@ethereumjs/util";
 import { inRange, isFailure, isTypeStringDynamicArray } from "../utils";
 import { ExpStructType, MissingType } from "../exp_types";
 
@@ -258,7 +258,7 @@ export abstract class BaseCalldataView<
     }
 
     pp(): string {
-        return `<${this.type.pp()}@${this.loc + this.base} in calldata>`;
+        return `<${this.type.pp()}@${bigIntToHex(this.loc + this.base)} in calldata>`;
     }
 
     get offset(): bigint {

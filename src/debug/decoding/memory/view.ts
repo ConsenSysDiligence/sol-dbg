@@ -17,7 +17,6 @@ import { ArrayLikeView, EncodingError, PointerView, StructView, View } from "../
 import { DecodingFailure, Struct, Value } from "../value";
 import {
     bigEndianBufToBigint,
-    bigIntToNum,
     encodeBigintInBigEndianBuf,
     fits,
     MAX_ARR_DECODE_LIMIT,
@@ -26,7 +25,7 @@ import {
     uint256,
     ZERO_BYTES32
 } from "../../../utils";
-import { Address, bytesToUtf8 } from "@ethereumjs/util";
+import { Address, bigIntToHex, bytesToUtf8 } from "@ethereumjs/util";
 import { ExpStructType, MissingType } from "../exp_types";
 import { inRange, isFailure } from "../utils";
 import { Allocator } from "./allocator";
@@ -95,7 +94,7 @@ export abstract class BaseMemoryView<
     }
 
     pp(): string {
-        return `<${this.type.pp()}@${this.loc} in memory>`;
+        return `<${this.type.pp()}@${bigIntToHex(this.loc)} in memory>`;
     }
 
     get offset(): bigint {
@@ -439,43 +438,17 @@ export class PointerMemView
         return 32;
     }
 
-    /**
-     * Helper to compute how much memory we need to allocate for a type `t` with a known static size.
-     * Return `undefined` if the size of t is unkown at compile time.
-     */
-    static staticTypeAllocSize(t: TypeNode): number | undefined {
-        if (t instanceof ArrayType) {
-            if (t.size === undefined) {
-                return undefined;
-            }
+    public static encodeInMem(
+        value: Value,
+        type: PointerType,
+        state: Memory,
+        alloc: Allocator
+    ): bigint {
+        const ptr = alloc.alloc(PointerMemView.allocSize(value, type.to));
+        const view = makeMemoryView(type.to, ptr);
+        view.encode(value, state, alloc);
 
-            return 32 * bigIntToNum(t.size);
-        }
-
-        if (t instanceof ExpStructType) {
-            let size = 0;
-            for (let i = 0; i < t.fields.length; i++) {
-                const fieldSize = PointerMemView.staticTypeAllocSize(t.fields[i][1]);
-
-                if (fieldSize === undefined) {
-                    return undefined;
-                }
-
-                size += fieldSize;
-            }
-
-            return size;
-        }
-
-        if (t instanceof PackedArrayType) {
-            return undefined;
-        }
-
-        if (t instanceof PointerType) {
-            return PointerMemView.staticTypeAllocSize(t.to);
-        }
-
-        return 32;
+        return ptr;
     }
 
     encode(value: Value, state: Memory, alloc: Allocator): void {
@@ -486,14 +459,17 @@ export class PointerMemView
                 );
             }
 
-            this.encodeIntAt(value.offset, this.loc, state);
+            const off = this.decodeIntAt(value.offset, types.uint256, state);
+            if (off instanceof DecodingFailure) {
+                throw new EncodingError(`Cannot read pointer value at ${value.offset}`);
+            }
+
+            this.encodeIntAt(off, this.loc, state);
             return;
         }
 
-        const ptr = alloc.alloc(PointerMemView.allocSize(value, this.type.to));
+        const ptr = PointerMemView.encodeInMem(value, this.type, state, alloc);
         this.encodeIntAt(ptr, this.loc, state);
-        const view = makeMemoryView(this.type.to, ptr);
-        view.encode(value, state, alloc);
     }
 
     toView(state: Memory): BaseMemoryView<Value, TypeNode> | DecodingFailure {
