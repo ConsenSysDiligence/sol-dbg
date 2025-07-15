@@ -528,7 +528,23 @@ const rttSamples: Array<[TypeNode | TypeGenerator, Value]> = [
                 ]
             ]
         ])
-    ]
+    ],
+    [
+        new PointerType(new ArrayType(new PointerType(new ArrayType(uint16), DataLocation.Memory)), DataLocation.Memory),
+        [[1n, 2n, 3n], [4n, 5n]]
+    ],
+    [
+        new PointerType(new ArrayType(new PointerType(new ArrayType(uint16), DataLocation.Memory), 2n), DataLocation.Memory),
+        [[1n, 2n, 3n], [4n, 5n]]
+    ],
+    [
+        new PointerType(new ArrayType(new PointerType(new ArrayType(uint16, 3n), DataLocation.Memory)), DataLocation.Memory),
+        [[1n, 2n, 3n], [4n, 5n, 6n]]
+    ],
+    [
+        new PointerType(new ArrayType(new PointerType(new ArrayType(uint16, 3n), DataLocation.Memory), 2n), DataLocation.Memory),
+        [[1n, 2n, 3n], [4n, 5n, 6n]]
+    ],
 ];
 
 describe(`Memory encoding/decoding RTT tests`, () => {

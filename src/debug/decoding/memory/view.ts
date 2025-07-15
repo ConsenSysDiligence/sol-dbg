@@ -420,10 +420,7 @@ export class PointerMemView
      */
     static allocSize(v: Value | undefined, t: TypeNode): number {
         if (t instanceof ArrayType) {
-            return (
-                (v as Value[]).length * PointerMemView.allocSize(undefined, t.elementT) +
-                (t.size !== undefined ? 0 : 32)
-            );
+            return (v as Value[]).length * 32 + (t.size !== undefined ? 0 : 32);
         }
 
         if (t instanceof ExpStructType) {
