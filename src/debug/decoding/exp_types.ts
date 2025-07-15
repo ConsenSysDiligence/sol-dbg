@@ -99,7 +99,7 @@ function variableDeclarationToTypeNode(v: VariableDeclaration, infer: InferType)
 export function simplifyType(
     rawT: TypeNode,
     infer: InferType,
-    loc: DataLocation | undefined
+    loc: DataLocation | undefined = undefined
 ): TypeNode {
     if (rawT instanceof ArrayType) {
         const expElT = simplifyType(rawT.elementT, infer, loc);

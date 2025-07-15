@@ -67,7 +67,7 @@ function buildFunArgViews(
             return undefined;
         }
 
-        res.unshift([name, makeStackView(simplifyType(typ, infer, undefined), offsetFromTop)]);
+        res.unshift([name, makeStackView(simplifyType(typ, infer), offsetFromTop)]);
     }
 
     return res;
