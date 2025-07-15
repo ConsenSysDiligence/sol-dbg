@@ -449,8 +449,7 @@ export class PointerMemView
                 return undefined;
             }
 
-            const elT = PointerMemView.staticTypeAllocSize(t.elementT);
-            return elT === undefined ? elT : bigIntToNum(t.size) * elT;
+            return 32 * bigIntToNum(t.size);
         }
 
         if (t instanceof ExpStructType) {
