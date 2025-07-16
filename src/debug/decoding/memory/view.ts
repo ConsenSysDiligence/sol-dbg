@@ -453,7 +453,7 @@ export class PointerMemView
 
     encode(value: Value, state: Memory, alloc: Allocator): void {
         if (value instanceof BaseMemoryView) {
-            if (value.type.pp() !== this.type.pp()) {
+            if (value.type.pp() !== this.type.to.pp()) {
                 throw new EncodingError(
                     `Cannot assign a pointer from incompatible type ${value.type.pp()} to ${this.pp()}`
                 );
