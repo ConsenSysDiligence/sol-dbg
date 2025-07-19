@@ -170,7 +170,7 @@ export abstract class BaseCalldataView<
     constructor(
         type: Type,
         loc: bigint,
-        protected base: bigint
+        public base: bigint
     ) {
         super(type, loc);
     }
