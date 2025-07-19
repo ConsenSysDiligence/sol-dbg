@@ -17,6 +17,7 @@ import { ArrayLikeView, EncodingError, PointerView, StructView, View } from "../
 import { DecodingFailure, Struct, Value } from "../value";
 import {
     bigEndianBufToBigint,
+    bigIntToNum,
     encodeBigintInBigEndianBuf,
     fits,
     MAX_ARR_DECODE_LIMIT,
@@ -419,16 +420,15 @@ export class PointerMemView
      */
     static allocSize(v: Value | undefined, t: TypeNode): number {
         if (t instanceof ArrayType) {
-            return (v as Value[]).length * 32 + (t.size !== undefined ? 0 : 32);
+            if (t.size !== undefined) {
+                return bigIntToNum(t.size * 32n);
+            }
+
+            return (v as Value[]).length * 32 + 32;
         }
 
         if (t instanceof ExpStructType) {
-            let size = 0;
-            for (let i = 0; i < t.fields.length; i++) {
-                size += PointerMemView.allocSize((v as Struct).entries[i][1], t.fields[i][1]);
-            }
-
-            return size;
+            return t.fields.length * 32;
         }
 
         if (t instanceof PackedArrayType) {
@@ -459,12 +459,7 @@ export class PointerMemView
                 );
             }
 
-            const off = this.decodeIntAt(value.offset, types.uint256, state);
-            if (off instanceof DecodingFailure) {
-                throw new EncodingError(`Cannot read pointer value at ${value.offset}`);
-            }
-
-            this.encodeIntAt(off, this.loc, state);
+            this.encodeIntAt(value.offset, this.loc, state);
             return;
         }
 
