@@ -6,6 +6,7 @@ import {
     BytesType,
     FixedBytesType,
     IntType,
+    MappingType,
     PackedArrayType,
     PointerType,
     StringType,
@@ -435,6 +436,11 @@ export class PointerMemView
             return Buffer.from(v as Uint8Array | string).length + 32;
         }
 
+        if (t instanceof MappingType) {
+            // Nothing gets allocated in memory for a Map
+            return 0;
+        }
+
         return 32;
     }
 
@@ -490,6 +496,19 @@ export class MissingMemView extends BaseMemoryView<Value, MissingType> {
     }
 }
 
+// In solidity <0.7.0 Map fields were allowed in memory structs. They were essentially a no-op:
+// An empty map is decoded, and nothing happens when we assign structs with maps inside.
+// For backwards compatibility allow Map views in memory.
+export class MapMemView extends BaseMemoryView<Map<Value, Value>, MappingType> {
+    encode(value: Map<Value, Value>, state: Memory, alloc: Allocator): void {
+        // Nothing to do
+    }
+    decode(state: Memory): Map<Value, Value> {
+        return new Map();
+    }
+
+}
+
 export function makeMemoryView(type: TypeNode, loc: bigint): BaseMemoryView<Value, TypeNode> {
     if (type instanceof IntType) {
         return new IntMemView(type, loc);
@@ -525,6 +544,10 @@ export function makeMemoryView(type: TypeNode, loc: bigint): BaseMemoryView<Valu
 
     if (type instanceof PointerType) {
         return new PointerMemView(type, loc);
+    }
+
+    if (type instanceof MappingType) {
+        return new MapMemView(type, loc);
     }
 
     if (type instanceof MissingType) {
