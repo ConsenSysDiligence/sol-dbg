@@ -30,7 +30,7 @@ import { inRange, isFailure, isTypeStringDynamicArray } from "../utils";
 import { ExpStructType, MissingType } from "../exp_types";
 
 interface ArrayLikeCalldataView<ValViewT extends BaseCalldataView<Value, TypeNode>>
-    extends ArrayLikeView<Memory, ValViewT> {}
+    extends ArrayLikeView<Memory, ValViewT> { }
 
 export function isArrayLikeCalldataView(
     v: any
@@ -331,8 +331,7 @@ export class SingleByteCalldataView extends BaseCalldataView<bigint, FixedBytesT
  */
 export class FixedBytesCalldataView
     extends BaseCalldataView<Uint8Array, FixedBytesType>
-    implements ArrayLikeCalldataView<SingleByteCalldataView>
-{
+    implements ArrayLikeCalldataView<SingleByteCalldataView> {
     decode(state: Memory): Uint8Array | DecodingFailure {
         return this.readMemAt(this.loc, state, this.type.size);
     }
@@ -352,8 +351,7 @@ export class FixedBytesCalldataView
 
 export class BytesCalldataView
     extends BaseCalldataView<Uint8Array, BytesType>
-    implements ArrayLikeCalldataView<SingleByteCalldataView>
-{
+    implements ArrayLikeCalldataView<SingleByteCalldataView> {
     decode(state: Memory): Uint8Array | DecodingFailure {
         return this.decodeBytesAt(this.loc, state);
     }
@@ -410,8 +408,7 @@ export class TupleCalldataView extends BaseCalldataView<Value[], TupleType> {
 
 export abstract class BaseArrayCalldataView
     extends BaseCalldataView<Value[], ArrayType>
-    implements ArrayLikeCalldataView<BaseCalldataView<Value, TypeNode>>
-{
+    implements ArrayLikeCalldataView<BaseCalldataView<Value, TypeNode>> {
     decodeArray(baseOff: bigint, bigIntSize: bigint, state: Memory): Value[] | DecodingFailure {
         if (!inRange(bigIntSize, 0, MAX_ARR_DECODE_LIMIT)) {
             return new DecodingFailure(`Array too large ${bigIntSize}`);
@@ -546,8 +543,7 @@ export class ArraySliceCalldataView extends BaseArrayCalldataView {
 
 export class StructCalldataView
     extends BaseCalldataView<Struct, ExpStructType>
-    implements StructView<Memory, BaseCalldataView<Value, TypeNode>>
-{
+    implements StructView<Memory, BaseCalldataView<Value, TypeNode>> {
     decode(state: Memory): Struct {
         // A StructCalldataView should be wrapped in a PointerCalldataView. So translating
         // the base should be handled by PointerCalldataView.decode
@@ -596,8 +592,7 @@ export class StructCalldataView
 
 export class PointerCalldataView
     extends BaseCalldataView<Value, PointerType>
-    implements PointerView<Memory, BaseCalldataView<Value, TypeNode>>
-{
+    implements PointerView<Memory, BaseCalldataView<Value, TypeNode>> {
     decode(state: Memory): Value | DecodingFailure {
         const innerView = this.toView(state);
 

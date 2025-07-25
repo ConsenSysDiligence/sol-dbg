@@ -24,6 +24,7 @@ import {
     MAX_ARR_DECODE_LIMIT,
     nyi,
     readMem,
+    roundUpToWordSize,
     uint256,
     ZERO_BYTES32
 } from "../../../utils";
@@ -34,7 +35,7 @@ import { Allocator } from "./allocator";
 import { utf8ToBytes } from "ethereum-cryptography/utils";
 
 interface ArrayLikeMemView<ValViewT extends BaseMemoryView<Value, TypeNode>>
-    extends ArrayLikeView<Memory, ValViewT> {}
+    extends ArrayLikeView<Memory, ValViewT> { }
 
 export function isArrayLikeMemView(v: any): v is ArrayLikeMemView<BaseMemoryView<Value, TypeNode>> {
     return v instanceof FixedBytesMemView || v instanceof ArrayMemView || v instanceof BytesMemView;
@@ -182,8 +183,7 @@ export class SingleByteMemView extends BaseMemoryView<bigint, FixedBytesType> {
 
 export class FixedBytesMemView
     extends BaseMemoryView<Uint8Array, FixedBytesType>
-    implements ArrayLikeMemView<SingleByteMemView>
-{
+    implements ArrayLikeMemView<SingleByteMemView> {
     decode(state: Memory): Uint8Array | DecodingFailure {
         return this.readMemAt(this.loc, state, this.type.size);
     }
@@ -233,8 +233,7 @@ export abstract class PackedArrayMemView<
 
 export class BytesMemView
     extends PackedArrayMemView<Uint8Array, BytesType>
-    implements ArrayLikeMemView<SingleByteMemView>
-{
+    implements ArrayLikeMemView<SingleByteMemView> {
     decode(state: Memory): Uint8Array | DecodingFailure {
         return this.decodeBytesAt(this.loc, state);
     }
@@ -275,8 +274,7 @@ export class StringMemView extends PackedArrayMemView<string, StringType> {
 
 export class ArrayMemView
     extends BaseMemoryView<Value[], ArrayType>
-    implements ArrayLikeMemView<BaseMemoryView<Value, TypeNode>>
-{
+    implements ArrayLikeMemView<BaseMemoryView<Value, TypeNode>> {
     decode(state: Memory): Value[] | DecodingFailure {
         let sizeBigint: bigint | DecodingFailure;
         let addr = this.loc;
@@ -358,8 +356,7 @@ export class ArrayMemView
 
 export class StructMemView
     extends BaseMemoryView<Struct, ExpStructType>
-    implements StructView<Memory, BaseMemoryView<Value, TypeNode>>
-{
+    implements StructView<Memory, BaseMemoryView<Value, TypeNode>> {
     decode(state: Memory): Struct {
         const entries: Array<[string, Value]> = [];
 
@@ -404,8 +401,7 @@ export class StructMemView
 
 export class PointerMemView
     extends BaseMemoryView<Value, PointerType>
-    implements PointerView<Memory, BaseMemoryView<Value, TypeNode>>
-{
+    implements PointerView<Memory, BaseMemoryView<Value, TypeNode>> {
     decode(state: Memory): Value | DecodingFailure {
         const view = this.toView(state);
 
@@ -433,7 +429,7 @@ export class PointerMemView
         }
 
         if (t instanceof PackedArrayType) {
-            return Buffer.from(v as Uint8Array | string).length + 32;
+            return roundUpToWordSize(Buffer.from(v as Uint8Array | string).length) + 32;
         }
 
         if (t instanceof MappingType) {
@@ -444,17 +440,14 @@ export class PointerMemView
         return 32;
     }
 
-    public static encodeInMem(
-        value: Value,
-        type: PointerType,
-        state: Memory,
-        alloc: Allocator
-    ): bigint {
-        const ptr = alloc.alloc(PointerMemView.allocSize(value, type.to));
-        const view = makeMemoryView(type.to, ptr);
-        view.encode(value, state, alloc);
-
-        return ptr;
+    public static allocMemFor(
+        val: Value | undefined,
+        type: TypeNode,
+        allocator: Allocator
+    ): BaseMemoryView<Value, typeof type> {
+        const size = PointerMemView.allocSize(val, type);
+        const addr = allocator.alloc(size);
+        return makeMemoryView(type, addr);
     }
 
     encode(value: Value, state: Memory, alloc: Allocator): void {
@@ -469,8 +462,9 @@ export class PointerMemView
             return;
         }
 
-        const ptr = PointerMemView.encodeInMem(value, this.type, state, alloc);
-        this.encodeIntAt(ptr, this.loc, state);
+        const toView = PointerMemView.allocMemFor(value, this.type.to, alloc);
+        toView.encode(value, state, alloc);
+        this.encodeIntAt(toView.offset, this.loc, state);
     }
 
     toView(state: Memory): BaseMemoryView<Value, TypeNode> | DecodingFailure {

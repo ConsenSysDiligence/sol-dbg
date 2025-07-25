@@ -102,6 +102,9 @@ export class ArtifactManager implements IArtifactManager {
     private _deployedBytecodeTemplates: BytecodeTemplate[];
     private _topicToEventInfo: Map<bigint, EventDefInfo>;
 
+    private _unitToArtifact: Map<SourceUnit, ArtifactInfo>;
+    private _contractToInfo: Map<ContractDefinition, ContractInfo>;
+
     /**
      * Helper to pick a canonical ABI encode version for a set of units.
      * For now just pick the highest version among the files
@@ -298,20 +301,46 @@ export class ArtifactManager implements IArtifactManager {
                 }
             }
         }
+
+        this._unitToArtifact = new Map();
+        this._contractToInfo = new Map();
+
+        for (const artifact of this._artifacts) {
+            for (const unit of artifact.units) {
+                this._unitToArtifact.set(unit, artifact);
+            }
+        }
+
+        for (const contractInfo of this._contracts) {
+            if (contractInfo.ast !== undefined) {
+                this._contractToInfo.set(contractInfo.ast, contractInfo);
+            }
+        }
     }
 
     artifacts(): ArtifactInfo[] {
         return this._artifacts;
     }
 
-    getContractInfo(contract: ContractDefinition): ContractInfo | undefined {
-        for (const info of this._contracts) {
-            if (info.ast === contract) {
-                return info;
-            }
+    getContractInfo(nd: ASTNode): ContractInfo | undefined {
+        const contract =
+            nd instanceof ContractDefinition ? nd : nd.getClosestParentByType(ContractDefinition);
+
+        if (contract === undefined) {
+            return undefined;
         }
 
-        return undefined;
+        return this._contractToInfo.get(contract);
+    }
+
+    getArtifact(nd: ASTNode): ArtifactInfo {
+        const unit = nd instanceof SourceUnit ? nd : nd.getClosestParentByType(SourceUnit);
+        assert(unit !== undefined, `No source unit for {0}`, nd);
+
+        const artifact = this._unitToArtifact.get(unit);
+        assert(artifact !== undefined, `No artifact info for unit {0}`, unit);
+
+        return artifact;
     }
 
     getContractFromMDHash(hash: HexString): ContractInfo | undefined {

@@ -1,5 +1,5 @@
 import { TypeNode } from "solc-typed-ast";
-import { DecodingFailure, Value } from "./value";
+import { DecodingFailure, Struct, Value } from "./value";
 import { Memory, Stack, Storage } from "../types";
 
 export type StateArea = Memory | Stack | Storage;
@@ -33,11 +33,16 @@ export abstract class View<
     abstract pp(): string;
 }
 
+interface ViewI<State, Val> {
+    decode(state: State): Val | DecodingFailure;
+    pp(): string;
+}
+
 export interface IndexableView<
     IdxType extends Value,
     State extends StateArea,
     ValViewT extends View<State>
-> {
+> extends ViewI<State, Value> {
     indexView(key: IdxType, state: State): ValViewT | DecodingFailure;
 }
 
@@ -46,10 +51,10 @@ export interface ArrayLikeView<State extends StateArea, KeyViewT extends View<St
     size(state: State): bigint | DecodingFailure;
 }
 
-export interface StructView<State, FieldViewT extends View<State>> {
+export interface StructView<State, FieldViewT extends View<State>> extends ViewI<State, Struct> {
     fieldView(name: string): FieldViewT | DecodingFailure;
 }
 
-export interface PointerView<State, ToViewT extends View<State>> {
+export interface PointerView<State, ToViewT extends View<State>> extends ViewI<State, Value> {
     toView(state: State): ToViewT | DecodingFailure;
 }

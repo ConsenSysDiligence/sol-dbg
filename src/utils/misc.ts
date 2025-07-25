@@ -345,3 +345,18 @@ export function single<T>(a: T[]): T {
 export function min(a: number, b: number): number {
     return a < b ? a : b;
 }
+
+export function roundUpToWordSize(size: bigint, wordSize?: bigint): bigint;
+export function roundUpToWordSize(size: number, wordSize?: number): number;
+export function roundUpToWordSize(
+    size: number | bigint,
+    wordSize?: number | bigint
+): number | bigint {
+    if (typeof size === "bigint") {
+        wordSize = wordSize === undefined ? 32n : BigInt(wordSize);
+        return (size / wordSize) * wordSize + (size % wordSize !== 0n ? wordSize : 0n);
+    }
+
+    wordSize = wordSize === undefined ? 32 : Number(wordSize);
+    return Math.floor(size / wordSize) * wordSize + (size % wordSize !== 0 ? wordSize : 0);
+}
