@@ -35,7 +35,7 @@ import { Allocator } from "./allocator";
 import { utf8ToBytes } from "ethereum-cryptography/utils";
 
 interface ArrayLikeMemView<ValViewT extends BaseMemoryView<Value, TypeNode>>
-    extends ArrayLikeView<Memory, ValViewT> { }
+    extends ArrayLikeView<Memory, ValViewT> {}
 
 export function isArrayLikeMemView(v: any): v is ArrayLikeMemView<BaseMemoryView<Value, TypeNode>> {
     return v instanceof FixedBytesMemView || v instanceof ArrayMemView || v instanceof BytesMemView;
@@ -183,7 +183,8 @@ export class SingleByteMemView extends BaseMemoryView<bigint, FixedBytesType> {
 
 export class FixedBytesMemView
     extends BaseMemoryView<Uint8Array, FixedBytesType>
-    implements ArrayLikeMemView<SingleByteMemView> {
+    implements ArrayLikeMemView<SingleByteMemView>
+{
     decode(state: Memory): Uint8Array | DecodingFailure {
         return this.readMemAt(this.loc, state, this.type.size);
     }
@@ -233,7 +234,8 @@ export abstract class PackedArrayMemView<
 
 export class BytesMemView
     extends PackedArrayMemView<Uint8Array, BytesType>
-    implements ArrayLikeMemView<SingleByteMemView> {
+    implements ArrayLikeMemView<SingleByteMemView>
+{
     decode(state: Memory): Uint8Array | DecodingFailure {
         return this.decodeBytesAt(this.loc, state);
     }
@@ -274,7 +276,8 @@ export class StringMemView extends PackedArrayMemView<string, StringType> {
 
 export class ArrayMemView
     extends BaseMemoryView<Value[], ArrayType>
-    implements ArrayLikeMemView<BaseMemoryView<Value, TypeNode>> {
+    implements ArrayLikeMemView<BaseMemoryView<Value, TypeNode>>
+{
     decode(state: Memory): Value[] | DecodingFailure {
         let sizeBigint: bigint | DecodingFailure;
         let addr = this.loc;
@@ -356,7 +359,8 @@ export class ArrayMemView
 
 export class StructMemView
     extends BaseMemoryView<Struct, ExpStructType>
-    implements StructView<Memory, BaseMemoryView<Value, TypeNode>> {
+    implements StructView<Memory, BaseMemoryView<Value, TypeNode>>
+{
     decode(state: Memory): Struct {
         const entries: Array<[string, Value]> = [];
 
@@ -401,7 +405,8 @@ export class StructMemView
 
 export class PointerMemView
     extends BaseMemoryView<Value, PointerType>
-    implements PointerView<Memory, BaseMemoryView<Value, TypeNode>> {
+    implements PointerView<Memory, BaseMemoryView<Value, TypeNode>>
+{
     decode(state: Memory): Value | DecodingFailure {
         const view = this.toView(state);
 
@@ -494,13 +499,12 @@ export class MissingMemView extends BaseMemoryView<Value, MissingType> {
 // An empty map is decoded, and nothing happens when we assign structs with maps inside.
 // For backwards compatibility allow Map views in memory.
 export class MapMemView extends BaseMemoryView<Map<Value, Value>, MappingType> {
-    encode(value: Map<Value, Value>, state: Memory, alloc: Allocator): void {
+    encode(): void {
         // Nothing to do
     }
-    decode(state: Memory): Map<Value, Value> {
+    decode(): Map<Value, Value> {
         return new Map();
     }
-
 }
 
 export function makeMemoryView(type: TypeNode, loc: bigint): BaseMemoryView<Value, TypeNode> {
