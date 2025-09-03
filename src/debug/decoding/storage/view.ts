@@ -1,18 +1,4 @@
-import {
-    AddressType,
-    ArrayType,
-    assert,
-    BoolType,
-    BytesType,
-    FixedBytesType,
-    IntType,
-    MappingType,
-    PointerType,
-    stringToBytes,
-    StringType,
-    TypeNode,
-    types
-} from "solc-typed-ast";
+import { assert, stringToBytes } from "solc-typed-ast";
 import { DecodingFailure, Struct, Value } from "../value";
 import {
     ArrayLikeView,
@@ -28,6 +14,7 @@ import {
     bigEndianBufToBigint,
     bigIntToBuf,
     bool,
+    byte,
     encodeBigintInBigEndianBuf,
     fits,
     MAX_ARR_DECODE_LIMIT,
@@ -39,20 +26,33 @@ import {
 } from "../../../utils";
 import { keccak256 } from "ethereum-cryptography/keccak";
 import { Address, bytesToUtf8, concatBytes } from "@ethereumjs/util";
-import { ExpStructType, MissingType } from "../exp_types";
 import { MapKeys } from "../../tracers";
 import { makeMemoryView } from "../memory";
 import { inRange, isFailure, isTypeStringStatic32BytesInStorage } from "../utils";
 import { BaseMemoryView, IntMemView } from "../memory/view";
 import { bytesToHex, equalsBytes, utf8ToBytes } from "ethereum-cryptography/utils";
+import {
+    AddressType,
+    ArrayType,
+    BaseRuntimeType,
+    BoolType,
+    BytesType,
+    FixedBytesType,
+    IntType,
+    MappingType,
+    MissingType,
+    PointerType,
+    StringType,
+    StructType
+} from "../../runtime_types";
 
-interface ArrayLikeStorageView<ValViewT extends BaseStorageView<Value, TypeNode>>
+interface ArrayLikeStorageView<ValViewT extends BaseStorageView<Value, BaseRuntimeType>>
     extends ArrayLikeView<Storage, ValViewT> {}
 type StorageLocation = [bigint, number];
 
 export function isArrayLikeStorageView(
     v: any
-): v is ArrayLikeStorageView<BaseStorageView<Value, TypeNode>> {
+): v is ArrayLikeStorageView<BaseStorageView<Value, BaseRuntimeType>> {
     return (
         v instanceof FixedBytesStorageView ||
         v instanceof ArrayStorageView ||
@@ -68,7 +68,7 @@ function move(loc: StorageLocation, byBytes: number): StorageLocation {
 
 export abstract class BaseStorageView<
     Val extends Value,
-    Type extends TypeNode = TypeNode
+    Type extends BaseRuntimeType = BaseRuntimeType
 > extends View<Storage, Val, [bigint, number], Type> {
     key: bigint;
     endOffsetInWord: number;
@@ -142,7 +142,7 @@ export abstract class BaseStorageView<
         type: IntType,
         state: Storage
     ): bigint | DecodingFailure {
-        const size = type.nBits / 8;
+        const size = type.numBits / 8;
 
         if (endOffsetInWord < size) {
             return new DecodingFailure(
@@ -155,10 +155,10 @@ export abstract class BaseStorageView<
         let res = bigEndianBufToBigint(rawBytes);
 
         // Convert signed negative 2's complement values
-        if (type.signed && (res & (BigInt(1) << BigInt(type.nBits - 1))) !== BigInt(0)) {
+        if (type.signed && (res & (BigInt(1) << BigInt(type.numBits - 1))) !== BigInt(0)) {
             // Mask out any 1's above the number's size
-            res = res & ((BigInt(1) << BigInt(type.nBits)) - BigInt(1));
-            res = -((BigInt(1) << BigInt(type.nBits)) - res);
+            res = res & ((BigInt(1) << BigInt(type.numBits)) - BigInt(1));
+            res = -((BigInt(1) << BigInt(type.numBits)) - res);
         }
 
         if (!fits(res, type)) {
@@ -177,7 +177,7 @@ export abstract class BaseStorageView<
         type: IntType,
         state: Storage
     ): Storage {
-        const size = type.nBits / 8;
+        const size = type.numBits / 8;
 
         if (endOffsetInWord < size) {
             throw new EncodingError(
@@ -192,7 +192,7 @@ export abstract class BaseStorageView<
         }
 
         const word = this.fetchWord(key, state);
-        encodeBigintInBigEndianBuf(val, word, type.nBits / 8, endOffsetInWord);
+        encodeBigintInBigEndianBuf(val, word, type.numBits / 8, endOffsetInWord);
         return this.setWord(key, word, state);
     }
 
@@ -215,7 +215,7 @@ export class IntStorageView extends BaseStorageView<bigint, IntType> {
     }
 
     nextLoc(): StorageLocation {
-        return move(this.loc, this.type.nBits / 8);
+        return move(this.loc, this.type.numBits / 8);
     }
 
     encode(value: bigint, state: Storage): Storage {
@@ -277,11 +277,11 @@ export class AddressStorageView extends BaseStorageView<Address, AddressType> {
  */
 export class SingleByteStorageView extends BaseStorageView<bigint, FixedBytesType> {
     constructor(loc: [bigint, number]) {
-        super(types.byte, loc);
+        super(byte, loc);
     }
 
     decode(state: Storage): bigint | DecodingFailure {
-        if (this.endOffsetInWord < this.type.size) {
+        if (this.endOffsetInWord < this.type.numBytes) {
             return new DecodingFailure(
                 `Unalighed Read: Can't decode ${this.type.pp()} starting at offset ${this.endOffsetInWord} in word ${this.key}`
             );
@@ -289,8 +289,8 @@ export class SingleByteStorageView extends BaseStorageView<bigint, FixedBytesTyp
 
         const byte = this.fetchBytes(
             this.key,
-            this.endOffsetInWord - this.type.size,
-            this.type.size,
+            this.endOffsetInWord - this.type.numBytes,
+            this.type.numBytes,
             state
         );
 
@@ -304,12 +304,12 @@ export class SingleByteStorageView extends BaseStorageView<bigint, FixedBytesTyp
             throw new EncodingError(`${value} not in byte range [0, 255]`);
         }
 
-        word[this.endOffsetInWord - this.type.size] = Number(value);
+        word[this.endOffsetInWord - this.type.numBytes] = Number(value);
         return this.setWord(this.key, word, state);
     }
 
     nextLoc(): StorageLocation {
-        return move(this.loc, this.type.size);
+        return move(this.loc, this.type.numBytes);
     }
 }
 
@@ -318,7 +318,7 @@ export class FixedBytesStorageView
     implements ArrayLikeStorageView<SingleByteStorageView>
 {
     decode(state: Storage): Uint8Array | DecodingFailure {
-        if (this.endOffsetInWord < this.type.size) {
+        if (this.endOffsetInWord < this.type.numBytes) {
             return new DecodingFailure(
                 `Unalighed Read: Can't decode ${this.type.pp()} starting at offset ${this.endOffsetInWord} in word ${this.key}`
             );
@@ -326,52 +326,52 @@ export class FixedBytesStorageView
 
         return this.fetchBytes(
             this.key,
-            this.endOffsetInWord - this.type.size,
-            this.type.size,
+            this.endOffsetInWord - this.type.numBytes,
+            this.type.numBytes,
             state
         );
     }
 
     encode(value: Uint8Array, state: Storage): Storage {
-        if (this.endOffsetInWord < this.type.size) {
+        if (this.endOffsetInWord < this.type.numBytes) {
             throw new EncodingError(
                 `Unalighed read: Can't decode ${this.type.pp()} starting at offset ${this.endOffsetInWord} in word ${this.key}`
             );
         }
 
         const word = this.fetchWord(this.key, state);
-        word.set(value, this.endOffsetInWord - this.type.size);
+        word.set(value, this.endOffsetInWord - this.type.numBytes);
         return this.setWord(this.key, word, state);
     }
 
     indexView(key: bigint): DecodingFailure | SingleByteStorageView {
-        if (!inRange(key, 0, this.type.size)) {
+        if (!inRange(key, 0, this.type.numBytes)) {
             return new DecodingFailure(`Invalid index ${key} in ${this.type.pp()}`);
         }
 
         return new SingleByteStorageView([
             this.key,
-            this.endOffsetInWord - this.type.size + Number(key) + 1
+            this.endOffsetInWord - this.type.numBytes + Number(key) + 1
         ]);
     }
 
     nextLoc(): StorageLocation {
-        return move(this.loc, this.type.size);
+        return move(this.loc, this.type.numBytes);
     }
 
     size(): bigint | DecodingFailure {
-        return BigInt(this.type.size);
+        return BigInt(this.type.numBytes);
     }
 }
 
 export class PointerStorageView
     extends BaseStorageView<Value, PointerType>
-    implements PointerView<Storage, BaseStorageView<Value, TypeNode>>
+    implements PointerView<Storage, BaseStorageView<Value, BaseRuntimeType>>
 {
-    innerView: BaseStorageView<Value, TypeNode>;
+    innerView: BaseStorageView<Value, BaseRuntimeType>;
     constructor(type: PointerType, loc: [bigint, number]) {
         super(type, loc);
-        this.innerView = makeStorageView(type.to, loc);
+        this.innerView = makeStorageView(type.toType, loc);
     }
 
     decode(state: Storage, mapKeys?: MapKeys): Value {
@@ -386,7 +386,7 @@ export class PointerStorageView
         return this.innerView.nextLoc();
     }
 
-    toView(): BaseStorageView<Value, TypeNode> {
+    toView(): BaseStorageView<Value, BaseRuntimeType> {
         return this.innerView;
     }
 }
@@ -400,7 +400,7 @@ function keccakOfAddr(addr: bigint): bigint {
 
 export class ArrayStorageView
     extends BaseStorageView<Value[], ArrayType>
-    implements ArrayLikeStorageView<BaseStorageView<Value, TypeNode>>
+    implements ArrayLikeStorageView<BaseStorageView<Value, BaseRuntimeType>>
 {
     private _nextLoc: StorageLocation | undefined;
 
@@ -410,7 +410,7 @@ export class ArrayStorageView
      * I.e. we state that we can fit `nEls` elements in `nWords`, where this is the smalles "package" possible.
      * @param elT
      */
-    static computeElmentSize(elT: TypeNode): [bigint, bigint] | undefined {
+    static computeElmentSize(elT: BaseRuntimeType): [bigint, bigint] | undefined {
         let tmpL: StorageLocation | undefined = [0n, 32];
         let nEls = 0n;
 
@@ -533,7 +533,10 @@ export class ArrayStorageView
         return s.collapseUntil(state);
     }
 
-    indexView(key: bigint, state: Storage): DecodingFailure | BaseStorageView<Value, TypeNode> {
+    indexView(
+        key: bigint,
+        state: Storage
+    ): DecodingFailure | BaseStorageView<Value, BaseRuntimeType> {
         let size: bigint | DecodingFailure;
         let addr: bigint;
 
@@ -581,20 +584,20 @@ export class ArrayStorageView
 }
 
 export class StructStorageView
-    extends BaseStorageView<Struct, ExpStructType>
-    implements StructView<Storage, BaseStorageView<Value, TypeNode>>
+    extends BaseStorageView<Struct, StructType>
+    implements StructView<Storage, BaseStorageView<Value, BaseRuntimeType>>
 {
-    fieldViews: Array<[string, BaseStorageView<Value, TypeNode>]> = [];
+    fieldViews: Array<[string, BaseStorageView<Value, BaseRuntimeType>]> = [];
     private _nextLoc: StorageLocation | undefined;
 
-    constructor(type: ExpStructType, loc: StorageLocation) {
+    constructor(type: StructType, loc: StorageLocation) {
         super(type, loc);
         assert(this.endOffsetInWord === 32, `Structs must start at 32 byte boundaries`);
 
         let fieldLoc: StorageLocation | undefined = this.loc;
 
         for (const [name, fieldT] of this.type.fields) {
-            const fieldView: BaseStorageView<Value, TypeNode> =
+            const fieldView: BaseStorageView<Value, BaseRuntimeType> =
                 fieldLoc === undefined
                     ? new MissingStorageView(new MissingType(undefined), [-1n, 32])
                     : makeStorageView(fieldT, fieldLoc);
@@ -634,7 +637,7 @@ export class StructStorageView
         return s.collapseUntil(state);
     }
 
-    fieldView(name: string): BaseStorageView<Value, TypeNode> | DecodingFailure {
+    fieldView(name: string): BaseStorageView<Value, BaseRuntimeType> | DecodingFailure {
         for (const [fieldName, fieldView] of this.fieldViews) {
             if (name === fieldName) {
                 return fieldView;
@@ -644,7 +647,7 @@ export class StructStorageView
     }
 }
 
-function decodeMapRefKey(type: TypeNode, data: Uint8Array): string {
+function decodeMapRefKey(type: BaseRuntimeType, data: Uint8Array): string {
     if (!(type instanceof StringType || type instanceof BytesType)) {
         throw new Error(`Invalid map reference key type ${type.pp()}`);
     }
@@ -652,13 +655,15 @@ function decodeMapRefKey(type: TypeNode, data: Uint8Array): string {
     return type instanceof StringType ? bytesToUtf8(data) : bytesToHex(data);
 }
 
-function encodeMapKey(keyT: TypeNode, value: Value): Uint8Array {
+function encodeMapKey(keyT: BaseRuntimeType, value: Value): Uint8Array {
     if (keyT instanceof PointerType) {
-        if (!(keyT.to instanceof StringType || keyT.to instanceof BytesType)) {
+        if (!(keyT.toType instanceof StringType || keyT.toType instanceof BytesType)) {
             throw new Error(`Invalid map reference key type ${keyT.pp()}`);
         }
 
-        return keyT.to instanceof StringType ? utf8ToBytes(value as string) : (value as Uint8Array);
+        return keyT.toType instanceof StringType
+            ? utf8ToBytes(value as string)
+            : (value as Uint8Array);
     }
 
     const buf = new Uint8Array(32);
@@ -669,7 +674,7 @@ function encodeMapKey(keyT: TypeNode, value: Value): Uint8Array {
 
 export class MapStorageView
     extends BaseStorageView<Map<Value, Value>, MappingType>
-    implements IndexableView<Value, Storage, BaseStorageView<Value, TypeNode>>
+    implements IndexableView<Value, Storage, BaseStorageView<Value, BaseRuntimeType>>
 {
     constructor(type: MappingType, loc: StorageLocation) {
         super(type, loc);
@@ -691,7 +696,7 @@ export class MapStorageView
             return res;
         }
 
-        let keyView: BaseMemoryView<Value, TypeNode> | undefined;
+        let keyView: BaseMemoryView<Value, BaseRuntimeType> | undefined;
 
         if (!(this.type.keyType instanceof PointerType)) {
             keyView = makeMemoryView(this.type.keyType, 0n);
@@ -704,7 +709,10 @@ export class MapStorageView
             if (keyView !== undefined) {
                 decodedKey = keyView.decode(candidateKey);
             } else {
-                decodedKey = decodeMapRefKey((this.type.keyType as PointerType).to, candidateKey);
+                decodedKey = decodeMapRefKey(
+                    (this.type.keyType as PointerType).toType,
+                    candidateKey
+                );
             }
 
             const valueView = makeStorageView(this.type.valueType, [candidateSlot, 32]);
@@ -739,7 +747,7 @@ export class MapStorageView
         return state;
     }
 
-    indexView(key: Value): DecodingFailure | BaseStorageView<Value, TypeNode> {
+    indexView(key: Value): DecodingFailure | BaseStorageView<Value, BaseRuntimeType> {
         const slotBuf = new Uint8Array(32);
         const memView = new IntMemView(uint256, 0n);
         memView.encode(this.loc[0], slotBuf);
@@ -752,7 +760,7 @@ export class MapStorageView
 
 export abstract class PackedArrayStorageView<
     V extends Value,
-    T extends TypeNode
+    T extends BaseRuntimeType
 > extends BaseStorageView<V, T> {
     nextLoc(): StorageLocation {
         return nextWord(this.loc);
@@ -896,23 +904,20 @@ export class MissingStorageView extends BaseStorageView<DecodingFailure, Missing
     constructor(type: MissingType, loc: StorageLocation) {
         super(type, loc);
 
-        if (this.type.rawTypeName !== undefined) {
-            const typeString = this.type.rawTypeName.typeString;
-
-            if (isTypeStringStatic32BytesInStorage(typeString)) {
+        if (this.type.typeString !== undefined) {
+            if (isTypeStringStatic32BytesInStorage(this.type.typeString)) {
                 assert(
                     this.endOffsetInWord === 32,
                     `Unexpected non-word aligned {0} in storage`,
-                    typeString
+                    this.type.typeString
                 );
             }
         }
     }
 
     decode(): DecodingFailure {
-        return new DecodingFailure(
-            `missing ${this.type.rawTypeName ? this.type.rawTypeName.type : "<unknown>"}`
-        );
+        const typeStr = this.type.typeString;
+        return new DecodingFailure(`missing ${typeStr ? typeStr : "<unknown>"}`);
     }
 
     encode(): Storage {
@@ -920,11 +925,11 @@ export class MissingStorageView extends BaseStorageView<DecodingFailure, Missing
     }
 
     nextLoc(): StorageLocation | undefined {
-        if (this.type.rawTypeName === undefined) {
+        if (this.type.typeString === undefined) {
             return undefined;
         }
 
-        const typeString = this.type.rawTypeName.typeString;
+        const typeString = this.type.typeString;
         // If we can guess this is a dynamic array or mapping from the typestring, then we know the nextLoc
         if (isTypeStringStatic32BytesInStorage(typeString)) {
             return nextWord(this.loc);
@@ -943,7 +948,7 @@ export class MissingStorageView extends BaseStorageView<DecodingFailure, Missing
  * @param infer
  * @returns
  */
-function typeFitsInLoc(typ: TypeNode, loc: StorageLocation): boolean {
+function typeFitsInLoc(typ: BaseRuntimeType, loc: StorageLocation): boolean {
     const [, endOffsetInWord] = loc;
 
     if (typeStartsInNewWord(typ)) {
@@ -957,12 +962,12 @@ export function nextWord(loc: StorageLocation): StorageLocation {
     return [loc[0] + 1n, 32];
 }
 
-function typeStartsInNewWord(t: TypeNode): boolean {
+function typeStartsInNewWord(t: BaseRuntimeType): boolean {
     if (t instanceof PointerType) {
-        return typeStartsInNewWord(t.to);
+        return typeStartsInNewWord(t.toType);
     }
 
-    return t instanceof ArrayType || t instanceof MappingType || t instanceof ExpStructType;
+    return t instanceof ArrayType || t instanceof MappingType || t instanceof StructType;
 }
 
 /**
@@ -971,13 +976,13 @@ function typeStartsInNewWord(t: TypeNode): boolean {
  * have special layout rules (always start in a new word, next item in layout
  * starts in own word too).
  */
-function staticSize(typ: TypeNode): number {
+function staticSize(typ: BaseRuntimeType): number {
     if (typ instanceof IntType) {
-        return typ.nBits / 8;
+        return typ.numBits / 8;
     }
 
     if (typ instanceof FixedBytesType) {
-        return typ.size;
+        return typ.numBytes;
     }
 
     if (typ instanceof BoolType) {
@@ -993,13 +998,13 @@ function staticSize(typ: TypeNode): number {
     }
 
     if (typ instanceof PointerType) {
-        return staticSize(typ.to);
+        return staticSize(typ.toType);
     }
 
     if (
         typ instanceof MissingType &&
-        typ.rawTypeName !== undefined &&
-        isTypeStringStatic32BytesInStorage(typ.rawTypeName.typeString)
+        typ.typeString !== undefined &&
+        isTypeStringStatic32BytesInStorage(typ.typeString)
     ) {
         return 32;
     }
@@ -1008,12 +1013,12 @@ function staticSize(typ: TypeNode): number {
 }
 
 export function makeStorageView(
-    type: TypeNode,
+    type: BaseRuntimeType,
     loc: StorageLocation
-): BaseStorageView<Value, TypeNode> {
+): BaseStorageView<Value, BaseRuntimeType> {
     if (type instanceof MissingType) {
-        if (type.rawTypeName !== undefined) {
-            if (isTypeStringStatic32BytesInStorage(type.rawTypeName.typeString)) {
+        if (type.typeString !== undefined) {
+            if (isTypeStringStatic32BytesInStorage(type.typeString)) {
                 loc = loc[1] === 32 ? loc : nextWord(loc);
             }
         }
@@ -1057,7 +1062,7 @@ export function makeStorageView(
         return new PointerStorageView(type, loc);
     }
 
-    if (type instanceof ExpStructType) {
+    if (type instanceof StructType) {
         return new StructStorageView(type, loc);
     }
 

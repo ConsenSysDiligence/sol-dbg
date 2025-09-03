@@ -1,6 +1,5 @@
 import expect from "expect";
 import {
-    AddressType,
     ArrayType,
     assert,
     ASTReader,
@@ -14,36 +13,36 @@ import {
 } from "solc-typed-ast";
 import { hasPoison, Value } from "../../src/debug/decoding/value";
 import { hexToBytes } from "ethereum-cryptography/utils";
-import { single, uint256 } from "../../src";
+import { single } from "../../src";
 import {
     address,
     bool,
     bytes22DArr,
-    bytes3,
     bytes4,
     bytesCalldata,
-    int16,
     int16Arr,
     int8,
     int8x4,
     int8x4x2,
     int8x4xN,
-    int8xNx2
-} from "../utils";
+    int8xNx2,
+    uint256
+} from "../utils/sol_types";
 import { createAddressFromString } from "@ethereumjs/util";
 import {
     ArrayCalldataView,
     BaseCalldataView,
     BytesCalldataView,
     DecodingFailure,
-    ExpStructType,
     FixedBytesCalldataView,
     makeCalldataView,
     PointerCalldataView,
-    simplifyType,
     StructCalldataView
 } from "../../src/debug/decoding/";
 import fse from "fs-extra";
+import { astToRuntimeType, BaseRuntimeType } from "../../src/debug/runtime_types";
+import * as rtt from "../../src/debug/runtime_types";
+import * as rttt from "../utils/rtt_types";
 
 const tupleS1 = new TupleType([
     int8,
@@ -187,12 +186,12 @@ describe(`Calldata Indexing Tests`, () => {
         const calldata = hexToBytes(calldataStr.slice(2));
 
         it(`Sample [${ppType(typeDesc)}]`, () => {
-            const type = simplifyType(
+            const type = astToRuntimeType(
                 typeDesc instanceof TypeNode ? typeDesc : typeDesc(unit),
                 infer,
                 DataLocation.CallData
             );
-            let view: BaseCalldataView<Value, TypeNode> | DecodingFailure = makeCalldataView(
+            let view: BaseCalldataView<Value, BaseRuntimeType> | DecodingFailure = makeCalldataView(
                 type,
                 0n,
                 4n
@@ -232,20 +231,20 @@ describe(`Calldata Indexing Tests`, () => {
             "b28be7570000000000000000000000000000000000000000000000000000000000000020ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000600708090000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff800000000000000000000000000000000000000000000000000000000000000065000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000000"
         );
         const view = makeCalldataView(
-            new PointerType(
-                new ExpStructType("", [
-                    ["t", int16],
+            new rtt.PointerType(
+                new rtt.StructType("", [
+                    ["t", rttt.int16],
                     [
                         "s",
-                        new PointerType(
-                            new ExpStructType("", [
-                                ["x", int8],
-                                ["y", uint256],
-                                ["b", bool],
+                        new rtt.PointerType(
+                            new rtt.StructType("", [
+                                ["x", rttt.int8],
+                                ["y", rttt.uint256],
+                                ["b", rttt.bool],
                                 [
                                     "addrs",
-                                    new PointerType(
-                                        new ArrayType(new AddressType(false)),
+                                    new rtt.PointerType(
+                                        new rtt.ArrayType(rttt.address),
                                         DataLocation.CallData
                                     )
                                 ]
@@ -253,7 +252,7 @@ describe(`Calldata Indexing Tests`, () => {
                             DataLocation.CallData
                         )
                     ],
-                    ["b", bytes3]
+                    ["b", rttt.bytes3]
                 ]),
                 DataLocation.CallData
             ),

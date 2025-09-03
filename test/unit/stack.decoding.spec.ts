@@ -1,19 +1,17 @@
 import expect from "expect";
-import { DataLocation, InferType, TypeNode } from "solc-typed-ast";
 import { hasPoison, Value } from "../../src/debug/decoding/value";
 import { Stack } from "../../src";
 import {
     DecodingFailure,
     FixedBytesStackView,
     makeStackView,
-    simplifyType,
     SingleByteStackView
 } from "../../src/debug/decoding/";
 import { hexToBytes } from "ethereum-cryptography/utils";
-import { address, bool, bytes21, int128, uint16, uint8 } from "../utils";
+import { address, bool, bytes21, int128, uint16, uint8 } from "../utils/rtt_types";
 import { createAddressFromString } from "@ethereumjs/util";
+import { BaseRuntimeType } from "../../src/debug/runtime_types";
 
-const infer = new InferType("0.8.29");
 const stack = [
     hexToBytes("0000000000000000000000000000000000000000000000000000000000000000"),
     hexToBytes("0000000000000000000000000000000000000000000000000000000000000001"),
@@ -23,7 +21,7 @@ const stack = [
     hexToBytes("cD6a42782d230D7c13A74ddec5dD140e55499Df9000000000000000000000000")
 ].reverse();
 
-const samples: Array<[Stack, number, TypeNode, Value]> = [
+const samples: Array<[Stack, number, BaseRuntimeType, Value]> = [
     [stack, 0, bool, false],
     [stack, 1, bool, true],
     [stack, 1, uint8, 1n],
@@ -36,8 +34,7 @@ const samples: Array<[Stack, number, TypeNode, Value]> = [
 describe(`Stack Decoding Tests`, () => {
     for (const [stack, offFromTop, type, expectedValue] of samples) {
         it(`Sample ${type.pp()}`, () => {
-            const simpleType = simplifyType(type, infer, DataLocation.Memory);
-            const view = makeStackView(simpleType, offFromTop);
+            const view = makeStackView(type, offFromTop);
             const value = view.decode(stack);
             expect(hasPoison(value)).toBeFalsy();
             expect(value).toEqual(expectedValue);

@@ -1,6 +1,6 @@
 import { IntMemView } from "../../src/debug/decoding/memory/view";
-import { encodeBigintInBigEndianBuf, uint256 } from "../../src/utils";
-import { int256 } from "../utils";
+import { encodeBigintInBigEndianBuf } from "../../src/utils";
+import { int256, uint256 } from "../utils/rtt_types";
 const samples = [
     0n,
     -1n,

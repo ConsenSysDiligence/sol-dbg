@@ -1,23 +1,11 @@
-import {
-    AddressType,
-    ArrayType,
-    assert,
-    BoolType,
-    BytesType,
-    FixedBytesType,
-    IntType,
-    PointerType,
-    StringType,
-    TupleType,
-    TypeNode,
-    types
-} from "solc-typed-ast";
+import { assert } from "solc-typed-ast";
 import { Memory } from "../../types";
 import { DecodingFailure, Struct, Value } from "../value";
 import { ArrayLikeView, PointerView, StructView, View } from "../view";
 import {
     bigEndianBufToBigint,
     bigIntToNum,
+    byte,
     fits,
     MAX_ARR_DECODE_LIMIT,
     nyi,
@@ -27,14 +15,27 @@ import {
 } from "../../../utils";
 import { Address, bigIntToHex, bytesToUtf8 } from "@ethereumjs/util";
 import { inRange, isFailure, isTypeStringDynamicArray } from "../utils";
-import { ExpStructType, MissingType } from "../exp_types";
+import {
+    AddressType,
+    ArrayType,
+    BaseRuntimeType,
+    BoolType,
+    BytesType,
+    FixedBytesType,
+    IntType,
+    MissingType,
+    PointerType,
+    StringType,
+    StructType,
+    TupleType
+} from "../../runtime_types";
 
-interface ArrayLikeCalldataView<ValViewT extends BaseCalldataView<Value, TypeNode>>
+interface ArrayLikeCalldataView<ValViewT extends BaseCalldataView<Value, BaseRuntimeType>>
     extends ArrayLikeView<Memory, ValViewT> {}
 
 export function isArrayLikeCalldataView(
     v: any
-): v is ArrayLikeCalldataView<BaseCalldataView<Value, TypeNode>> {
+): v is ArrayLikeCalldataView<BaseCalldataView<Value, BaseRuntimeType>> {
     return (
         v instanceof FixedBytesCalldataView ||
         v instanceof ArrayCalldataView ||
@@ -48,7 +49,7 @@ export function isArrayLikeCalldataView(
  * @param infer
  * @returns
  */
-function isTypeDynamic(t: TypeNode): boolean {
+function isTypeDynamic(t: BaseRuntimeType): boolean {
     if (t instanceof BytesType || t instanceof StringType) {
         return true;
     }
@@ -58,14 +59,14 @@ function isTypeDynamic(t: TypeNode): boolean {
     }
 
     if (t instanceof TupleType) {
-        for (const elementT of t.elements) {
+        for (const elementT of t.elementTypes) {
             if (elementT && isTypeDynamic(elementT)) {
                 return true;
             }
         }
     }
 
-    if (t instanceof ExpStructType) {
+    if (t instanceof StructType) {
         for (const [, fieldT] of t.fields) {
             if (isTypeDynamic(fieldT)) {
                 return true;
@@ -74,7 +75,7 @@ function isTypeDynamic(t: TypeNode): boolean {
     }
 
     if (t instanceof PointerType) {
-        return isTypeDynamic(t.to);
+        return isTypeDynamic(t.toType);
     }
 
     return false;
@@ -88,7 +89,7 @@ function isTypeDynamic(t: TypeNode): boolean {
  * @param infer
  * @returns
  */
-function headSize(t: TypeNode): number | undefined {
+function headSize(t: BaseRuntimeType): number | undefined {
     if (isTypeDynamic(t)) {
         return 32;
     }
@@ -96,8 +97,8 @@ function headSize(t: TypeNode): number | undefined {
     if (t instanceof TupleType) {
         let size = 0;
 
-        for (const elT of t.elements) {
-            const elSize = headSize(elT as TypeNode);
+        for (const elT of t.elementTypes) {
+            const elSize = headSize(elT as BaseRuntimeType);
 
             if (elSize === undefined) {
                 return undefined;
@@ -120,7 +121,7 @@ function headSize(t: TypeNode): number | undefined {
         return elSize * bigIntToNum(t.size);
     }
 
-    if (t instanceof ExpStructType) {
+    if (t instanceof StructType) {
         let size = 0;
         for (const [, fieldT] of t.fields) {
             const fieldSize = headSize(fieldT);
@@ -145,17 +146,17 @@ function headSize(t: TypeNode): number | undefined {
     }
 
     if (t instanceof PointerType) {
-        return headSize(t.to);
+        return headSize(t.toType);
     }
 
     if (t instanceof MissingType) {
-        if (t.rawTypeName === undefined) {
+        if (t.typeString === undefined) {
             return undefined;
         }
 
         // Small optimization - if we can guess this is a dynamic array of an unknown
         // element type, we still know the head size is 32.
-        if (isTypeStringDynamicArray(t.rawTypeName.typeString)) {
+        if (isTypeStringDynamicArray(t.typeString)) {
             return 32;
         }
     }
@@ -165,7 +166,7 @@ function headSize(t: TypeNode): number | undefined {
 
 export abstract class BaseCalldataView<
     Val extends Value,
-    Type extends TypeNode = TypeNode
+    Type extends BaseRuntimeType = BaseRuntimeType
 > extends View<Memory, Val, bigint, Type> {
     constructor(
         type: Type,
@@ -207,10 +208,10 @@ export abstract class BaseCalldataView<
         let res = bigEndianBufToBigint(bytes);
 
         // Convert signed negative 2's complement values
-        if (typ.signed && (res & (BigInt(1) << BigInt(typ.nBits - 1))) !== BigInt(0)) {
+        if (typ.signed && (res & (BigInt(1) << BigInt(typ.numBits - 1))) !== BigInt(0)) {
             // Mask out any 1's above the number's size
-            res = res & ((BigInt(1) << BigInt(typ.nBits)) - BigInt(1));
-            res = -((BigInt(1) << BigInt(typ.nBits)) - res);
+            res = res & ((BigInt(1) << BigInt(typ.numBits)) - BigInt(1));
+            res = -((BigInt(1) << BigInt(typ.numBits)) - res);
         }
 
         if (!fits(res, typ)) {
@@ -238,7 +239,7 @@ export abstract class BaseCalldataView<
         const res: Value[] = [];
         let failRemaining = false;
 
-        for (const t of type.elements) {
+        for (const t of type.elementTypes) {
             if (failRemaining) {
                 res.push(new DecodingFailure(`Failed due to earlier failure.`));
             }
@@ -312,7 +313,7 @@ export class AddressCalldataView extends BaseCalldataView<Address, AddressType> 
  */
 export class SingleByteCalldataView extends BaseCalldataView<bigint, FixedBytesType> {
     constructor(loc: bigint, base: bigint) {
-        super(types.byte, loc, base);
+        super(byte, loc, base);
     }
 
     decode(state: Memory): bigint | DecodingFailure {
@@ -334,11 +335,11 @@ export class FixedBytesCalldataView
     implements ArrayLikeCalldataView<SingleByteCalldataView>
 {
     decode(state: Memory): Uint8Array | DecodingFailure {
-        return this.readMemAt(this.loc, state, this.type.size);
+        return this.readMemAt(this.loc, state, this.type.numBytes);
     }
 
     indexView(key: bigint): DecodingFailure | SingleByteCalldataView {
-        if (key >= this.type.size || key < 0n) {
+        if (key >= this.type.numBytes || key < 0n) {
             return new DecodingFailure(`Invalid index ${key} in ${this.type.pp()}`);
         }
 
@@ -346,7 +347,7 @@ export class FixedBytesCalldataView
     }
 
     size(): bigint | DecodingFailure {
-        return BigInt(this.type.size);
+        return BigInt(this.type.numBytes);
     }
 }
 
@@ -410,7 +411,7 @@ export class TupleCalldataView extends BaseCalldataView<Value[], TupleType> {
 
 export abstract class BaseArrayCalldataView
     extends BaseCalldataView<Value[], ArrayType>
-    implements ArrayLikeCalldataView<BaseCalldataView<Value, TypeNode>>
+    implements ArrayLikeCalldataView<BaseCalldataView<Value, BaseRuntimeType>>
 {
     decodeArray(baseOff: bigint, bigIntSize: bigint, state: Memory): Value[] | DecodingFailure {
         if (!inRange(bigIntSize, 0, MAX_ARR_DECODE_LIMIT)) {
@@ -443,7 +444,7 @@ export abstract class BaseArrayCalldataView
         key: bigint,
         baseOff: bigint,
         size: bigint
-    ): BaseCalldataView<Value, TypeNode> | DecodingFailure {
+    ): BaseCalldataView<Value, BaseRuntimeType> | DecodingFailure {
         if (key >= size || key < 0n) {
             return new DecodingFailure(`Invalid index ${key} in array of size ${size}`);
         }
@@ -462,7 +463,7 @@ export abstract class BaseArrayCalldataView
     abstract indexView(
         key: bigint,
         state: Memory
-    ): BaseCalldataView<Value, TypeNode> | DecodingFailure;
+    ): BaseCalldataView<Value, BaseRuntimeType> | DecodingFailure;
     abstract size(state: Memory): bigint | DecodingFailure;
 }
 
@@ -488,7 +489,10 @@ export class ArrayCalldataView extends BaseArrayCalldataView {
         return this.decodeArray(baseOff, bigintSize, state);
     }
 
-    indexView(key: bigint, state: Memory): BaseCalldataView<Value, TypeNode> | DecodingFailure {
+    indexView(
+        key: bigint,
+        state: Memory
+    ): BaseCalldataView<Value, BaseRuntimeType> | DecodingFailure {
         let baseOff: bigint = this.loc;
 
         // Dynamic sized arrays have length at the start. Fixed sized arrays do
@@ -535,7 +539,7 @@ export class ArraySliceCalldataView extends BaseArrayCalldataView {
         return this.decodeArray(this.loc, this.len, state);
     }
 
-    indexView(key: bigint): BaseCalldataView<Value, TypeNode> | DecodingFailure {
+    indexView(key: bigint): BaseCalldataView<Value, BaseRuntimeType> | DecodingFailure {
         return this._indexView(key, this.loc, this.len);
     }
 
@@ -545,8 +549,8 @@ export class ArraySliceCalldataView extends BaseArrayCalldataView {
 }
 
 export class StructCalldataView
-    extends BaseCalldataView<Struct, ExpStructType>
-    implements StructView<Memory, BaseCalldataView<Value, TypeNode>>
+    extends BaseCalldataView<Struct, StructType>
+    implements StructView<Memory, BaseCalldataView<Value, BaseRuntimeType>>
 {
     decode(state: Memory): Struct {
         // A StructCalldataView should be wrapped in a PointerCalldataView. So translating
@@ -565,7 +569,7 @@ export class StructCalldataView
         );
     }
 
-    fieldView(name: string): DecodingFailure | BaseCalldataView<Value, TypeNode> {
+    fieldView(name: string): DecodingFailure | BaseCalldataView<Value, BaseRuntimeType> {
         let base = this.base;
         let loc = this.loc;
 
@@ -596,7 +600,7 @@ export class StructCalldataView
 
 export class PointerCalldataView
     extends BaseCalldataView<Value, PointerType>
-    implements PointerView<Memory, BaseCalldataView<Value, TypeNode>>
+    implements PointerView<Memory, BaseCalldataView<Value, BaseRuntimeType>>
 {
     decode(state: Memory): Value | DecodingFailure {
         const innerView = this.toView(state);
@@ -608,36 +612,34 @@ export class PointerCalldataView
         return innerView.decode(state);
     }
 
-    toView(state: Memory): DecodingFailure | BaseCalldataView<Value, TypeNode> {
+    toView(state: Memory): DecodingFailure | BaseCalldataView<Value, BaseRuntimeType> {
         let off: bigint | DecodingFailure = this.loc;
 
-        if (isTypeDynamic(this.type.to)) {
+        if (isTypeDynamic(this.type.toType)) {
             off = this.decodeIntAt(off, uint256, state);
 
             if (isFailure(off)) {
                 return off;
             }
 
-            return makeCalldataView(this.type.to, 0n, this.base + off);
+            return makeCalldataView(this.type.toType, 0n, this.base + off);
         }
 
-        return makeCalldataView(this.type.to, off, this.base);
+        return makeCalldataView(this.type.toType, off, this.base);
     }
 }
 
 export class MissingCalldataView extends BaseCalldataView<DecodingFailure, MissingType> {
     decode(): DecodingFailure {
-        return new DecodingFailure(
-            `${this.type.rawTypeName ? this.type.rawTypeName.type : "<unknown>"}`
-        );
+        return new DecodingFailure(`${this.type.typeString ? this.type.typeString : "<unknown>"}`);
     }
 }
 
 export function makeCalldataView(
-    type: TypeNode,
+    type: BaseRuntimeType,
     loc: bigint,
     base: bigint
-): BaseCalldataView<Value, TypeNode> {
+): BaseCalldataView<Value, BaseRuntimeType> {
     if (type instanceof IntType) {
         return new IntCalldataView(type, loc, base);
     }
@@ -670,7 +672,7 @@ export function makeCalldataView(
         return new ArrayCalldataView(type, loc, base);
     }
 
-    if (type instanceof ExpStructType) {
+    if (type instanceof StructType) {
         return new StructCalldataView(type, loc, base);
     }
 
@@ -690,11 +692,11 @@ export function makeCalldataView(
 }
 
 export function makeCalldataViews(
-    types: TypeNode[],
+    types: BaseRuntimeType[],
     base: bigint
-): Array<BaseCalldataView<Value, TypeNode>> {
+): Array<BaseCalldataView<Value, BaseRuntimeType>> {
     let off = 0n;
-    const res: Array<BaseCalldataView<Value, TypeNode>> = [];
+    const res: Array<BaseCalldataView<Value, BaseRuntimeType>> = [];
     let failRemaining = false;
 
     for (const t of types) {

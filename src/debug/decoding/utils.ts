@@ -1,22 +1,28 @@
-import {
-    ArrayType,
-    PackedArrayType,
-    PointerType,
-    DataLocation as SolDataLocation,
-    TypeNode
-} from "solc-typed-ast";
+import { DataLocation as SolDataLocation } from "solc-typed-ast";
 import { DecodingFailure, Value } from "./value";
 import { PointerView, View } from "./view";
 import { PointerCalldataView } from "./calldata";
 import { PointerMemView } from "./memory";
 import { PointerStorageView } from "./storage";
 import { PointerStackView } from "./stack";
+import {
+    ArrayType,
+    astToRuntimeType,
+    BaseRuntimeType,
+    BytesType,
+    PointerType,
+    StringType
+} from "../runtime_types";
+import * as sol from "solc-typed-ast";
+import * as rtt from "../runtime_types/ast";
+import { isTypeUnknownContract } from "../../utils";
 
-export function isCalldataArrayType(typ: TypeNode): boolean {
+export function isCalldataArrayType(typ: BaseRuntimeType): boolean {
     return (
         typ instanceof PointerType &&
-        ((typ.to instanceof ArrayType && typ.to.size === undefined) ||
-            typ.to instanceof PackedArrayType) &&
+        ((typ.toType instanceof ArrayType && typ.toType.size === undefined) ||
+            typ.toType instanceof BytesType ||
+            typ.toType instanceof StringType) &&
         typ.location === SolDataLocation.CallData
     );
 }
@@ -59,4 +65,95 @@ export function isPointerView(v: any): v is PointerView<any, View> {
         v instanceof PointerStorageView ||
         v instanceof PointerStackView
     );
+}
+
+/**
+ * Helper for converting `VariableDeclartaion`s to `TypeNode`s. In some cases when solc-typed-ast conversion fails,
+ * it can try and guess the correct simplified type from the typeString
+ *
+ * - unknown contracts - retun address
+ */
+function variableDeclarationToTypeNode(
+    v: sol.VariableDeclaration,
+    infer: sol.InferType
+): sol.TypeNode {
+    try {
+        return infer.variableDeclarationToTypeNode(v);
+    } catch (e) {
+        if (v.vType && isTypeUnknownContract(v.vType)) {
+            return new sol.AddressType(false);
+        }
+
+        throw e;
+    }
+}
+
+/**
+ * Given a `ContractDefinition` try and compute an `ExpStructType` struct that
+ * describes the layout of the class.  This takes into account all base classes,
+ * and simplifies types using `simplifyType`.
+ *
+ * Since we may be missing AST information for some user-defined types, or even
+ * entire bases, the layout may be partial. It may be only up to a given base,
+ * and it may be missing exact type information for certain fields.
+ *
+ * We return a tuple with the resulting layout, and a boolean specifying whether
+ * the layout is complete.
+ *
+ * @param def
+ * @param infer
+ */
+export function getContractLayoutType(
+    contract: sol.ContractDefinition,
+    infer: sol.InferType
+): [rtt.StructType, boolean] {
+    const stateVars: Array<[string, rtt.BaseRuntimeType]> = [];
+    let complete = true;
+
+    for (const base of [...contract.vLinearizedBaseContracts].reverse()) {
+        if (base === null || base === undefined) {
+            complete = false;
+            break;
+        }
+
+        for (const varDecl of base.vStateVariables) {
+            // Not part of layout
+            if (
+                varDecl.mutability === sol.Mutability.Constant ||
+                varDecl.mutability === sol.Mutability.Immutable ||
+                varDecl.storageLocation === sol.DataLocation.Transient
+            ) {
+                continue;
+            }
+
+            let typeNode: sol.TypeNode;
+
+            try {
+                typeNode = variableDeclarationToTypeNode(varDecl, infer);
+            } catch (e) {
+                /**
+                 * Missing type info. If this is a:
+                 *  - map type
+                 *  - array type
+                 *
+                 * then we can continue decoding as it takes exactly 32 bytes
+                 * statically in the layout. Otherwise we have to abort decoding
+                 */
+                complete = false;
+                if (isTypeStringStatic32BytesInStorage(varDecl.typeString)) {
+                    stateVars.push([varDecl.name, new rtt.MissingType(varDecl.typeString)]);
+                    continue;
+                } else {
+                    break;
+                }
+            }
+
+            stateVars.push([
+                varDecl.name,
+                astToRuntimeType(typeNode, infer, sol.DataLocation.Storage)
+            ]);
+        }
+    }
+
+    return [new rtt.StructType(contract.name, stateVars), complete];
 }

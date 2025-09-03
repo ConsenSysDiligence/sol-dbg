@@ -1,24 +1,15 @@
 import { Address } from "@ethereumjs/util";
 import { bytesToHex } from "ethereum-cryptography/utils";
 import {
-    AddressType,
-    ArrayType,
     assert,
-    BoolType,
-    BytesType,
     ContractDefinition,
-    FixedBytesType,
     FunctionDefinition,
     FunctionKind,
-    InferType,
-    IntType,
-    PointerType,
-    StringType,
-    TypeNode
+    InferType
 } from "solc-typed-ast";
 import { ArtifactManager } from "../debug/artifact_manager/artifact_manager";
 import { ContractInfo, SourceFileInfo } from "../debug/artifact_manager/types";
-import { decodeView, ExpStructType } from "../debug/decoding";
+import { decodeView } from "../debug/decoding";
 import { SolTxDebugger } from "../debug/tracers";
 import {
     decodeSourceLoc,
@@ -30,11 +21,23 @@ import {
 } from "../debug/tracers/transformers";
 import { ExternalFrame, Frame, FrameKind, StepState } from "../debug/types";
 import { Struct } from "../debug/decoding/value";
+import {
+    AddressType,
+    ArrayType,
+    BaseRuntimeType,
+    BoolType,
+    BytesType,
+    FixedBytesType,
+    IntType,
+    PointerType,
+    StringType,
+    StructType
+} from "../debug/runtime_types";
 
 const srcLocation = require("src-location");
 const fse = require("fs-extra");
 
-function ppValue(typ: TypeNode, v: any, infer: InferType): string {
+function ppValue(typ: BaseRuntimeType, v: any, infer: InferType): string {
     if (v === undefined) {
         return `<failed decoding>`;
     }
@@ -56,24 +59,24 @@ function ppValue(typ: TypeNode, v: any, infer: InferType): string {
     }
 
     if (typ instanceof PointerType) {
-        if (typ.to instanceof ArrayType) {
-            const elT = typ.to.elementT;
+        if (typ.toType instanceof ArrayType) {
+            const elT = typ.toType.elementT;
 
             return `[${(v as any[]).map((el) => ppValue(elT, el, infer)).join(", ")}]`;
         }
 
-        if (typ.to instanceof BytesType) {
+        if (typ.toType instanceof BytesType) {
             return `0x${bytesToHex(v as Uint8Array)}`;
         }
 
-        if (typ.to instanceof StringType) {
+        if (typ.toType instanceof StringType) {
             return `"${v}"`;
         }
 
-        if (typ.to instanceof ExpStructType) {
+        if (typ.toType instanceof StructType) {
             const strFields: string[] = [];
 
-            for (const [name, fieldT] of typ.to.fields) {
+            for (const [name, fieldT] of typ.toType.fields) {
                 try {
                     strFields.push(name + ": " + ppValue(fieldT, (v as Struct).field(name), infer));
                 } catch (e) {
@@ -84,7 +87,7 @@ function ppValue(typ: TypeNode, v: any, infer: InferType): string {
             return `{${strFields.join(", ")}}`;
         }
 
-        throw new Error(`NYI ppValue of referenced type ${typ.to.pp()}`);
+        throw new Error(`NYI ppValue of referenced type ${typ.toType.pp()}`);
     }
 
     throw new Error(`NYI ppValue of type ${typ.pp()}`);

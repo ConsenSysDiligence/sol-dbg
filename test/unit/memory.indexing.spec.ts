@@ -1,38 +1,29 @@
 import expect from "expect";
-import {
-    ArrayType,
-    assert,
-    ASTReader,
-    BytesType,
-    compileSourceString,
-    DataLocation,
-    InferType,
-    PointerType,
-    SourceUnit,
-    TypeNode
-} from "solc-typed-ast";
+import { assert, DataLocation } from "solc-typed-ast";
 import { hasPoison, Value } from "../../src/debug/decoding/value";
 import { hexToBytes } from "ethereum-cryptography/utils";
-import { single, uint256 } from "../../src";
-import { address, bool, bytes2, bytes3, bytes32, int128, int8, uint16 } from "../utils";
+import { uint256 } from "../../src";
+import { address, bool, bytes2, bytes3, bytes32, int128, int8, uint16 } from "../utils/rtt_types";
 import {
     ArrayMemView,
     BaseMemoryView,
     BytesMemView,
     DecodingFailure,
-    ExpStructType,
     FixedBytesMemView,
     makeMemoryView,
     PointerMemView,
-    simplifyType,
     SingleByteMemView,
     StructMemView
 } from "../../src/debug/decoding/";
-import fse from "fs-extra";
+import {
+    ArrayType,
+    BaseRuntimeType,
+    BytesType,
+    PointerType,
+    StructType
+} from "../../src/debug/runtime_types";
 
-const infer = new InferType("0.8.29");
-type TypeGenerator = (unit: SourceUnit) => TypeNode;
-const samples: Array<[string, number, TypeNode | TypeGenerator, Value[] | Uint8Array]> = [
+const samples: Array<[string, number, BaseRuntimeType, Value[] | Uint8Array]> = [
     [
         "0102000000000000000000000000000000000000000000000000000000000000",
         0,
@@ -66,36 +57,12 @@ const samples: Array<[string, number, TypeNode | TypeGenerator, Value[] | Uint8A
     ]
 ];
 
-let unit: SourceUnit;
-
-beforeAll(async () => {
-    const file = fse.readFileSync("test/samples/decoding/memory_views_test.sol", {
-        encoding: "utf-8"
-    });
-    const compileResult = await compileSourceString("memory_views_test.sol", file, "0.8.21");
-    const reader = new ASTReader();
-    unit = single(reader.read(compileResult.data));
-});
-
-function ppType(t: TypeNode | TypeGenerator): string {
-    if (t instanceof TypeNode) {
-        return t.pp();
-    }
-
-    return "<type-generator>";
-}
-
 describe(`Memory Indexing Tests`, () => {
-    for (const [memoryStr, offset, typeDesc, expectedValue] of samples) {
+    for (const [memoryStr, offset, type, expectedValue] of samples) {
         const memory = hexToBytes(memoryStr);
 
-        it(`Sample ${ppType(typeDesc)}`, () => {
-            const type = simplifyType(
-                typeDesc instanceof TypeNode ? typeDesc : typeDesc(unit),
-                infer,
-                DataLocation.Memory
-            );
-            let view: BaseMemoryView<Value, TypeNode> | DecodingFailure = makeMemoryView(
+        it(`Sample ${type.pp()}`, () => {
+            let view: BaseMemoryView<Value, BaseRuntimeType> | DecodingFailure = makeMemoryView(
                 type,
                 BigInt(offset)
             );
@@ -123,7 +90,7 @@ describe(`Memory Indexing Tests`, () => {
                 expectedIdxVal =
                     typeof expectedIdxVal === "number" ? BigInt(expectedIdxVal) : expectedIdxVal;
 
-                expect((idxView as BaseMemoryView<Value, TypeNode>).decode(memory)).toEqual(
+                expect((idxView as BaseMemoryView<Value, BaseRuntimeType>).decode(memory)).toEqual(
                     expectedIdxVal
                 );
             }
@@ -146,12 +113,12 @@ describe(`Memory Indexing Tests`, () => {
             "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000180000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000010007080900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000b26e0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000cd6a42782d230d7c13a74ddec5dd140e55499df9"
         );
         const view = makeMemoryView(
-            new ExpStructType("", [
+            new StructType("", [
                 ["t", new PointerType(new ArrayType(uint16), DataLocation.Memory)],
                 [
                     "s",
                     new PointerType(
-                        new ExpStructType("", [
+                        new StructType("", [
                             ["x", int8],
                             ["y", uint256],
                             ["b", bool],
@@ -166,12 +133,12 @@ describe(`Memory Indexing Tests`, () => {
         ) as StructMemView;
 
         // t
-        let fView = view.fieldView("t") as BaseMemoryView<Value, TypeNode>;
+        let fView = view.fieldView("t") as BaseMemoryView<Value, BaseRuntimeType>;
         expect(fView.decode(mem)).toEqual([]);
-        fView = view.fieldView("b") as BaseMemoryView<Value, TypeNode>;
+        fView = view.fieldView("b") as BaseMemoryView<Value, BaseRuntimeType>;
         expect(fView.decode(mem)).toEqual(hexToBytes("0x070809"));
         const sView = (view.fieldView("s") as PointerMemView).toView(mem) as StructMemView;
-        fView = sView.fieldView("y") as BaseMemoryView<Value, TypeNode>;
+        fView = sView.fieldView("y") as BaseMemoryView<Value, BaseRuntimeType>;
         expect(fView.decode(mem)).toEqual(45678n);
     });
 });

@@ -1,6 +1,6 @@
-import { TypeNode } from "solc-typed-ast";
 import { DecodingFailure, Struct, Value } from "./value";
 import { Memory, Stack, Storage } from "../types";
+import { BaseRuntimeType } from "../runtime_types";
 
 export type StateArea = Memory | Stack | Storage;
 
@@ -18,7 +18,7 @@ export abstract class View<
     State = StateArea,
     Val extends Value = Value,
     Loc = any,
-    Type extends TypeNode = TypeNode
+    Type extends BaseRuntimeType = BaseRuntimeType
 > {
     constructor(
         public readonly type: Type,

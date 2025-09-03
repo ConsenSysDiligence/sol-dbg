@@ -1,18 +1,9 @@
 import expect from "expect";
-import {
-    ArrayType,
-    BytesType,
-    DataLocation,
-    MappingType,
-    PointerType,
-    StringType,
-    TypeNode
-} from "solc-typed-ast";
+import { DataLocation } from "solc-typed-ast";
 import { hasPoison, Struct, Value } from "../../src/debug/decoding/value";
 import { bytesToHex, hexToBytes } from "ethereum-cryptography/utils";
 import {
     bigEndianBufToBigint,
-    ExpStructType,
     ImmMap,
     makeStorageView,
     MapKeys,
@@ -40,8 +31,17 @@ import {
     uint16,
     uint248,
     uint8
-} from "../utils";
+} from "../utils/rtt_types";
 import { createAddressFromString, setLengthLeft } from "@ethereumjs/util";
+import {
+    ArrayType,
+    BaseRuntimeType,
+    BytesType,
+    MappingType,
+    PointerType,
+    StringType,
+    StructType
+} from "../../src/debug/runtime_types";
 
 type StorageDesc = { [key: string]: string };
 
@@ -195,35 +195,31 @@ export const mapWithComplexKeysStorDesc = {
 };
 
 export const uint8x2 = new PointerType(new ArrayType(uint8, 2n), DataLocation.Storage);
-export const S = new ExpStructType("S", [
+export const S = new StructType("S", [
     ["x", int32],
     ["y", bool]
 ]);
-export const CLayoutType = new ExpStructType(
-    "C",
+export const CLayoutType = new StructType("C", [
+    ["a", uint256],
+    ["e", new PointerType(new ArrayType(uint8), DataLocation.Storage)],
     [
-        ["a", uint256],
-        ["e", new PointerType(new ArrayType(uint8), DataLocation.Storage)],
-        [
-            "f",
-            new PointerType(
-                new MappingType(uint256, new PointerType(S, DataLocation.Storage)),
-                DataLocation.Storage
-            )
-        ],
-        ["g", uint16],
-        ["h", uint16],
-        ["s", new PointerType(S, DataLocation.Storage)],
-        ["k", int8],
-        ["l", bytes21],
-        ["m", new PointerType(new ArrayType(uint8, 12n), DataLocation.Storage)],
-        ["n", new PointerType(new ArrayType(bytes5, 8n), DataLocation.Storage)],
-        ["o", bytes5]
+        "f",
+        new PointerType(
+            new MappingType(uint256, new PointerType(S, DataLocation.Storage)),
+            DataLocation.Storage
+        )
     ],
-    undefined
-);
+    ["g", uint16],
+    ["h", uint16],
+    ["s", new PointerType(S, DataLocation.Storage)],
+    ["k", int8],
+    ["l", bytes21],
+    ["m", new PointerType(new ArrayType(uint8, 12n), DataLocation.Storage)],
+    ["n", new PointerType(new ArrayType(bytes5, 8n), DataLocation.Storage)],
+    ["o", bytes5]
+]);
 
-export const SimpleTypes = new ExpStructType("MoreStructs.SimpleTypes", [
+export const SimpleTypes = new StructType("MoreStructs.SimpleTypes", [
     ["a", int8],
     ["b", uint16],
     ["c", uint256],
@@ -233,34 +229,34 @@ export const SimpleTypes = new ExpStructType("MoreStructs.SimpleTypes", [
     ["b2", bytes32],
     ["en", uint8]
 ]);
-export const S_static = new ExpStructType("MoreStructs.S_static", [
+export const S_static = new StructType("MoreStructs.S_static", [
     ["x", int8],
     ["y", uint256],
     ["b", bool],
     ["addrs", address]
 ]);
-export const S1 = new ExpStructType("MoreStructs.S1", [
+export const S1 = new StructType("MoreStructs.S1", [
     ["x", int8],
     ["y", uint256],
     ["b", bool],
     ["addrs", new PointerType(new ArrayType(address), DataLocation.Storage)]
 ]);
-export const S_nested_static_static = new ExpStructType("MoreStructs.S_nested_static_static", [
+export const S_nested_static_static = new StructType("MoreStructs.S_nested_static_static", [
     ["t", int16],
     ["s", new PointerType(S_static, DataLocation.Storage)],
     ["b", bytes3]
 ]);
-export const S_nested_dynamic_static = new ExpStructType("MoreStructs.S_nested_dynamic_static", [
+export const S_nested_dynamic_static = new StructType("MoreStructs.S_nested_dynamic_static", [
     ["t", new PointerType(new ArrayType(int16), DataLocation.Storage)],
     ["s", new PointerType(S_static, DataLocation.Storage)],
     ["b", bytes3]
 ]);
-export const S_nested_static_dynamic = new ExpStructType("MoreStructs.S_nested_static_dynamic", [
+export const S_nested_static_dynamic = new StructType("MoreStructs.S_nested_static_dynamic", [
     ["t", int16],
     ["s", new PointerType(S1, DataLocation.Storage)],
     ["b", bytes3]
 ]);
-export const S_struct_arr = new ExpStructType("MoreStructs.S_struct_arr", [
+export const S_struct_arr = new StructType("MoreStructs.S_struct_arr", [
     ["x", int8],
     [
         "sArr",
@@ -270,12 +266,12 @@ export const S_struct_arr = new ExpStructType("MoreStructs.S_struct_arr", [
         )
     ]
 ]);
-export const ArrTypes = new ExpStructType("MoreStructs.ArrTypes", [
+export const ArrTypes = new StructType("MoreStructs.ArrTypes", [
     ["a1", new PointerType(new ArrayType(uint16), DataLocation.Storage)],
     ["a2", new PointerType(new ArrayType(int128, 4n), DataLocation.Storage)]
 ]);
 
-export const MoreStructsLayoutType = new ExpStructType("MoreStructs", [
+export const MoreStructsLayoutType = new StructType("MoreStructs", [
     ["st", new PointerType(SimpleTypes, DataLocation.Storage)],
     ["s_static", new PointerType(S_static, DataLocation.Storage)],
     ["s1", new PointerType(S1, DataLocation.Storage)],
@@ -285,38 +281,38 @@ export const MoreStructsLayoutType = new ExpStructType("MoreStructs", [
     ["s_struct_arr", new PointerType(S_struct_arr, DataLocation.Storage)],
     ["at", new PointerType(ArrTypes, DataLocation.Storage)]
 ]);
-export const bytesLayoutType = new ExpStructType("Bytes", [
+export const bytesLayoutType = new StructType("Bytes", [
     ["smallB", new PointerType(new BytesType(), DataLocation.Storage)],
     ["bigB", new PointerType(new BytesType(), DataLocation.Storage)],
     ["biggerB", new PointerType(new BytesType(), DataLocation.Storage)],
     ["smallS", new PointerType(new StringType(), DataLocation.Storage)],
     ["bigS", new PointerType(new StringType(), DataLocation.Storage)]
 ]);
-export const SmallerThanWordType = new ExpStructType("Misc.SmallerThanWord", [
+export const SmallerThanWordType = new StructType("Misc.SmallerThanWord", [
     ["a", uint120],
     ["b", uint112]
 ]);
-export const OneWordType = new ExpStructType("Misc.OneWord", [
+export const OneWordType = new StructType("Misc.OneWord", [
     ["a", uint120],
     ["b", uint136]
 ]);
-export const MoreThanOneWordType = new ExpStructType("Misc.MoreThanOneWord", [
+export const MoreThanOneWordType = new StructType("Misc.MoreThanOneWord", [
     ["a", uint120],
     ["b", uint144]
 ]);
-export const ThreeWordsType = new ExpStructType("Misc.ThreeWords", [
+export const ThreeWordsType = new StructType("Misc.ThreeWords", [
     ["a", uint120],
     ["c", uint248],
     ["b", uint144]
 ]);
-export const FourWordsType = new ExpStructType("Misc.FourWords", [
+export const FourWordsType = new StructType("Misc.FourWords", [
     ["a", uint120],
     ["c", uint256],
     ["d", uint248],
     ["b", uint144]
 ]);
 
-export const miscLayoutType = new ExpStructType("Misc", [
+export const miscLayoutType = new StructType("Misc", [
     [
         "x",
         new PointerType(
@@ -376,7 +372,7 @@ export const miscLayoutType = new ExpStructType("Misc", [
     ["v", uint256]
 ]);
 
-const samples: Array<[StorageDesc, number, number, ExpStructType, Value]> = [
+const samples: Array<[StorageDesc, number, number, StructType, Value]> = [
     [
         moreStructsStorDesc,
         0,
@@ -741,7 +737,7 @@ describe(`Storage Encoding Tests`, () => {
     }
 });
 
-const rttSamples: Array<[TypeNode, Value, bigint, MapKeys | undefined]> = [
+const rttSamples: Array<[BaseRuntimeType, Value, bigint, MapKeys | undefined]> = [
     [
         MoreStructsLayoutType,
         new Struct([
@@ -1134,7 +1130,7 @@ const rttSamples: Array<[TypeNode, Value, bigint, MapKeys | undefined]> = [
 
 describe(`Storage Eecoding RTT Tests`, () => {
     for (const [type, value, baseOff, m] of rttSamples) {
-        it(`Sample ${type instanceof ExpStructType ? type.name : type.pp()} `, () => {
+        it(`Sample ${type instanceof StructType ? type.name : type.pp()} `, () => {
             const storage: Storage = ImmMap.fromEntries([]);
             const view = makeStorageView(type, [baseOff, 32]);
             const newStore = view.encode(value, storage);
@@ -1193,7 +1189,7 @@ describe(`Storage Eecoding RTT Tests`, () => {
             ["mNoKeys", new Map([])]
         ]);
 
-        const layout = new ExpStructType("MapWithComplexKeys", [
+        const layout = new StructType("MapWithComplexKeys", [
             ["m1", new MappingType(new PointerType(new BytesType(), DataLocation.Memory), uint256)],
             [
                 "m2",

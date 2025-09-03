@@ -2,16 +2,9 @@ import { Common } from "@ethereumjs/common";
 import { createTx, TypedTransaction, TypedTxData } from "@ethereumjs/tx";
 import { Address, setLengthLeft, createAddressFromString } from "@ethereumjs/util";
 import { bytesToHex, hexToBytes } from "ethereum-cryptography/utils";
-import {
-    AddressType,
-    BoolType,
-    FixedBytesType,
-    FunctionDefinition,
-    InferType,
-    IntType,
-    assert
-} from "solc-typed-ast";
+import { FunctionDefinition, InferType, assert } from "solc-typed-ast";
 import { HexString, Stack, Storage, UnprefixedHexString } from "../debug/types";
+import { AddressType, BoolType, FixedBytesType, IntType } from "../debug/runtime_types";
 
 export const ZERO_ADDRESS_STRING: HexString = "0x0000000000000000000000000000000000000000";
 export const ZERO_ADDRESS = createAddressFromString(ZERO_ADDRESS_STRING);
@@ -21,8 +14,9 @@ export const ZERO_BYTES32 = new Uint8Array(32);
 export const uint256 = new IntType(256, false);
 export const uint8 = new IntType(8, false);
 export const bytes4 = new FixedBytesType(4);
+export const byte = new FixedBytesType(1);
 export const bool = new BoolType();
-export const address = new AddressType(false);
+export const address = new AddressType();
 export const MAX_ARR_DECODE_LIMIT = BigInt(1000);
 
 export function toHexString(n: number | bigint | Uint8Array, padding = 0): HexString {
@@ -90,13 +84,13 @@ export function makeFakeTransaction(
  */
 export function limits(typ: IntType): [bigint, bigint] {
     if (typ.signed) {
-        const min = -(BigInt(2) << BigInt(typ.nBits - 1));
-        const max = BigInt(2) << (BigInt(typ.nBits - 1) - BigInt(1));
+        const min = -(BigInt(2) << BigInt(typ.numBits - 1));
+        const max = BigInt(2) << (BigInt(typ.numBits - 1) - BigInt(1));
 
         return [min, max];
     }
 
-    return [BigInt(0), (BigInt(2) << BigInt(typ.nBits)) - BigInt(1)];
+    return [BigInt(0), (BigInt(2) << BigInt(typ.numBits)) - BigInt(1)];
 }
 
 export function fits(val: bigint, typ: IntType): boolean {

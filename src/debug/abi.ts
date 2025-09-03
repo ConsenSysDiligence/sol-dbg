@@ -15,8 +15,8 @@ import { DecodedEventDesc, EventDefInfo, EventDesc, Memory } from "./types";
 import { bytes4, split, zip } from "../utils";
 import { BaseCalldataView, makeCalldataView, makeCalldataViews } from "./decoding/calldata/view";
 import { DecodingFailure, Value } from "./decoding/value";
-import { simplifyType } from "./decoding";
 import { IArtifactManager } from "./artifact_manager";
+import { astToRuntimeType, BaseRuntimeType } from "./runtime_types";
 
 /**
  * Return true if the given callee requires a selector
@@ -74,7 +74,7 @@ export function buildMsgViews(
                   .map((typ: TypeNode, i: number) => [`ARG_${i}`, typ]);
 
     const views = makeCalldataViews(
-        formals.map((x) => simplifyType(x[1], infer, DataLocation.CallData)),
+        formals.map((x) => astToRuntimeType(x[1], infer, DataLocation.CallData)),
         base
     );
     res.push(
@@ -87,14 +87,14 @@ export function buildMsgViews(
     return res;
 }
 
-abstract class BaseEventView<V extends Value, L, T extends TypeNode> extends View<
+abstract class BaseEventView<V extends Value, L, T extends BaseRuntimeType> extends View<
     EventDesc,
     V,
     L,
     T
 > {}
 
-class EventPayloadView<V extends Value, T extends TypeNode> extends BaseEventView<
+class EventPayloadView<V extends Value, T extends BaseRuntimeType> extends BaseEventView<
     V,
     BaseCalldataView<V, T>,
     T
@@ -108,7 +108,7 @@ class EventPayloadView<V extends Value, T extends TypeNode> extends BaseEventVie
     }
 }
 
-class TopicPayloadView<T extends TypeNode> extends BaseEventView<Value, number, T> {
+class TopicPayloadView<T extends BaseRuntimeType> extends BaseEventView<Value, number, T> {
     decode(state: EventDesc): Value | DecodingFailure {
         if (this.type instanceof PointerType) {
             return new DecodingFailure(`Cannot decode indexed complex type ${this.type.pp()}`);
@@ -123,7 +123,7 @@ class TopicPayloadView<T extends TypeNode> extends BaseEventView<Value, number, 
     }
 }
 
-type GenEventView = BaseEventView<Value, any, TypeNode>;
+type GenEventView = BaseEventView<Value, any, BaseRuntimeType>;
 export function buildEventViews(
     evtDef: EventDefInfo,
     infer: InferType
@@ -136,10 +136,10 @@ export function buildEventViews(
     let topicIdx = evtDef.definition.anonymous ? 0 : 1;
     const indexedViews: GenEventView[] = indexedArgs.map(
         ([, [, type]]) =>
-            new TopicPayloadView(simplifyType(type, infer, DataLocation.CallData), topicIdx++)
+            new TopicPayloadView(astToRuntimeType(type, infer, DataLocation.CallData), topicIdx++)
     );
     const nonIndexedViews: GenEventView[] = makeCalldataViews(
-        nonIndexedArgs.map(([, [, type]]) => simplifyType(type, infer, DataLocation.CallData)),
+        nonIndexedArgs.map(([, [, type]]) => astToRuntimeType(type, infer, DataLocation.CallData)),
         0n
     ).map((v) => new EventPayloadView(v.type, v));
 

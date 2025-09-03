@@ -1,19 +1,9 @@
-import {
-    AddressType,
-    ArrayType,
-    BoolType,
-    DataLocation,
-    FixedBytesType,
-    IntType,
-    PointerType,
-    TypeNode,
-    types
-} from "solc-typed-ast";
 import { Stack } from "../../types";
 import { DecodingFailure, Value } from "../value";
 import { ArrayLikeView, EncodingError, View } from "../view";
 import {
     bigEndianBufToBigint,
+    byte,
     encodeBigintInBigEndianBuf,
     fits,
     nyi,
@@ -25,11 +15,20 @@ import { Address } from "@ethereumjs/util";
 import { makeStorageView } from "../storage";
 import { inRange, isCalldataArrayType, isFailure } from "../utils";
 import { ArraySliceCalldataView, BaseCalldataView, makeCalldataView } from "../calldata/view";
-import { makeMemoryView } from "../memory";
 import { BaseStorageView } from "../storage/view";
-import { BaseMemoryView } from "../memory/view";
+import { BaseMemoryView, makeMemoryView } from "../memory/view";
+import {
+    AddressType,
+    ArrayType,
+    BaseRuntimeType,
+    BoolType,
+    FixedBytesType,
+    IntType,
+    PointerType
+} from "../../runtime_types";
+import { DataLocation } from "solc-typed-ast";
 
-export abstract class BaseStackView<Val extends Value, Type extends TypeNode> extends View<
+export abstract class BaseStackView<Val extends Value, Type extends BaseRuntimeType> extends View<
     Stack,
     Val,
     number,
@@ -54,10 +53,10 @@ export abstract class BaseStackView<Val extends Value, Type extends TypeNode> ex
 
         let res = bigEndianBufToBigint(word);
         // Convert signed negative 2's complement values
-        if (typ.signed && (res & (BigInt(1) << BigInt(typ.nBits - 1))) !== BigInt(0)) {
+        if (typ.signed && (res & (BigInt(1) << BigInt(typ.numBits - 1))) !== BigInt(0)) {
             // Mask out any 1's above the number's size
-            res = res & ((BigInt(1) << BigInt(typ.nBits)) - BigInt(1));
-            res = -((BigInt(1) << BigInt(typ.nBits)) - res);
+            res = res & ((BigInt(1) << BigInt(typ.numBits)) - BigInt(1));
+            res = -((BigInt(1) << BigInt(typ.numBits)) - res);
         }
 
         if (!fits(res, typ)) {
@@ -78,7 +77,7 @@ export abstract class BaseStackView<Val extends Value, Type extends TypeNode> ex
             throw new EncodingError(`OoB access at ${offsetFromTop} in stack`);
         }
 
-        encodeBigintInBigEndianBuf(value, state[offsetFromTop], type.nBits / 8);
+        encodeBigintInBigEndianBuf(value, state[offsetFromTop], type.numBits / 8);
     }
 }
 
@@ -125,7 +124,7 @@ export class SingleByteStackView extends BaseStackView<bigint, FixedBytesType> {
         loc: number,
         public readonly byteOffset: number
     ) {
-        super(types.byte, loc);
+        super(byte, loc);
     }
 
     decode(state: Stack): bigint | DecodingFailure {
@@ -154,7 +153,7 @@ export class FixedBytesStackView
 {
     decode(state: Stack): Uint8Array | DecodingFailure {
         const w = this.fetchStackWord(this.loc, state);
-        return isFailure(w) ? w : w.slice(0, this.type.size);
+        return isFailure(w) ? w : w.slice(0, this.type.numBytes);
     }
 
     encode(value: Uint8Array, state: Stack): void {
@@ -167,11 +166,11 @@ export class FixedBytesStackView
     }
 
     size(): bigint | DecodingFailure {
-        return BigInt(this.type.size);
+        return BigInt(this.type.numBytes);
     }
 
     indexView(key: bigint): DecodingFailure | SingleByteStackView {
-        if (!inRange(key, 0, this.type.size - 1)) {
+        if (!inRange(key, 0, this.type.numBytes - 1)) {
             return new DecodingFailure(`Invalid index ${key} in ${this.type.pp()}`);
         }
 
@@ -179,7 +178,7 @@ export class FixedBytesStackView
     }
 }
 
-type PointerValue = View<any, Value, any, TypeNode>;
+type PointerValue = View<any, Value, any, BaseRuntimeType>;
 
 export class PointerStackView extends BaseStackView<PointerValue, PointerType> {
     decode(state: Stack): PointerValue | DecodingFailure {
@@ -197,22 +196,23 @@ export class PointerStackView extends BaseStackView<PointerValue, PointerType> {
                 return len;
             }
 
-            return new ArraySliceCalldataView(this.type.to as ArrayType, off, len);
+            // This cast is weird...
+            return new ArraySliceCalldataView(this.type.toType as ArrayType, off, len);
         }
 
         if (this.type.location === DataLocation.CallData) {
-            return makeCalldataView(this.type.to, 0n, off);
+            return makeCalldataView(this.type.toType, 0n, off);
         }
 
         if (this.type.location === DataLocation.Memory) {
-            return makeMemoryView(this.type.to, off);
+            return makeMemoryView(this.type.toType, off);
         }
 
         if (
             this.type.location === DataLocation.Storage ||
             this.type.location === DataLocation.Transient
         ) {
-            return makeStorageView(this.type.to, [off, 32]);
+            return makeStorageView(this.type.toType, [off, 32]);
         }
 
         nyi(`Stack pointer to ${this.type.location}`);
@@ -235,7 +235,10 @@ export class PointerStackView extends BaseStackView<PointerValue, PointerType> {
     }
 }
 
-export function makeStackView(type: TypeNode, loc: number): BaseStackView<Value, TypeNode> {
+export function makeStackView(
+    type: BaseRuntimeType,
+    loc: number
+): BaseStackView<Value, BaseRuntimeType> {
     if (type instanceof IntType) {
         return new IntStackView(type, loc);
     }

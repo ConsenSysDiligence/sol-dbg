@@ -14,7 +14,7 @@ import { FrameKind } from "../../types";
 import { BasicStepInfo } from "./basic_info";
 import { ExternalFrameInfo, topExtFrame } from "./ext_stack";
 import { makeCalldataViews } from "../../decoding/calldata/view";
-import { simplifyType } from "../../decoding";
+import { astToRuntimeType } from "../../runtime_types";
 
 export interface ReturnInfo {
     retInfo?: {
@@ -111,7 +111,7 @@ export async function addReturnInfo<T extends object & BasicStepInfo & ExternalF
 
     // We treat these as in calldata, since they should already be abi-encoded in memory for the Return instruction
     const views = makeCalldataViews(
-        type.returns.map((t) => simplifyType(t, infer, DataLocation.CallData)),
+        type.returns.map((t) => astToRuntimeType(t, infer, DataLocation.CallData)),
         0n
     );
     const decodedReturnData = views.map((v) => v.decode(rawReturnData));

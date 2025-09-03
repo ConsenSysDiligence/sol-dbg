@@ -5,3 +5,4 @@ export * from "./layout";
 export * from "./opcodes";
 export * from "./tracers";
 export * from "./types";
+export * from "./runtime_types";

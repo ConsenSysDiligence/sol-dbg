@@ -8,6 +8,6 @@ export * from "./int_type";
 export * from "./mapping_type";
 export * from "./missing_type";
 export * from "./pointer_type";
-export * from "./strings_type";
+export * from "./string_type";
 export * from "./struct_type";
 export * from "./tuple_type";

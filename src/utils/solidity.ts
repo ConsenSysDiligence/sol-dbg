@@ -1,5 +1,14 @@
 import * as sol from "solc-typed-ast";
 
+export function isTypeUnknownContract(t: sol.TypeName | undefined): boolean {
+    return (
+        t instanceof sol.UserDefinedTypeName &&
+        t.referencedDeclaration < 0 &&
+        (t.typeString.startsWith("contract ") ||
+            t.typeString.startsWith("interface ") ||
+            t.typeString.startsWith("library "))
+    );
+}
 /**
  * Returns the receive function for a contract (if any). Note that it may be defined on a base class
  */

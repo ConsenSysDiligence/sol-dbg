@@ -5,7 +5,11 @@ import { BaseRuntimeType } from "./base_type";
  * @todo may deprecate this in the future
  */
 export class MissingType extends BaseRuntimeType {
+    constructor(public readonly typeString: string | undefined) {
+        super();
+    }
+
     pp(): string {
-        return `<mssing type>`;
+        return `<mssing type${this.typeString !== undefined ? `: ${this.typeString}` : ""}>`;
     }
 }
