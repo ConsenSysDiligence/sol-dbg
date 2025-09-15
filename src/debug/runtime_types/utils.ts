@@ -139,3 +139,101 @@ export function astToRuntimeType(
 
     nyi(`Type ${rawT.constructor.name}`);
 }
+
+/**
+ * Given a general runtime type 'pattern' that doesn't contain any data locations, and a data location,
+ * produce a concrete instance of the general type for the target location.
+ * This is the inverse of `specializeType()`
+ *
+ * @param type - general type "pattern"
+ * @param loc - target location to specialize to
+ * @returns specialized type
+ */
+export function specializeType(
+    type: rtt.BaseRuntimeType,
+    loc: sol.DataLocation
+): rtt.BaseRuntimeType {
+    sol.assert(
+        !(type instanceof rtt.PointerType),
+        "Unexpected pointer type {0} in concretization.",
+        type
+    );
+    sol.assert(
+        !(type instanceof rtt.TupleType),
+        "Unexpected tuple type {0} in concretization.",
+        type
+    );
+
+    // bytes and string
+    if (type instanceof rtt.StringType || type instanceof rtt.BytesType) {
+        return new rtt.PointerType(type, loc);
+    }
+
+    if (type instanceof rtt.ArrayType) {
+        const concreteElT = specializeType(type.elementT, loc);
+
+        return new rtt.PointerType(new rtt.ArrayType(concreteElT, type.size), loc);
+    }
+
+    if (type instanceof rtt.StructType) {
+        return new rtt.PointerType(type, loc);
+    }
+
+    if (type instanceof rtt.MappingType) {
+        // Always treat map keys as in-memory copies
+        const concreteKeyT = specializeType(type.keyType, sol.DataLocation.Memory);
+        // The result of map indexing is always a pointer to a value that lives in storage
+        const concreteValueT = specializeType(type.valueType, sol.DataLocation.Storage); // @todo update when maps supported in transient
+        // Maps always live in storage
+        return new rtt.PointerType(
+            new rtt.MappingType(concreteKeyT, concreteValueT),
+            sol.DataLocation.Storage
+        ); // @todo update when maps supported in transient
+    }
+
+    if (type instanceof rtt.TupleType) {
+        return new rtt.TupleType(type.elementTypes.map((elT) => specializeType(elT, loc)));
+    }
+
+    return type;
+}
+
+/**
+ * Given a `BaseRuntimeType` `type` that is specialized to some storage location,
+ * compute the original 'general' type that is independent of location.
+ * This is the inverse of `specializeType()`
+ *
+ * @param type - specialized type
+ * @returns computed generalized type
+ */
+export function generalizeType(type: rtt.BaseRuntimeType): rtt.BaseRuntimeType {
+    if (type instanceof rtt.PointerType) {
+        return generalizeType(type.toType);
+    }
+
+    if (type instanceof rtt.ArrayType) {
+        const innerT = generalizeType(type.elementT);
+
+        return new rtt.ArrayType(innerT, type.size);
+    }
+
+    if (type instanceof rtt.MappingType) {
+        const genearlKeyT = generalizeType(type.keyType);
+        const generalValueT = generalizeType(type.valueType);
+
+        return new rtt.MappingType(genearlKeyT, generalValueT);
+    }
+
+    if (type instanceof rtt.StructType) {
+        return new rtt.StructType(
+            type.name,
+            type.fields.map(([fieldName, fieldT]) => [fieldName, generalizeType(fieldT)])
+        );
+    }
+
+    if (type instanceof rtt.TupleType) {
+        return new rtt.TupleType(type.elementTypes.map(generalizeType));
+    }
+
+    return type;
+}
