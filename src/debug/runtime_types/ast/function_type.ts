@@ -1,10 +1,11 @@
+import { FunctionStateMutability } from "solc-typed-ast";
 import { BaseRuntimeType } from "./base_type";
 
 export class FunctionType extends BaseRuntimeType {
     constructor(
         public readonly argTs: BaseRuntimeType[],
         public readonly external: boolean,
-        public readonly mutability: "pure" | "view" | "payable",
+        public readonly mutability: FunctionStateMutability,
         public readonly retTs: BaseRuntimeType[]
     ) {
         super();

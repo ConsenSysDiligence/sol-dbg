@@ -23,7 +23,7 @@ import { astToRuntimeType, BaseRuntimeType } from "./runtime_types";
  * @param callee
  * @returns
  */
-function hasSelector(callee: FunctionDefinition | VariableDeclaration): boolean {
+export function hasSelector(callee: FunctionDefinition | VariableDeclaration): boolean {
     if (callee instanceof VariableDeclaration) {
         return true;
     }
