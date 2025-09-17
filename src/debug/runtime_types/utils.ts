@@ -84,9 +84,12 @@ export function astToRuntimeType(
     }
 
     if (rawT instanceof sol.PointerType) {
-        const toT = astToRuntimeType(rawT.to, infer, rawT.location);
+        let ptrLoc = rawT.location === sol.DataLocation.Default ? loc : rawT.location
+        sol.assert(ptrLoc !== undefined, `Missing location in conversion of {0}`, rawT);
 
-        return new rtt.PointerType(toT, rawT.location);
+        const toT = astToRuntimeType(rawT.to, infer, ptrLoc);
+
+        return new rtt.PointerType(toT, ptrLoc);
     }
 
     if (rawT instanceof sol.UserDefinedType) {
