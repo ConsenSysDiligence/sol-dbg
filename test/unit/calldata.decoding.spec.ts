@@ -472,7 +472,6 @@ describe(`Calldata Decoding Tests`, () => {
             const views = makeCalldataViews(types, 4n);
             const value = views.map((v) => v.decode(calldata));
 
-            console.error(value);
             expect(hasPoison(value)).toBeFalsy();
             expect(value).toEqual(expectedValues);
             for (let i = 0; i < views.length; i++) {
