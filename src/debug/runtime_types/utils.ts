@@ -140,6 +140,10 @@ export function astToRuntimeType(
         }
     }
 
+    if (rawT instanceof sol.TypeNameType) {
+        return new rtt.TypeType(rawT.type);
+    }
+
     nyi(`Type ${rawT.constructor.name}`);
 }
 
