@@ -84,13 +84,13 @@ export function makeFakeTransaction(
  */
 export function limits(typ: IntType): [bigint, bigint] {
     if (typ.signed) {
-        const min = -(BigInt(2) << BigInt(typ.numBits - 1));
-        const max = BigInt(2) << (BigInt(typ.numBits - 1) - BigInt(1));
+        const min = -(BigInt(1) << BigInt(typ.numBits - 1));
+        const max = (BigInt(1) << BigInt(typ.numBits - 1)) - BigInt(1);
 
         return [min, max];
     }
 
-    return [BigInt(0), (BigInt(2) << BigInt(typ.numBits)) - BigInt(1)];
+    return [BigInt(0), (BigInt(1) << BigInt(typ.numBits)) - BigInt(1)];
 }
 
 export function fits(val: bigint, typ: IntType): boolean {

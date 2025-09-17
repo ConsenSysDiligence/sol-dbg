@@ -309,7 +309,7 @@ describe(`Memory Reference Types Encoding Tests`, () => {
 const rttSamples: Array<[TypeNode | TypeGenerator, Value]> = [
     [int8, -1n],
     [uint16, 65535n],
-    [uint16, 123456n],
+    [uint16, 12345n],
     [types.bool, true],
     [types.address, createAddressFromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")],
     [bytes2, hexToBytes("0102")],
