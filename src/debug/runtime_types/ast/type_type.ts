@@ -6,9 +6,7 @@ import { BaseRuntimeType } from "./base_type";
  * to have it here as it appears as an argument to `abi.decode`.
  */
 export class TypeType extends BaseRuntimeType {
-    constructor(
-        public readonly rawT: sol.TypeNode,
-    ) {
+    constructor(public readonly rawT: sol.TypeNode) {
         super();
     }
 

@@ -12,4 +12,4 @@ export * from "./string_type";
 export * from "./struct_type";
 export * from "./tuple_type";
 export * from "./function_type";
-export * from "./type_type"
+export * from "./type_type";
