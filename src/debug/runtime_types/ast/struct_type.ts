@@ -9,6 +9,6 @@ export class StructType extends BaseRuntimeType {
     }
 
     pp(): string {
-        return `struct ${this.name}`;
+        return `struct ${this.name} {${this.fields.map(([name, type]) => `${name}: ${type.pp()}`).join(";\n")}}`;
     }
 }
