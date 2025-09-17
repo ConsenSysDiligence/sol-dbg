@@ -1,13 +1,10 @@
-import { SourceUnit, TypeNode } from "solc-typed-ast";
-import { ExpStructType } from "../../src";
+import { SourceUnit } from "solc-typed-ast";
+import { BaseRuntimeType } from "../../src/debug/runtime_types";
 
-export type TypeGenerator = (unit: SourceUnit) => TypeNode;
+export type TypeGenerator = (unit: SourceUnit) => BaseRuntimeType;
 
-export function ppType(t: TypeNode | TypeGenerator): string {
-    if (t instanceof ExpStructType) {
-        return `<internal struct ${t.name}>`;
-    }
-    if (t instanceof TypeNode) {
+export function ppType(t: BaseRuntimeType | TypeGenerator): string {
+    if (t instanceof BaseRuntimeType) {
         return t.pp();
     }
 

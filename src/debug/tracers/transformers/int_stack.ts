@@ -9,7 +9,8 @@ import { BasicStepInfo } from "./basic_info";
 import { ExternalFrameInfo, topExtFrame } from "./ext_stack";
 import { SourceInfo } from "./source";
 import { View } from "../../decoding/view";
-import { makeStackView, simplifyType } from "../../decoding";
+import { makeStackView } from "../../decoding";
+import { astToRuntimeType } from "../../runtime_types";
 
 export interface InternalFrameInfo {
     intStack: InternalCallFrame[];
@@ -58,7 +59,8 @@ function buildFunArgViews(
 
     for (let i = formals.length - 1; i >= 0; i--) {
         const [name, typ] = formals[i];
-        const stackSize = isCalldataArrayType(typ) ? 2 : 1;
+        const rttTyp = astToRuntimeType(typ, infer);
+        const stackSize = isCalldataArrayType(rttTyp) ? 2 : 1;
 
         offsetFromTop += stackSize;
 
@@ -67,7 +69,7 @@ function buildFunArgViews(
             return undefined;
         }
 
-        res.unshift([name, makeStackView(simplifyType(typ, infer), offsetFromTop)]);
+        res.unshift([name, makeStackView(rttTyp, offsetFromTop)]);
     }
 
     return res;

@@ -1,17 +1,17 @@
+import { DataLocation } from "solc-typed-ast";
 import {
     AddressType,
     ArrayType,
     BoolType,
     BytesType,
-    DataLocation,
     FixedBytesType,
     IntType,
     PointerType,
     StringType
-} from "solc-typed-ast";
+} from "../../src/debug/runtime_types";
 
 export const bool = new BoolType();
-export const address = new AddressType(false);
+export const address = new AddressType();
 export const bytes1 = new FixedBytesType(1);
 export const bytes2 = new FixedBytesType(2);
 export const bytes3 = new FixedBytesType(3);
@@ -30,6 +30,7 @@ export const uint128 = new IntType(128, false);
 export const uint136 = new IntType(136, false);
 export const uint144 = new IntType(144, false);
 export const uint248 = new IntType(248, false);
+export const uint256 = new IntType(256, false);
 
 export const int8 = new IntType(8, true);
 export const int16 = new IntType(16, true);

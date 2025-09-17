@@ -5,7 +5,8 @@ import { IArtifactManager } from "./artifact_manager";
 import { getStorage } from "./tracers/transformers/basic_info";
 import { getMapKeys, KeccakPreimageMap, MapKeys } from "./tracers/transformers/keccak256_invert";
 import { Storage } from "./types";
-import { getContractLayoutType, makeStorageView } from "./decoding";
+import { getContractLayoutType } from "./decoding";
+import { makeStorageView } from "./decoding";
 import { isFailure } from "./decoding/utils";
 import { Struct } from "./decoding/value";
 

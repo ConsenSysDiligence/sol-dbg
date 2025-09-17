@@ -1,16 +1,5 @@
 import expect from "expect";
-import {
-    ArrayType,
-    assert,
-    BytesType,
-    DataLocation,
-    IntType,
-    MappingType,
-    PointerType,
-    StringType,
-    TypeNode,
-    types
-} from "solc-typed-ast";
+import { assert, DataLocation } from "solc-typed-ast";
 import { DecodingFailure, hasPoison, Value } from "../../src/debug/decoding/value";
 import { hexToBytes } from "ethereum-cryptography/utils";
 import {
@@ -18,7 +7,6 @@ import {
     BaseStorageView,
     bigEndianBufToBigint,
     BytesStorageView,
-    ExpStructType,
     FixedBytesStorageView,
     ImmMap,
     makeStorageView,
@@ -29,8 +17,18 @@ import {
     StructStorageView,
     uint256
 } from "../../src";
-import { bool, bytes21, bytes5, int32, int8, uint16, uint8 } from "../utils";
+import { bool, bytes21, bytes5, int32, int8, uint16, uint8 } from "../utils/rtt_types";
 import { setLengthLeft } from "@ethereumjs/util";
+import {
+    ArrayType,
+    BaseRuntimeType,
+    BytesType,
+    IntType,
+    MappingType,
+    PointerType,
+    StringType,
+    StructType
+} from "../../src/debug/runtime_types";
 
 type StorageDesc = { [key: string]: string };
 
@@ -97,37 +95,33 @@ const CStorDesc = {
     "0xc9b370bcd3a6b8dd1220b7a7faea196be095b68db0e96af1b734f26b58075de4": "0x04030201",
     "0xde857217eaef9a2f6b2dade6c3e435fdb07f23d3e6a6109ea1626de7e649c81a": "0x0100000001"
 };
-const S = new ExpStructType("S", [
+const S = new StructType("S", [
     ["x", int32],
     ["y", bool]
 ]);
-const CLayoutType = new ExpStructType(
-    "C",
+const CLayoutType = new StructType("C", [
+    ["a", uint256],
+    ["e", new PointerType(new ArrayType(uint8), DataLocation.Storage)],
     [
-        ["a", uint256],
-        ["e", new PointerType(new ArrayType(uint8), DataLocation.Storage)],
-        [
-            "f",
-            new PointerType(
-                new MappingType(uint256, new PointerType(S, DataLocation.Storage)),
-                DataLocation.Storage
-            )
-        ],
-        ["g", uint16],
-        ["h", uint16],
-        ["s", new PointerType(S, DataLocation.Storage)],
-        ["k", int8],
-        ["l", bytes21],
-        ["m", new PointerType(new ArrayType(uint8, 12n), DataLocation.Storage)],
-        ["n", new PointerType(new ArrayType(bytes5, 8n), DataLocation.Storage)],
-        ["o", bytes5]
+        "f",
+        new PointerType(
+            new MappingType(uint256, new PointerType(S, DataLocation.Storage)),
+            DataLocation.Storage
+        )
     ],
-    undefined
-);
+    ["g", uint16],
+    ["h", uint16],
+    ["s", new PointerType(S, DataLocation.Storage)],
+    ["k", int8],
+    ["l", bytes21],
+    ["m", new PointerType(new ArrayType(uint8, 12n), DataLocation.Storage)],
+    ["n", new PointerType(new ArrayType(bytes5, 8n), DataLocation.Storage)],
+    ["o", bytes5]
+]);
 
 const uint8x2 = new PointerType(new ArrayType(uint8, 2n), DataLocation.Storage);
 
-const samples: Array<[StorageDesc, bigint, number, TypeNode, Value[] | Uint8Array]> = [
+const samples: Array<[StorageDesc, bigint, number, BaseRuntimeType, Value[] | Uint8Array]> = [
     [simpleStorDesc, 1n, 32, bytes5, hexToBytes("0405060708")],
     [simpleStorDesc, 2n, 32, uint8x2, [0x42n, 0x43n]],
     [
@@ -141,7 +135,7 @@ const samples: Array<[StorageDesc, bigint, number, TypeNode, Value[] | Uint8Arra
         arrStorDesc,
         1n,
         32,
-        new PointerType(new ArrayType(types.uint160, 5n), DataLocation.Storage),
+        new PointerType(new ArrayType(new IntType(160, false), 5n), DataLocation.Storage),
         [101n, 102n, 103n, 104n, 105n]
     ],
     [
@@ -196,9 +190,9 @@ describe(`Storage Indexing Tests`, () => {
                 let expectedIdxVal = expectedValue[i];
                 expectedIdxVal =
                     typeof expectedIdxVal === "number" ? BigInt(expectedIdxVal) : expectedIdxVal;
-                expect((idxView as BaseStorageView<Value, TypeNode>).decode(storage)).toEqual(
-                    expectedIdxVal
-                );
+                expect(
+                    (idxView as BaseStorageView<Value, BaseRuntimeType>).decode(storage)
+                ).toEqual(expectedIdxVal);
             }
         });
     }
@@ -206,20 +200,14 @@ describe(`Storage Indexing Tests`, () => {
     it("Map with complex keys", () => {
         const m1View = makeStorageView(
             new PointerType(
-                new MappingType(
-                    new PointerType(new BytesType(), DataLocation.Memory),
-                    types.uint256
-                ),
+                new MappingType(new PointerType(new BytesType(), DataLocation.Memory), uint256),
                 DataLocation.Storage
             ),
             [0n, 32]
         ) as PointerStorageView;
         const m2View = makeStorageView(
             new PointerType(
-                new MappingType(
-                    new PointerType(new StringType(), DataLocation.Memory),
-                    types.uint256
-                ),
+                new MappingType(new PointerType(new StringType(), DataLocation.Memory), uint256),
                 DataLocation.Storage
             ),
             [1n, 32]
@@ -228,18 +216,18 @@ describe(`Storage Indexing Tests`, () => {
 
         let v = (m1View.toView() as MapStorageView).indexView(hexToBytes("010203"));
         expect(v).not.toBeInstanceOf(DecodingFailure);
-        expect((v as BaseStorageView<Value, TypeNode>).decode(storage)).toEqual(1n);
+        expect((v as BaseStorageView<Value, BaseRuntimeType>).decode(storage)).toEqual(1n);
         v = (m1View.toView() as MapStorageView).indexView(hexToBytes("010205"));
         expect(v).not.toBeInstanceOf(DecodingFailure);
-        expect((v as BaseStorageView<Value, TypeNode>).decode(storage)).toEqual(0n);
+        expect((v as BaseStorageView<Value, BaseRuntimeType>).decode(storage)).toEqual(0n);
 
         v = (m2View.toView() as MapStorageView).indexView("abc");
         expect(v).not.toBeInstanceOf(DecodingFailure);
-        expect((v as BaseStorageView<Value, TypeNode>).decode(storage)).toEqual(3n);
+        expect((v as BaseStorageView<Value, BaseRuntimeType>).decode(storage)).toEqual(3n);
 
         v = (m2View.toView() as MapStorageView).indexView("xxx");
         expect(v).not.toBeInstanceOf(DecodingFailure);
-        expect((v as BaseStorageView<Value, TypeNode>).decode(storage)).toEqual(0n);
+        expect((v as BaseStorageView<Value, BaseRuntimeType>).decode(storage)).toEqual(0n);
     });
 
     it("SignleByteStorageView encoding test", () => {
@@ -258,11 +246,11 @@ describe(`Storage Indexing Tests`, () => {
         // a
         let fView = view.fieldView("a");
         expect(fView).not.toBeInstanceOf(DecodingFailure);
-        expect((fView as BaseStorageView<Value, TypeNode>).decode(storage)).toEqual(5678n);
+        expect((fView as BaseStorageView<Value, BaseRuntimeType>).decode(storage)).toEqual(5678n);
         // e
         fView = view.fieldView("e");
         expect(fView).not.toBeInstanceOf(DecodingFailure);
-        expect((fView as BaseStorageView<Value, TypeNode>).decode(storage)).toEqual([
+        expect((fView as BaseStorageView<Value, BaseRuntimeType>).decode(storage)).toEqual([
             1n,
             2n,
             3n,
@@ -273,6 +261,6 @@ describe(`Storage Indexing Tests`, () => {
             (view.fieldView("s") as PointerStorageView).toView() as StructStorageView
         ).fieldView("x");
         expect(fView).not.toBeInstanceOf(DecodingFailure);
-        expect((fView as BaseStorageView<Value, TypeNode>).decode(storage)).toEqual(13n);
+        expect((fView as BaseStorageView<Value, BaseRuntimeType>).decode(storage)).toEqual(13n);
     });
 });

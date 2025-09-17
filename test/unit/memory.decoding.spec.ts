@@ -9,35 +9,43 @@ import {
     SourceUnit,
     TypeNode,
     UserDefinedType,
-    XPath
+    types,
+    XPath,
+    IntType,
+    FixedBytesType
 } from "solc-typed-ast";
 import { hasPoison, Struct, Value } from "../../src/debug/decoding/value";
 import { hexToBytes } from "ethereum-cryptography/utils";
 import { MAX_ARR_DECODE_LIMIT, Memory, single } from "../../src";
-import { address, bool, bytes2, bytes32, int128, int8, uint16 } from "../utils";
 import {
     BaseMemoryView,
     DecodingFailure,
     isArrayLikeMemView,
     makeMemoryView,
     PointerMemView,
-    simplifyType,
     StructMemView
 } from "../../src/debug/decoding/";
 import fse from "fs-extra";
 import { createAddressFromString } from "@ethereumjs/util";
+import { astToRuntimeType, BaseRuntimeType } from "../../src/debug/runtime_types";
 
 const infer = new InferType("0.8.29");
 type TypeGenerator = (unit: SourceUnit) => TypeNode;
+
+const int8 = new IntType(8, true);
+const uint16 = new IntType(16, false);
+const bytes2 = new FixedBytesType(2);
+const int128 = new IntType(128, true);
+
 const samples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
     ["ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 0, int8, -1n],
     ["000000000000000000000000000000000000000000000000000000000000ffff", 0, uint16, 65535n],
-    ["000000000000000000000000000000000000000000000000000000000001e240", 0, uint16, 123456n],
-    ["0000000000000000000000000000000000000000000000000000000000000001", 0, bool, true],
+    ["0000000000000000000000000000000000000000000000000000000000000011", 0, uint16, 17n],
+    ["0000000000000000000000000000000000000000000000000000000000000001", 0, types.bool, true],
     [
         "0000000000000000000000005b38da6a701c568545dcfcb03fcb875f56beddc4",
         0,
-        address,
+        types.address,
         createAddressFromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")
     ],
     [
@@ -49,7 +57,7 @@ const samples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
     [
         "0000000000000000000000000000000000000000000000000000000000abcdef",
         0,
-        bytes32,
+        types.bytes32,
         hexToBytes("0000000000000000000000000000000000000000000000000000000000abcdef")
     ],
     [
@@ -72,11 +80,7 @@ const samples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
                 "//ContractDefinition/StructDefinition[@name='SimpleTypes']"
             )[0];
 
-            const t = simplifyType(
-                new UserDefinedType("SimpleTypes", decl),
-                infer,
-                DataLocation.Memory
-            );
+            const t = new UserDefinedType("SimpleTypes", decl);
             return t;
         },
         new Struct([
@@ -98,11 +102,7 @@ const samples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
                 "//ContractDefinition/StructDefinition[@name='ArrTypes']"
             )[0];
 
-            const t = simplifyType(
-                new UserDefinedType("ArrTypes", decl),
-                infer,
-                DataLocation.Memory
-            );
+            const t = new UserDefinedType("ArrTypes", decl);
             return t;
         },
         new Struct([
@@ -118,11 +118,7 @@ const samples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
                 "//ContractDefinition/StructDefinition[@name='S_nested_dynamic_static']"
             )[0];
 
-            const t = simplifyType(
-                new UserDefinedType("S_nested_dynamic_static", decl),
-                infer,
-                DataLocation.Memory
-            );
+            const t = new UserDefinedType("S_nested_dynamic_static", decl);
             return t;
         },
         new Struct([
@@ -147,11 +143,7 @@ const samples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
                 "//ContractDefinition/StructDefinition[@name='S_nested_static_dynamic']"
             )[0];
 
-            const t = simplifyType(
-                new UserDefinedType("S_nested_static_dynamic", decl),
-                infer,
-                DataLocation.Memory
-            );
+            const t = new UserDefinedType("S_nested_static_dynamic", decl);
             return t;
         },
         new Struct([
@@ -182,11 +174,7 @@ const samples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
                 "//ContractDefinition/StructDefinition[@name='S_nested_static_static']"
             )[0];
 
-            const t = simplifyType(
-                new UserDefinedType("S_nested_static_static", decl),
-                infer,
-                DataLocation.Memory
-            );
+            const t = new UserDefinedType("S_nested_static_static", decl);
             return t;
         },
         new Struct([
@@ -211,11 +199,7 @@ const samples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
                 "//ContractDefinition/StructDefinition[@name='S_static']"
             )[0];
 
-            const t = simplifyType(
-                new UserDefinedType("S_static", decl),
-                infer,
-                DataLocation.Memory
-            );
+            const t = new UserDefinedType("S_static", decl);
             return t;
         },
         new Struct([
@@ -233,11 +217,7 @@ const samples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
                 "//ContractDefinition/StructDefinition[@name='S_struct_arr']"
             )[0];
 
-            const t = simplifyType(
-                new UserDefinedType("S_struct_arr", decl),
-                infer,
-                DataLocation.Memory
-            );
+            const t = new UserDefinedType("S_struct_arr", decl);
             return t;
         },
         new Struct([
@@ -297,7 +277,7 @@ describe(`Memory Decoding Tests`, () => {
         const memory = hexToBytes(memoryStr);
 
         it(`Sample ${ppType(typeDesc)}`, () => {
-            const type = simplifyType(
+            const type = astToRuntimeType(
                 typeDesc instanceof TypeNode ? typeDesc : typeDesc(unit),
                 infer,
                 DataLocation.Memory
@@ -312,13 +292,13 @@ describe(`Memory Decoding Tests`, () => {
 });
 
 function recCheckViewDecodesTo(
-    v: BaseMemoryView<Value, TypeNode>,
+    v: BaseMemoryView<Value, BaseRuntimeType>,
     value: Value,
     state: Memory
 ): boolean {
     if (v instanceof PointerMemView) {
         return recCheckViewDecodesTo(
-            v.toView(state) as BaseMemoryView<Value, TypeNode>,
+            v.toView(state) as BaseMemoryView<Value, BaseRuntimeType>,
             value,
             state
         );

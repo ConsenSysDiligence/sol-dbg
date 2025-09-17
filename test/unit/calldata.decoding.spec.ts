@@ -14,7 +14,7 @@ import {
 } from "solc-typed-ast";
 import { hasPoison, Struct, Value } from "../../src/debug/decoding/value";
 import { hexToBytes } from "ethereum-cryptography/utils";
-import { MAX_ARR_DECODE_LIMIT, Memory, single, uint256 } from "../../src";
+import { MAX_ARR_DECODE_LIMIT, Memory, single } from "../../src";
 import {
     address,
     bool,
@@ -35,8 +35,9 @@ import {
     stringCalldata,
     uint16,
     uint24,
+    uint256,
     uint8
-} from "../utils";
+} from "../utils/sol_types";
 import { createAddressFromString } from "@ethereumjs/util";
 import {
     BaseCalldataView,
@@ -44,10 +45,10 @@ import {
     isArrayLikeCalldataView,
     makeCalldataViews,
     PointerCalldataView,
-    simplifyType,
     StructCalldataView
 } from "../../src/debug/decoding/";
 import fse from "fs-extra";
+import { astToRuntimeType, BaseRuntimeType } from "../../src/debug/runtime_types";
 
 const tupleS1 = new TupleType([
     int8,
@@ -466,7 +467,7 @@ describe(`Calldata Decoding Tests`, () => {
 
         it(`Sample [${typeDesc.map(ppType).join(", ")}]`, () => {
             const types = typeDesc.map((t) =>
-                simplifyType(t instanceof TypeNode ? t : t(unit), infer, DataLocation.CallData)
+                astToRuntimeType(t instanceof TypeNode ? t : t(unit), infer, DataLocation.CallData)
             );
             const views = makeCalldataViews(types, 4n);
             const value = views.map((v) => v.decode(calldata));
@@ -481,7 +482,7 @@ describe(`Calldata Decoding Tests`, () => {
 });
 
 function recCheckViewDecodesTo(
-    v: BaseCalldataView<Value, TypeNode>,
+    v: BaseCalldataView<Value, BaseRuntimeType>,
     value: Value,
     state: Memory
 ): boolean {

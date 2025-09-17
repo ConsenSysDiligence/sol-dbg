@@ -1,24 +1,11 @@
-import {
-    AddressType,
-    ArrayType,
-    assert,
-    BoolType,
-    BytesType,
-    FixedBytesType,
-    IntType,
-    MappingType,
-    PackedArrayType,
-    PointerType,
-    StringType,
-    TypeNode,
-    types
-} from "solc-typed-ast";
+import { assert } from "solc-typed-ast";
 import { Memory } from "../../types";
 import { ArrayLikeView, EncodingError, PointerView, StructView, View } from "../view";
 import { DecodingFailure, Struct, Value } from "../value";
 import {
     bigEndianBufToBigint,
     bigIntToNum,
+    byte,
     encodeBigintInBigEndianBuf,
     fits,
     MAX_ARR_DECODE_LIMIT,
@@ -29,21 +16,36 @@ import {
     ZERO_BYTES32
 } from "../../../utils";
 import { Address, bigIntToHex, bytesToUtf8 } from "@ethereumjs/util";
-import { ExpStructType, MissingType } from "../exp_types";
 import { inRange, isFailure } from "../utils";
 import { Allocator } from "./allocator";
 import { utf8ToBytes } from "ethereum-cryptography/utils";
+import {
+    AddressType,
+    ArrayType,
+    BaseRuntimeType,
+    BoolType,
+    BytesType,
+    FixedBytesType,
+    IntType,
+    MappingType,
+    MissingType,
+    PointerType,
+    StringType,
+    StructType
+} from "../../runtime_types";
 
-interface ArrayLikeMemView<ValViewT extends BaseMemoryView<Value, TypeNode>>
+interface ArrayLikeMemView<ValViewT extends BaseMemoryView<Value, BaseRuntimeType>>
     extends ArrayLikeView<Memory, ValViewT> {}
 
-export function isArrayLikeMemView(v: any): v is ArrayLikeMemView<BaseMemoryView<Value, TypeNode>> {
+export function isArrayLikeMemView(
+    v: any
+): v is ArrayLikeMemView<BaseMemoryView<Value, BaseRuntimeType>> {
     return v instanceof FixedBytesMemView || v instanceof ArrayMemView || v instanceof BytesMemView;
 }
 
 export abstract class BaseMemoryView<
     Val extends Value,
-    Type extends TypeNode = TypeNode
+    Type extends BaseRuntimeType = BaseRuntimeType
 > extends View<Memory, Val, bigint, Type> {
     protected writeMemAt(value: Uint8Array, off: bigint, mem: Memory): void {
         if (!inRange(off, 0n, mem.length - value.length)) {
@@ -82,10 +84,10 @@ export abstract class BaseMemoryView<
         let res = bigEndianBufToBigint(bytes);
 
         // Convert signed negative 2's complement values
-        if (type.signed && (res & (BigInt(1) << BigInt(type.nBits - 1))) !== BigInt(0)) {
+        if (type.signed && (res & (BigInt(1) << BigInt(type.numBits - 1))) !== BigInt(0)) {
             // Mask out any 1's above the number's size
-            res = res & ((BigInt(1) << BigInt(type.nBits)) - BigInt(1));
-            res = -((BigInt(1) << BigInt(type.nBits)) - res);
+            res = res & ((BigInt(1) << BigInt(type.numBits)) - BigInt(1));
+            res = -((BigInt(1) << BigInt(type.numBits)) - res);
         }
 
         if (!fits(res, type)) {
@@ -160,7 +162,7 @@ export class BoolMemView extends BaseMemoryView<boolean, BoolType> {
  */
 export class SingleByteMemView extends BaseMemoryView<bigint, FixedBytesType> {
     constructor(loc: bigint) {
-        super(types.byte, loc);
+        super(byte, loc);
     }
 
     decode(state: Memory): bigint | DecodingFailure {
@@ -186,7 +188,7 @@ export class FixedBytesMemView
     implements ArrayLikeMemView<SingleByteMemView>
 {
     decode(state: Memory): Uint8Array | DecodingFailure {
-        return this.readMemAt(this.loc, state, this.type.size);
+        return this.readMemAt(this.loc, state, this.type.numBytes);
     }
 
     encode(value: Uint8Array<ArrayBufferLike>, state: Memory): void {
@@ -196,7 +198,7 @@ export class FixedBytesMemView
     }
 
     indexView(key: bigint): DecodingFailure | SingleByteMemView {
-        if (key >= this.type.size || key < 0n) {
+        if (key >= this.type.numBytes || key < 0n) {
             return new DecodingFailure(`Invalid index ${key} in ${this.type.pp()}`);
         }
 
@@ -204,13 +206,13 @@ export class FixedBytesMemView
     }
 
     size(): bigint {
-        return BigInt(this.type.size);
+        return BigInt(this.type.numBytes);
     }
 }
 
 export abstract class PackedArrayMemView<
     V extends Value,
-    T extends TypeNode
+    T extends BaseRuntimeType
 > extends BaseMemoryView<V, T> {
     protected decodeBytesAt(loc: bigint, state: Memory): Uint8Array | DecodingFailure {
         const len = this.decodeIntAt(loc, uint256, state);
@@ -276,7 +278,7 @@ export class StringMemView extends PackedArrayMemView<string, StringType> {
 
 export class ArrayMemView
     extends BaseMemoryView<Value[], ArrayType>
-    implements ArrayLikeMemView<BaseMemoryView<Value, TypeNode>>
+    implements ArrayLikeMemView<BaseMemoryView<Value, BaseRuntimeType>>
 {
     decode(state: Memory): Value[] | DecodingFailure {
         let sizeBigint: bigint | DecodingFailure;
@@ -325,7 +327,10 @@ export class ArrayMemView
         }
     }
 
-    indexView(key: bigint, state: Memory): BaseMemoryView<Value, TypeNode> | DecodingFailure {
+    indexView(
+        key: bigint,
+        state: Memory
+    ): BaseMemoryView<Value, BaseRuntimeType> | DecodingFailure {
         let addr = this.loc;
         let size: bigint | DecodingFailure;
 
@@ -358,8 +363,8 @@ export class ArrayMemView
 }
 
 export class StructMemView
-    extends BaseMemoryView<Struct, ExpStructType>
-    implements StructView<Memory, BaseMemoryView<Value, TypeNode>>
+    extends BaseMemoryView<Struct, StructType>
+    implements StructView<Memory, BaseMemoryView<Value, BaseRuntimeType>>
 {
     decode(state: Memory): Struct {
         const entries: Array<[string, Value]> = [];
@@ -388,7 +393,7 @@ export class StructMemView
         }
     }
 
-    fieldView(name: string): BaseMemoryView<Value, TypeNode> | DecodingFailure {
+    fieldView(name: string): BaseMemoryView<Value, BaseRuntimeType> | DecodingFailure {
         let offset = this.loc;
 
         for (const [fieldName, type] of this.type.fields) {
@@ -405,7 +410,7 @@ export class StructMemView
 
 export class PointerMemView
     extends BaseMemoryView<Value, PointerType>
-    implements PointerView<Memory, BaseMemoryView<Value, TypeNode>>
+    implements PointerView<Memory, BaseMemoryView<Value, BaseRuntimeType>>
 {
     decode(state: Memory): Value | DecodingFailure {
         const view = this.toView(state);
@@ -420,7 +425,7 @@ export class PointerMemView
     /**
      * Helper to compute how much memory we need to allocate for a pointed-to value of type t
      */
-    static allocSize(v: Value | undefined, t: TypeNode): number {
+    static allocSize(v: Value | undefined, t: BaseRuntimeType): number {
         if (t instanceof ArrayType) {
             if (t.size !== undefined) {
                 return bigIntToNum(t.size * 32n);
@@ -429,11 +434,11 @@ export class PointerMemView
             return (v as Value[]).length * 32 + 32;
         }
 
-        if (t instanceof ExpStructType) {
+        if (t instanceof StructType) {
             return t.fields.length * 32;
         }
 
-        if (t instanceof PackedArrayType) {
+        if (t instanceof StringType || t instanceof BytesType) {
             return roundUpToWordSize(Buffer.from(v as Uint8Array | string).length) + 32;
         }
 
@@ -447,7 +452,7 @@ export class PointerMemView
 
     public static allocMemFor(
         val: Value | undefined,
-        type: TypeNode,
+        type: BaseRuntimeType,
         allocator: Allocator
     ): BaseMemoryView<Value, typeof type> {
         const size = PointerMemView.allocSize(val, type);
@@ -457,7 +462,7 @@ export class PointerMemView
 
     encode(value: Value, state: Memory, alloc: Allocator): void {
         if (value instanceof BaseMemoryView) {
-            if (value.type.pp() !== this.type.to.pp()) {
+            if (value.type.pp() !== this.type.toType.pp()) {
                 throw new EncodingError(
                     `Cannot assign a pointer from incompatible type ${value.type.pp()} to ${this.pp()}`
                 );
@@ -467,27 +472,25 @@ export class PointerMemView
             return;
         }
 
-        const toView = PointerMemView.allocMemFor(value, this.type.to, alloc);
+        const toView = PointerMemView.allocMemFor(value, this.type.toType, alloc);
         toView.encode(value, state, alloc);
         this.encodeIntAt(toView.offset, this.loc, state);
     }
 
-    toView(state: Memory): BaseMemoryView<Value, TypeNode> | DecodingFailure {
+    toView(state: Memory): BaseMemoryView<Value, BaseRuntimeType> | DecodingFailure {
         const offset = this.decodeIntAt(this.loc, uint256, state);
 
         if (isFailure(offset)) {
             return offset;
         }
 
-        return makeMemoryView(this.type.to, offset);
+        return makeMemoryView(this.type.toType, offset);
     }
 }
 
 export class MissingMemView extends BaseMemoryView<Value, MissingType> {
     decode(): DecodingFailure {
-        return new DecodingFailure(
-            `${this.type.rawTypeName ? this.type.rawTypeName.type : "<unknown>"}`
-        );
+        return new DecodingFailure(`${this.type.typeString ? this.type.typeString : "<unknown>"}`);
     }
 
     encode(): void {
@@ -507,7 +510,10 @@ export class MapMemView extends BaseMemoryView<Map<Value, Value>, MappingType> {
     }
 }
 
-export function makeMemoryView(type: TypeNode, loc: bigint): BaseMemoryView<Value, TypeNode> {
+export function makeMemoryView(
+    type: BaseRuntimeType,
+    loc: bigint
+): BaseMemoryView<Value, BaseRuntimeType> {
     if (type instanceof IntType) {
         return new IntMemView(type, loc);
     }
@@ -524,7 +530,7 @@ export function makeMemoryView(type: TypeNode, loc: bigint): BaseMemoryView<Valu
         return new FixedBytesMemView(type, loc);
     }
 
-    if (type instanceof ExpStructType) {
+    if (type instanceof StructType) {
         return new StructMemView(type, loc);
     }
 
