@@ -182,7 +182,8 @@ export class ArtifactManager implements IArtifactManager {
                 compilerVersion,
                 abiEncoderVersion,
                 fileMap,
-                srcMap
+                srcMap,
+                codegen: "old"
             });
         }
 
@@ -271,7 +272,8 @@ export class ArtifactManager implements IArtifactManager {
                             ),
                             offsetToIndexMap: buildOffsetToIndexMap(
                                 contractArtifact.evm.bytecode.object
-                            )
+                            ),
+                            bytecode: hexToBytes(contractArtifact.evm.bytecode.object)
                         },
                         deployedBytecode: {
                             generatedFileMap: deployedGeneratedFileMap,
@@ -280,7 +282,8 @@ export class ArtifactManager implements IArtifactManager {
                             ),
                             offsetToIndexMap: buildOffsetToIndexMap(
                                 contractArtifact.evm.deployedBytecode.object
-                            )
+                            ),
+                            bytecode: hexToBytes(contractArtifact.evm.bytecode.object)
                         },
                         mdHash: hash
                     };

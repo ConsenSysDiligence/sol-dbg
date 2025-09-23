@@ -26,6 +26,10 @@ export interface BytecodeInfo {
      * Map from bytecode offsets to instruction indices. (since some instructions are multi-byte, offset != instruction index).
      */
     offsetToIndexMap: Map<number, number>;
+    /**
+     * Actual bytecode
+     */
+    bytecode: Uint8Array;
 }
 
 /**
@@ -98,6 +102,10 @@ export interface ArtifactInfo {
      * Map from src triples to AST nodes with that source range
      */
     srcMap: Map<string, ASTNode>;
+    /**
+     * Codegen type
+     */
+    codegen: "ir" | "old"
 }
 
 /**
