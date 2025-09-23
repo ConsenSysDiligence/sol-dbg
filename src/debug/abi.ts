@@ -51,14 +51,18 @@ function isTypeUnknownContract(t: TypeName | undefined): boolean {
 
 export function buildMsgViews(
     callee: FunctionDefinition | VariableDeclaration,
-    infer: InferType
+    infer: InferType,
+    base?: bigint
 ): Array<[string, View<Memory>]> {
     const res: Array<[string, View]> = [];
-    let base: bigint = 0n;
 
-    if (hasSelector(callee)) {
-        res.push(["<selector>", makeCalldataView(bytes4, 0n, base)]);
-        base = 4n;
+    if (base === undefined) {
+        base = 0n;
+
+        if (hasSelector(callee)) {
+            res.push(["<selector>", makeCalldataView(bytes4, 0n, base)]);
+            base = 4n;
+        }
     }
 
     const formals: Array<[string, TypeNode]> =
