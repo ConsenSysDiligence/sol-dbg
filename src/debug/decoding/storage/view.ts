@@ -92,6 +92,21 @@ export abstract class BaseStorageView<
         return res;
     }
 
+    /**
+     * Helper to fetch the word residing at key `key` from `storage`. If the key is missing return an all-0 value.
+     * Unlike `fetchWord` the returned Uint8Array does not alias the array in storage.
+     */
+    protected fetchWordCopy(key: bigint, storage: Storage): Uint8Array {
+        const keyHash = bigEndianBufToBigint(keccak256(bigIntToBuf(key, 32, "big")));
+        const res = storage.get(keyHash);
+
+        if (res === undefined) {
+            return new Uint8Array(32);
+        }
+
+        return new Uint8Array(res);
+    }
+
     protected setWord(key: bigint, value: Uint8Array, storage: Storage): Storage {
         const keyHash = bigEndianBufToBigint(keccak256(bigIntToBuf(key, 32, "big")));
 
@@ -191,7 +206,7 @@ export abstract class BaseStorageView<
             );
         }
 
-        const word = this.fetchWord(key, state);
+        const word = this.fetchWordCopy(key, state);
         encodeBigintInBigEndianBuf(val, word, type.numBits / 8, endOffsetInWord);
         return this.setWord(key, word, state);
     }
@@ -262,7 +277,7 @@ export class AddressStorageView extends BaseStorageView<Address, AddressType> {
             );
         }
 
-        const word = this.fetchWord(this.key, state);
+        const word = this.fetchWordCopy(this.key, state);
         word.set(value.bytes, this.endOffsetInWord - 20);
         return this.setWord(this.key, word, state);
     }
@@ -298,7 +313,7 @@ export class SingleByteStorageView extends BaseStorageView<bigint, FixedBytesTyp
     }
 
     encode(value: bigint, state: Storage): Storage {
-        const word = this.fetchWord(this.key, state);
+        const word = this.fetchWordCopy(this.key, state);
 
         if (!inRange(value, 0, 255)) {
             throw new EncodingError(`${value} not in byte range [0, 255]`);
@@ -339,7 +354,7 @@ export class FixedBytesStorageView
             );
         }
 
-        const word = this.fetchWord(this.key, state);
+        const word = this.fetchWordCopy(this.key, state);
         word.set(value, this.endOffsetInWord - this.type.numBytes);
         return this.setWord(this.key, word, state);
     }
@@ -512,9 +527,11 @@ export class ArrayStorageView
 
         const size = BigInt(value.length);
         let baseKey = this.key;
+        let stateAfterFirstAssign: Storage | undefined;
 
         if (this.type.size === undefined) {
             s = this.encodeIntAt(size, this.key, this.endOffsetInWord, uint256, s);
+            stateAfterFirstAssign = s;
             baseKey = keccakOfAddr(baseKey);
         }
 
@@ -523,6 +540,11 @@ export class ArrayStorageView
         for (let i = 0; i < size; i++) {
             const view = makeStorageView(this.type.elementT, elLoc);
             s = view.encode(value[i], s);
+
+            if (stateAfterFirstAssign === undefined) {
+                stateAfterFirstAssign = s;
+            }
+
             elLoc = view.nextLoc();
             assert(
                 elLoc !== undefined,
@@ -530,7 +552,7 @@ export class ArrayStorageView
             );
         }
 
-        return s.collapseUntil(state);
+        return stateAfterFirstAssign !== undefined ? s.collapseUntil(stateAfterFirstAssign) : s;
     }
 
     indexView(
@@ -629,12 +651,17 @@ export class StructStorageView
         }
 
         let s = state;
+        let stateAfterFirstAssign: Storage | undefined;
 
         for (let i = 0; i < value.entries.length; i++) {
             s = this.fieldViews[i][1].encode(value.entries[i][1], s);
+
+            if (stateAfterFirstAssign === undefined) {
+                stateAfterFirstAssign = s;
+            }
         }
 
-        return s.collapseUntil(state);
+        return stateAfterFirstAssign !== undefined ? s.collapseUntil(stateAfterFirstAssign) : s;
     }
 
     fieldView(name: string): BaseStorageView<Value, BaseRuntimeType> | DecodingFailure {
@@ -816,13 +843,14 @@ export abstract class PackedArrayStorageView<
 
     encodeBytesAt(bytes: Uint8Array, slot: bigint, state: Storage): Storage {
         if (bytes.length < 32) {
-            const w = this.fetchWord(slot, state);
+            const w = this.fetchWordCopy(slot, state);
             w[31] = 2 * bytes.length;
             w.set(bytes, 0);
             return this.setWord(slot, w, state);
         }
 
         let s = this.encodeIntAt(BigInt(2 * bytes.length + 1), slot, 32, uint256, state);
+        const stateAfterLen = s;
         let addr = keccakOfAddr(this.key);
         let srcOff = 0;
         while (srcOff < bytes.length) {
@@ -832,7 +860,7 @@ export abstract class PackedArrayStorageView<
             if (end - srcOff === 32) {
                 w = bytes.slice(srcOff, end);
             } else {
-                w = this.fetchWord(addr, s);
+                w = this.fetchWordCopy(addr, s);
                 w.set(bytes.slice(srcOff, end));
             }
 
@@ -841,7 +869,7 @@ export abstract class PackedArrayStorageView<
             srcOff += 32;
         }
 
-        return s.collapseUntil(state);
+        return s.collapseUntil(stateAfterLen);
     }
 }
 

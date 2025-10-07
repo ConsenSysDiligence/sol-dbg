@@ -105,7 +105,7 @@ export interface ArtifactInfo {
     /**
      * Codegen type
      */
-    codegen: "ir" | "old"
+    codegen: "ir" | "old";
 }
 
 /**

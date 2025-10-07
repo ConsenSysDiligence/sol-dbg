@@ -738,6 +738,22 @@ describe(`Storage Encoding Tests`, () => {
 });
 
 const rttSamples: Array<[BaseRuntimeType, Value, bigint, MapKeys | undefined]> = [
+    [uint256, 12n, 0n, undefined],
+    [new PointerType(new ArrayType(uint256), DataLocation.Memory), [12n, 14n], 0n, undefined],
+    [new PointerType(new ArrayType(uint256, 2n), DataLocation.Memory), [12n, 14n], 0n, undefined],
+    [new ArrayType(uint256, 2n), [12n, 14n], 0n, undefined],
+    [
+        new StructType("Point", [
+            ["x", uint8],
+            ["y", uint8]
+        ]),
+        new Struct([
+            ["x", 3n],
+            ["y", 4n]
+        ]),
+        0n,
+        undefined
+    ],
     [
         MoreStructsLayoutType,
         new Struct([

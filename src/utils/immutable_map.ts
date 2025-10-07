@@ -86,6 +86,10 @@ export class ImmMap<KeyT, ValT> {
 
         while (m !== parent && m !== undefined) {
             for (const [k, v] of m.innerM) {
+                if (newMap.innerM.has(k)) {
+                    continue;
+                }
+
                 newMap.innerM.set(k, v);
             }
 
