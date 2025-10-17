@@ -250,7 +250,7 @@ export class ArtifactManager implements IArtifactManager {
                                 rawAst: src.ast,
                                 ast: undefined,
                                 name: src.name ? src.name : "",
-                                contents: src.contents ? src.contents : undefined,
+                                contents: src.contents,
                                 type: SourceFileType.InternalYul,
                                 fileIndex: src.id
                             });
