@@ -29,7 +29,16 @@ import { DecodedBytecodeSourceMapEntry, fastParseBytecodeSourceMapping } from ".
 import { OpcodeInfo } from "../opcodes";
 import { EventDefInfo, EventDesc, HexString, UnprefixedHexString } from "../types";
 import { BytecodeTemplate, makeTemplate, matchesTemplate } from "./bytecode_templates";
-import { ArtifactInfo, BytecodeInfo, ContractInfo, ImmutableRefMap, LinkMap, LinkRefMap, SourceFileInfo, SourceFileType } from "./types";
+import {
+    ArtifactInfo,
+    BytecodeInfo,
+    ContractInfo,
+    ImmutableRefMap,
+    LinkMap,
+    LinkRefMap,
+    SourceFileInfo,
+    SourceFileType
+} from "./types";
 
 export interface IArtifactManager {
     getContractFromDeployedBytecode(code: Uint8Array): ContractInfo | undefined;
@@ -49,7 +58,7 @@ export interface IArtifactManager {
     ): FunctionDefinition | VariableDeclaration | undefined;
     getEventDefInfo(topic: bigint | Uint8Array | EventDesc): EventDefInfo | undefined;
     getContractInfo(contract: ContractDefinition): ContractInfo | undefined;
-    link(bytecode: BytecodeInfo, linkMap: LinkMap): Uint8Array
+    link(bytecode: BytecodeInfo, linkMap: LinkMap): Uint8Array;
 }
 
 /**
@@ -90,7 +99,7 @@ export function getOffsetSrc(off: number, bytecode: BytecodeInfo): DecodedByteco
     return bytecode.srcMap[idx];
 }
 
-const linkRefPattern = /__\$[0-9a-z]*\$__/g
+const linkRefPattern = /__\$[0-9a-z]*\$__/g;
 
 function buildBytecodeInfo(bytecodeInfo: PartialBytecodeDescription): BytecodeInfo {
     const generatedFileMap = new Map<number, SourceFileInfo>();
@@ -113,36 +122,37 @@ function buildBytecodeInfo(bytecodeInfo: PartialBytecodeDescription): BytecodeIn
     if (bytecodeInfo.linkReferences) {
         for (const sourceUnitKey in bytecodeInfo.linkReferences) {
             for (const contractName in bytecodeInfo.linkReferences[sourceUnitKey]) {
-                linkReferences.set(`${sourceUnitKey}:${contractName}`, bytecodeInfo.linkReferences[sourceUnitKey][contractName])
+                linkReferences.set(
+                    `${sourceUnitKey}:${contractName}`,
+                    bytecodeInfo.linkReferences[sourceUnitKey][contractName]
+                );
             }
         }
-
     }
 
     const immutableReferences: ImmutableRefMap = new Map();
 
     if (bytecodeInfo.immutableReferences) {
         for (const id in bytecodeInfo.immutableReferences) {
-            immutableReferences.set(Number(id), bytecodeInfo.immutableReferences[id])
+            immutableReferences.set(Number(id), bytecodeInfo.immutableReferences[id]);
         }
     }
 
     // @todo This assumes all 32 byte link references. We could make this more generic by using the link references json
-    const bytecodeSansLinkRefs = bytecodeInfo.object.replaceAll(linkRefPattern, "0000000000000000000000000000000000000000")
-    const bytecodeObj = hexToBytes(bytecodeSansLinkRefs)
+    const bytecodeSansLinkRefs = bytecodeInfo.object.replaceAll(
+        linkRefPattern,
+        "0000000000000000000000000000000000000000"
+    );
+    const bytecodeObj = hexToBytes(bytecodeSansLinkRefs);
 
     return {
         generatedFileMap,
-        srcMap: fastParseBytecodeSourceMapping(
-            bytecodeInfo.sourceMap
-        ),
-        offsetToIndexMap: buildOffsetToIndexMap(
-            bytecodeObj
-        ),
+        srcMap: fastParseBytecodeSourceMapping(bytecodeInfo.sourceMap),
+        offsetToIndexMap: buildOffsetToIndexMap(bytecodeObj),
         bytecode: bytecodeObj,
         linkReferences,
         immutableReferences
-    }
+    };
 }
 
 /**
@@ -292,8 +302,10 @@ export class ArtifactManager implements IArtifactManager {
                     }
 
                     const hash = getCodeHash(contractArtifact.evm.deployedBytecode.object);
-                    const bytecodeInfo = buildBytecodeInfo(contractArtifact.evm.bytecode)
-                    const deployedBytecodeInfo = buildBytecodeInfo(contractArtifact.evm.deployedBytecode)
+                    const bytecodeInfo = buildBytecodeInfo(contractArtifact.evm.bytecode);
+                    const deployedBytecodeInfo = buildBytecodeInfo(
+                        contractArtifact.evm.deployedBytecode
+                    );
 
                     const contractInfo: ContractInfo = {
                         artifact: artifactInfo,
@@ -312,13 +324,9 @@ export class ArtifactManager implements IArtifactManager {
                         this._mdHashToContractInfo.set(hash, contractInfo);
                     }
 
-                    this._creationBytecodeTemplates.push(
-                        makeTemplate(bytecodeInfo)
-                    );
+                    this._creationBytecodeTemplates.push(makeTemplate(bytecodeInfo));
 
-                    this._deployedBytecodeTemplates.push(
-                        makeTemplate(deployedBytecodeInfo)
-                    );
+                    this._deployedBytecodeTemplates.push(makeTemplate(deployedBytecodeInfo));
                 }
             }
         }
@@ -344,15 +352,15 @@ export class ArtifactManager implements IArtifactManager {
 
         for (const [libraryId, ranges] of bytecode.linkReferences) {
             const addr = linkMap.get(libraryId);
-            assert(addr !== undefined, `Missing link information for ${libraryId}`)
+            assert(addr !== undefined, `Missing link information for ${libraryId}`);
 
             for (const range of ranges) {
-                assert(range.length === 20, ``)
-                linkedBytecode.set(addr.bytes, range.start)
+                assert(range.length === 20, ``);
+                linkedBytecode.set(addr.bytes, range.start);
             }
         }
 
-        return linkedBytecode
+        return linkedBytecode;
     }
 
     artifacts(): ArtifactInfo[] {

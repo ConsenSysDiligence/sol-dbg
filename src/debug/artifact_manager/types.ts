@@ -17,17 +17,17 @@ export interface BytecodeReference {
 /**
  * Link references map from `FileName:ContractName` to a list of bytecode ranges
  */
-export type LinkRefMap = Map<string, BytecodeReference[]>
+export type LinkRefMap = Map<string, BytecodeReference[]>;
 
 /**
  * Immutable references map from AST ids to a list of bytecode ranges
  */
-export type ImmutableRefMap = Map<number, BytecodeReference[]>
+export type ImmutableRefMap = Map<number, BytecodeReference[]>;
 
 /**
  * LinkMap maps `FileName:ContractName` to the actual on-chain addresses where those references should be linked
  */
-export type LinkMap = Map<string, Address>
+export type LinkMap = Map<string, Address>;
 
 /**
  * Bytecode info kept by the artifact manager, for each bytecode array.
@@ -53,11 +53,11 @@ export interface BytecodeInfo {
     /**
      * Linked references. A map from `fileName:LibraryName` to `[start, length]` tuples.
      */
-    linkReferences: LinkRefMap
+    linkReferences: LinkRefMap;
     /**
      * Immutable references. A map from AST ids to `[start, length]` tuples.
      */
-    immutableReferences: ImmutableRefMap
+    immutableReferences: ImmutableRefMap;
 }
 
 /**
