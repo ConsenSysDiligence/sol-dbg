@@ -1,5 +1,6 @@
-import { equalsBytes, hexToBytes } from "@ethereumjs/util";
-import { PartialBytecodeDescription, RangeList } from "../../artifacts";
+import { equalsBytes } from "@ethereumjs/util";
+import { RangeList } from "../../artifacts";
+import { BytecodeInfo } from ".";
 
 export interface BytecodeTemplate {
     object: Uint8Array;
@@ -10,27 +11,21 @@ function makeSkipRanges(rawList: RangeList): Array<[number, number]> {
     return rawList.map((raw) => [raw.start, raw.start + raw.length]);
 }
 
-export function makeTemplate(artifact: PartialBytecodeDescription): BytecodeTemplate {
+export function makeTemplate(artifact: BytecodeInfo): BytecodeTemplate {
     const skipRanges: Array<[number, number]> = [];
 
-    if (artifact.linkReferences) {
-        for (const obj of Object.values(artifact.linkReferences)) {
-            for (const ranges of Object.values(obj)) {
-                skipRanges.push(...makeSkipRanges(ranges));
-            }
-        }
+    for (const [, ranges] of artifact.linkReferences) {
+        skipRanges.push(...makeSkipRanges(ranges));
     }
 
-    if (artifact.immutableReferences) {
-        for (const ranges of Object.values(artifact.immutableReferences)) {
-            skipRanges.push(...makeSkipRanges(ranges));
-        }
+    for (const [, ranges] of artifact.immutableReferences) {
+        skipRanges.push(...makeSkipRanges(ranges));
     }
 
     skipRanges.sort();
 
     return {
-        object: hexToBytes(`0x${artifact.object}`),
+        object: artifact.bytecode,
         skipRanges
     };
 }

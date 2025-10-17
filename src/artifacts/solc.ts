@@ -25,7 +25,7 @@ export interface LinkReferences {
 }
 
 export interface ImmutableReferences {
-    [number: string | number]: RangeList;
+    [number: number]: RangeList;
 }
 
 export interface PartialBytecodeDescription {
