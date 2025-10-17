@@ -16,6 +16,8 @@ import {
 import * as sol from "solc-typed-ast";
 import * as rtt from "../runtime_types/ast";
 import { isTypeUnknownContract } from "../../utils";
+import { BytecodeInfo, LinkMap } from "../artifact_manager";
+import { Address } from "@ethereumjs/util";
 
 export function isCalldataArrayType(typ: BaseRuntimeType): boolean {
     return (
@@ -156,4 +158,26 @@ export function getContractLayoutType(
     }
 
     return [new rtt.StructType(contract.name, stateVars), complete];
+}
+
+/**
+ * Given a `BytecodeInfo` and some actual linked bytecode, decode the `LinkMap` that was used to link the bytecode.
+ * @param bytecodeInfo
+ * @param actualBytecode
+ * @returns
+ */
+export function decodeLinkMap(bytecodeInfo: BytecodeInfo, actualBytecode: Uint8Array): LinkMap {
+    const res: LinkMap = new Map();
+
+    if (!bytecodeInfo.linkReferences) {
+        return res;
+    }
+
+    for (const [libId, ranges] of bytecodeInfo.linkReferences) {
+        sol.assert(ranges.length > 0 && ranges[0].length == 20, ``);
+        const rng = ranges[0];
+        res.set(libId, new Address(actualBytecode.slice(rng.start, rng.start + rng.length)));
+    }
+
+    return res;
 }

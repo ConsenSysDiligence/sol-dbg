@@ -2,6 +2,7 @@ import expect from "expect";
 import { ArtifactManager, BytecodeReference, LinkMap, ZERO_ADDRESS } from "../../src";
 import * as fse from "fs-extra";
 import { createAddressFromString } from "@ethereumjs/util";
+import { decodeLinkMap } from "../../src/debug/decoding/utils";
 
 describe(`Link references test`, () => {
     it("Can load an artifact with link references", () => {
@@ -21,9 +22,9 @@ describe(`Link references test`, () => {
         const libId = "test/samples/static/link_ref/contracts/libraries.sol:Lib1";
         const addr = createAddressFromString("0xAaaaAaAAaaaAAaAAaAaaaaAAAAAaAaaaAaAaaAA0");
 
-        const goodLinkMap: LinkMap = new Map([[libId, addr]]);
+        const linkMap: LinkMap = new Map([[libId, addr]]);
 
-        const linkedBytecode = artifactManager.link(lib.bytecode, goodLinkMap);
+        const linkedBytecode = artifactManager.link(lib.bytecode, linkMap);
 
         // All the link ranges are set correctly
         for (const range of linkRefs.get(libId) as BytecodeReference[]) {
@@ -31,6 +32,11 @@ describe(`Link references test`, () => {
                 addr.bytes
             );
         }
+
+        // Decoding works
+        const decodedLinkMap = decodeLinkMap(lib.bytecode, linkedBytecode);
+        expect(decodedLinkMap).toEqual(linkMap);
+
         // If we zero them out we get the original bytecode
         for (const range of linkRefs.get(libId) as BytecodeReference[]) {
             linkedBytecode.set(ZERO_ADDRESS.bytes, range.start);
