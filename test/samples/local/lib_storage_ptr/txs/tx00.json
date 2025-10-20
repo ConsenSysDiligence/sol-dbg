@@ -1,0 +1,82 @@
+{
+    "initialState": {
+        "accounts": {
+            "0xAaaaAaAAaaaAAaAAaAaaaaAAAAAaAaaaAaAaaAA0": {
+                "nonce": 0,
+                "balance": "0x0000000000000000000000f000000000",
+                "code": "",
+                "storage": {}
+            },
+            "0xAaAaaAAAaAaaAaAaAaaAAaAaAAAAAaAAAaaAaAa2": {
+                "nonce": 0,
+                "balance": "0x0000000000000000000000f000000000",
+                "code": "",
+                "storage": {}
+            },
+            "0xafFEaFFEAFfeAfFEAffeaFfEAfFEaffeafFeAFfE": {
+                "nonce": 0,
+                "balance": "0x0000000000000000000000f000000000",
+                "code": "",
+                "storage": {}
+            }
+        }
+    },
+    "steps": [
+        {
+            "address": "0x0000000000000000000000000000000000000000",
+            "gasLimit": "0xff0000",
+            "gasPrice": "0x1",
+            "input": "0x61012861004d600b8282823980515f1a6073146041577f4e487b71000000000000000000000000000000000000000000000000000000005f525f60045260245ffd5b305f52607381538281f3fe73000000000000000000000000000000000000000030146080604052600436106032575f3560e01c806352a25a5d146036575b5f5ffd5b8180156040575f5ffd5b506057600480360381019060539190609f565b6059565b005b5f818054905014606a57606960c5565b5b50565b5f5ffd5b5f819050919050565b6081816071565b8114608a575f5ffd5b50565b5f81359050609981607a565b92915050565b5f6020828403121560b15760b0606d565b5b5f60bc84828501608d565b91505092915050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52600160045260245ffdfea26469706673582212206e45958abbcff17c70ef0591c571f5dfbbd3cd520dc155570d8c3680d5df065e64736f6c634300081d0033",
+            "origin": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+            "value": "0x0",
+            "blockCoinbase": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+            "blockDifficulty": "0xc",
+            "blockGasLimit": "0xff0000",
+            "blockNumber": "0x1",
+            "blockTime": "0x1",
+            "result": {
+                "kind": "contract_created",
+                "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c"
+            }
+        },
+        {
+            "address": "0x0000000000000000000000000000000000000000",
+            "gasLimit": "0xff0000",
+            "gasPrice": "0x1",
+            "input": "0x6080604052348015600e575f5ffd5b5061010d8061001c5f395ff3fe6080604052348015600e575f5ffd5b50600436106026575f3560e01c8063dffeadd014602a575b5f5ffd5b60306032565b005b5f6001908060018154018082558091505060019003905f5260205f20015f909190919091505573f084a83954ce917799e0b4dbd03934a2ea65888c6352a25a5d5f6040518263ffffffff1660e01b8152600401608d919060c0565b5f6040518083038186803b15801560a2575f5ffd5b505af415801560b3573d5f5f3e3d5ffd5b50505050565b8082525050565b5f60208201905060d15f83018460b9565b9291505056fea2646970667358221220d84c80d4974b7d7834834e70afb16ab449e9d1accf2a0b36fc00a2099509b38c64736f6c634300081d0033",
+            "origin": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+            "value": "0x0",
+            "blockCoinbase": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+            "blockDifficulty": "0xc",
+            "blockGasLimit": "0xff0000",
+            "blockNumber": "0x1",
+            "blockTime": "0x1",
+            "result": {
+                "kind": "contract_created",
+                "address": "0x1faca6f2f8e169c54e0b1fe6d889dfc21ab5737e"
+            }
+        },
+        {
+            "address": "0x1faca6f2f8e169c54e0b1fe6d889dfc21ab5737e",
+            "gasLimit": "0xff0000",
+            "gasPrice": "0x1",
+            "input": "0xdffeadd0",
+            "origin": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+            "value": "0x0",
+            "blockCoinbase": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+            "blockDifficulty": "0xc",
+            "blockGasLimit": "0xff0000",
+            "blockNumber": "0x2",
+            "blockTime": "0x2",
+            "result": {
+                "kind": "revert"
+            },
+            "errorString": "assert(p.length == 0)",
+            "errorStack": [
+                "test/samples/local/lib_storage_ptr/contracts/libraries.sol Lib.mustBeEmpty([1])",
+                "test/samples/local/lib_storage_ptr/contracts/libraries.sol Foo.main()"
+            ],
+            "expectedLastMsg": "mustBeEmpty(0)"
+        }
+    ]
+}

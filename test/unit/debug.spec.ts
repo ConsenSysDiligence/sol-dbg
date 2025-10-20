@@ -2,7 +2,14 @@ import { Address, createAddressFromString } from "@ethereumjs/util";
 import { bytesToHex } from "ethereum-cryptography/utils";
 import expect from "expect";
 import fse from "fs-extra";
-import { assert, DecodedBytecodeSourceMapEntry, forAny } from "solc-typed-ast";
+import {
+    assert,
+    ASTNode,
+    DecodedBytecodeSourceMapEntry,
+    forAny,
+    FunctionDefinition,
+    InferType
+} from "solc-typed-ast";
 import {
     ArtifactManager,
     ContractInfo,
@@ -22,6 +29,7 @@ import {
     findLastNonInternalStepBeforeRevert,
     nyi,
     ppStackTrace,
+    ppValue,
     sanitizeBigintFromJson,
     TxRunner
 } from "../../src/utils";
@@ -489,6 +497,42 @@ describe("Local tests", () => {
                                 expect(actualDecodedEvents).toEqual(
                                     curStep.decodedEvents === undefined ? [] : curStep.decodedEvents
                                 );
+                            }
+                        });
+                    }
+
+                    if (forAny(testJSON.steps, (step) => step.expectedLastMsg !== undefined)) {
+                        it("Expected last TX msg is correct", async () => {
+                            for (let i = 0; i < testJSON.steps.length; i++) {
+                                const curStep = testJSON.steps[i];
+
+                                if (curStep.expectedLastMsg === undefined) {
+                                    continue;
+                                }
+
+                                const trace = traces[i];
+
+                                const errorStep = getStepFailTraceStep(curStep, trace);
+
+                                expect(errorStep).not.toBeUndefined();
+                                const lastExtFrame = topExtFrame(errorStep as StepState);
+
+                                expect(lastExtFrame.callee instanceof FunctionDefinition);
+                                expect(lastExtFrame.arguments !== undefined);
+
+                                const artifact = artifactManager.getArtifact(
+                                    lastExtFrame.callee as ASTNode
+                                );
+                                const infer = new InferType(artifact.compilerVersion);
+
+                                const msg = `${(lastExtFrame.callee as FunctionDefinition).name}(${lastExtFrame.arguments
+                                    ?.slice(1)
+                                    .map(
+                                        ([, view]) =>
+                                            `${ppValue(view.type, view.decode(lastExtFrame.msgData), infer)}`
+                                    )})`;
+
+                                expect(msg).toEqual(curStep.expectedLastMsg);
                             }
                         });
                     }

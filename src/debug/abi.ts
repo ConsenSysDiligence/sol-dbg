@@ -1,37 +1,26 @@
-import {
-    FunctionDefinition,
-    VariableDeclaration,
-    InferType,
-    FunctionKind,
-    TypeNode,
-    types,
-    TypeName,
-    UserDefinedTypeName,
-    DataLocation,
-    PointerType
-} from "solc-typed-ast";
+import * as sol from "solc-typed-ast";
 import { View } from "./decoding/view";
 import { DecodedEventDesc, EventDefInfo, EventDesc, Memory } from "./types";
-import { bytes4, split, zip } from "../utils";
+import { bytes4, split, uint256, zip } from "../utils";
 import { BaseCalldataView, makeCalldataView, makeCalldataViews } from "./decoding/calldata/view";
 import { DecodingFailure, Value } from "./decoding/value";
 import { IArtifactManager } from "./artifact_manager";
-import { astToRuntimeType, BaseRuntimeType } from "./runtime_types";
+import { astToRuntimeType, BaseRuntimeType, PointerType } from "./runtime_types";
 
 /**
  * Return true if the given callee requires a selector
  * @param callee
  * @returns
  */
-export function hasSelector(callee: FunctionDefinition | VariableDeclaration): boolean {
-    if (callee instanceof VariableDeclaration) {
+export function hasSelector(callee: sol.FunctionDefinition | sol.VariableDeclaration): boolean {
+    if (callee instanceof sol.VariableDeclaration) {
         return true;
     }
 
     if (
         callee.isConstructor ||
-        callee.kind === FunctionKind.Receive ||
-        callee.kind === FunctionKind.Fallback
+        callee.kind === sol.FunctionKind.Receive ||
+        callee.kind === sol.FunctionKind.Fallback
     ) {
         return false;
     }
@@ -39,9 +28,9 @@ export function hasSelector(callee: FunctionDefinition | VariableDeclaration): b
     return true;
 }
 
-function isTypeUnknownContract(t: TypeName | undefined): boolean {
+function isTypeUnknownContract(t: sol.TypeName | undefined): boolean {
     return (
-        t instanceof UserDefinedTypeName &&
+        t instanceof sol.UserDefinedTypeName &&
         t.referencedDeclaration < 0 &&
         (t.typeString.startsWith("contract ") ||
             t.typeString.startsWith("interface ") ||
@@ -50,8 +39,8 @@ function isTypeUnknownContract(t: TypeName | undefined): boolean {
 }
 
 export function buildMsgViews(
-    callee: FunctionDefinition | VariableDeclaration,
-    infer: InferType,
+    callee: sol.FunctionDefinition | sol.VariableDeclaration,
+    infer: sol.InferType,
     base?: bigint
 ): Array<[string, View<Memory>]> {
     const res: Array<[string, View]> = [];
@@ -65,20 +54,25 @@ export function buildMsgViews(
         }
     }
 
-    const formals: Array<[string, TypeNode]> =
-        callee instanceof FunctionDefinition
-            ? callee.vParameters.vParameters.map((argDef: VariableDeclaration) => [
+    const formals: Array<[string, sol.TypeNode]> =
+        callee instanceof sol.FunctionDefinition
+            ? callee.vParameters.vParameters.map((argDef: sol.VariableDeclaration) => [
                   argDef.name,
                   isTypeUnknownContract(argDef.vType)
-                      ? types.address
+                      ? sol.types.address
                       : infer.variableDeclarationToTypeNode(argDef)
               ])
             : infer
                   .getterArgsAndReturn(callee)[0]
-                  .map((typ: TypeNode, i: number) => [`ARG_${i}`, typ]);
+                  .map((typ: sol.TypeNode, i: number) => [`ARG_${i}`, typ]);
 
     const views = makeCalldataViews(
-        formals.map((x) => astToRuntimeType(x[1], infer, DataLocation.CallData)),
+        formals.map((x) => {
+            const rtt = astToRuntimeType(x[1], infer, sol.DataLocation.CallData);
+            return rtt instanceof PointerType && rtt.location === sol.DataLocation.Storage
+                ? uint256
+                : rtt;
+        }),
         base
     );
     res.push(
@@ -130,20 +124,25 @@ class TopicPayloadView<T extends BaseRuntimeType> extends BaseEventView<Value, n
 type GenEventView = BaseEventView<Value, any, BaseRuntimeType>;
 export function buildEventViews(
     evtDef: EventDefInfo,
-    infer: InferType
+    infer: sol.InferType
 ): Array<[string, GenEventView]> {
     const [indexedArgs, nonIndexedArgs] = split(
-        evtDef.args.map<[number, [string, TypeNode, boolean]]>((x, i) => [i, x]),
+        evtDef.args.map<[number, [string, sol.TypeNode, boolean]]>((x, i) => [i, x]),
         ([, [, , indexed]]) => indexed
     );
 
     let topicIdx = evtDef.definition.anonymous ? 0 : 1;
     const indexedViews: GenEventView[] = indexedArgs.map(
         ([, [, type]]) =>
-            new TopicPayloadView(astToRuntimeType(type, infer, DataLocation.CallData), topicIdx++)
+            new TopicPayloadView(
+                astToRuntimeType(type, infer, sol.DataLocation.CallData),
+                topicIdx++
+            )
     );
     const nonIndexedViews: GenEventView[] = makeCalldataViews(
-        nonIndexedArgs.map(([, [, type]]) => astToRuntimeType(type, infer, DataLocation.CallData)),
+        nonIndexedArgs.map(([, [, type]]) =>
+            astToRuntimeType(type, infer, sol.DataLocation.CallData)
+        ),
         0n
     ).map((v) => new EventPayloadView(v.type, v));
 

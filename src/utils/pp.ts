@@ -37,7 +37,7 @@ import {
 const srcLocation = require("src-location");
 const fse = require("fs-extra");
 
-function ppValue(typ: BaseRuntimeType, v: any, infer: InferType): string {
+export function ppValue(typ: BaseRuntimeType, v: any, infer: InferType): string {
     if (v === undefined) {
         return `<failed decoding>`;
     }
