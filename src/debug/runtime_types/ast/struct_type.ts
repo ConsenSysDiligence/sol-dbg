@@ -2,7 +2,7 @@ import { assert } from "solc-typed-ast";
 import { BaseRuntimeType } from "./base_type";
 
 export class StructType extends BaseRuntimeType {
-    filedM: Map<string, BaseRuntimeType>
+    filedM: Map<string, BaseRuntimeType>;
 
     constructor(
         public readonly name: string,

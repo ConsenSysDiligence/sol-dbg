@@ -3,7 +3,12 @@ import { DecodingFailure, Value } from "./value";
 import { ArrayLikeView, IndexableView, PointerView, StateArea, StructView, View } from "./view";
 import { isArrayLikeCalldataView, PointerCalldataView, StructCalldataView } from "./calldata";
 import { isArrayLikeMemView, PointerMemView, StructMemView } from "./memory";
-import { isArrayLikeStorageView, MapStorageView, PointerStorageView, StructStorageView } from "./storage";
+import {
+    isArrayLikeStorageView,
+    MapStorageView,
+    PointerStorageView,
+    StructStorageView
+} from "./storage";
 import { PointerStackView } from "./stack";
 import {
     ArrayType,
@@ -70,11 +75,7 @@ export function isPointerView(v: any): v is PointerView<any, View> {
 }
 
 export function isArrayLikeView(v: any): v is ArrayLikeView<any, View> {
-    return (
-        isArrayLikeMemView(v) ||
-        isArrayLikeCalldataView(v) ||
-        isArrayLikeStorageView(v)
-    );
+    return isArrayLikeMemView(v) || isArrayLikeCalldataView(v) || isArrayLikeStorageView(v);
 }
 
 export function isStructView(v: any): v is StructView<any, View> {
