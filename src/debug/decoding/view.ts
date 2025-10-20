@@ -23,7 +23,7 @@ export abstract class View<
     constructor(
         public readonly type: Type,
         protected loc: Loc
-    ) {}
+    ) { }
 
     /**
      * Decode a value from the given State

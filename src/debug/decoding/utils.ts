@@ -1,9 +1,9 @@
 import { DataLocation as SolDataLocation } from "solc-typed-ast";
 import { DecodingFailure, Value } from "./value";
-import { PointerView, View } from "./view";
-import { PointerCalldataView } from "./calldata";
-import { PointerMemView } from "./memory";
-import { PointerStorageView } from "./storage";
+import { ArrayLikeView, IndexableView, PointerView, StateArea, StructView, View } from "./view";
+import { isArrayLikeCalldataView, PointerCalldataView, StructCalldataView } from "./calldata";
+import { isArrayLikeMemView, PointerMemView, StructMemView } from "./memory";
+import { isArrayLikeStorageView, MapStorageView, PointerStorageView, StructStorageView } from "./storage";
 import { PointerStackView } from "./stack";
 import {
     ArrayType,
@@ -66,6 +66,31 @@ export function isPointerView(v: any): v is PointerView<any, View> {
         v instanceof PointerMemView ||
         v instanceof PointerStorageView ||
         v instanceof PointerStackView
+    );
+}
+
+export function isArrayLikeView(v: any): v is ArrayLikeView<any, View> {
+    return (
+        isArrayLikeMemView(v) ||
+        isArrayLikeCalldataView(v) ||
+        isArrayLikeStorageView(v)
+    );
+}
+
+export function isStructView(v: any): v is StructView<any, View> {
+    return (
+        v instanceof StructMemView ||
+        v instanceof StructCalldataView ||
+        v instanceof StructStorageView
+    );
+}
+
+export function isIndexableView(v: any): v is IndexableView<any, StateArea, View> {
+    return (
+        isArrayLikeMemView(v) ||
+        isArrayLikeCalldataView(v) ||
+        isArrayLikeStorageView(v) ||
+        v instanceof MapStorageView
     );
 }
 
