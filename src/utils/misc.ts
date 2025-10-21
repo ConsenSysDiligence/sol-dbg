@@ -17,7 +17,7 @@ export const bytes4 = new FixedBytesType(4);
 export const byte = new FixedBytesType(1);
 export const bool = new BoolType();
 export const address = new AddressType();
-export const MAX_ARR_DECODE_LIMIT = BigInt(1000);
+export const MAX_ARR_DECODE_LIMIT = BigInt(1000000);
 
 export function toHexString(n: number | bigint | Uint8Array, padding = 0): HexString {
     let hex: string;
