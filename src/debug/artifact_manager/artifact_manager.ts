@@ -14,7 +14,8 @@ import {
     TypeNode,
     VariableDeclaration,
     assert,
-    getABIEncoderVersion
+    getABIEncoderVersion,
+    repeat
 } from "solc-typed-ast";
 import { ABIEncoderVersion, abiTypeToCanonicalName } from "solc-typed-ast/dist/types/abi";
 import {
@@ -99,8 +100,6 @@ export function getOffsetSrc(off: number, bytecode: BytecodeInfo): DecodedByteco
     return bytecode.srcMap[idx];
 }
 
-const linkRefPattern = /__\$[0-9a-z]*\$__/g;
-
 function buildBytecodeInfo(bytecodeInfo: PartialBytecodeDescription): BytecodeInfo {
     const generatedFileMap = new Map<number, SourceFileInfo>();
 
@@ -138,11 +137,19 @@ function buildBytecodeInfo(bytecodeInfo: PartialBytecodeDescription): BytecodeIn
         }
     }
 
+    let bytecodeSansLinkRefs = bytecodeInfo.object;
+
+    if (bytecodeInfo.linkReferences !== undefined) {
+        for (const fileName in bytecodeInfo.linkReferences) {
+            for (const libName in bytecodeInfo.linkReferences[fileName]) {
+                for (const range of bytecodeInfo.linkReferences[fileName][libName]) {
+                    bytecodeSansLinkRefs = bytecodeSansLinkRefs.slice(0, range.start * 2) + repeat("00", range.length).join("") + bytecodeSansLinkRefs.slice((range.start + range.length) * 2)
+                }
+            }
+        }
+    }
+
     // @todo This assumes all 32 byte link references. We could make this more generic by using the link references json
-    const bytecodeSansLinkRefs = bytecodeInfo.object.replaceAll(
-        linkRefPattern,
-        "0000000000000000000000000000000000000000"
-    );
     const bytecodeObj = hexToBytes(bytecodeSansLinkRefs);
 
     return {
