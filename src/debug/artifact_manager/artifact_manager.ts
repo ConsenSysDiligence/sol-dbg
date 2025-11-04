@@ -143,7 +143,10 @@ function buildBytecodeInfo(bytecodeInfo: PartialBytecodeDescription): BytecodeIn
         for (const fileName in bytecodeInfo.linkReferences) {
             for (const libName in bytecodeInfo.linkReferences[fileName]) {
                 for (const range of bytecodeInfo.linkReferences[fileName][libName]) {
-                    bytecodeSansLinkRefs = bytecodeSansLinkRefs.slice(0, range.start * 2) + repeat("00", range.length).join("") + bytecodeSansLinkRefs.slice((range.start + range.length) * 2)
+                    bytecodeSansLinkRefs =
+                        bytecodeSansLinkRefs.slice(0, range.start * 2) +
+                        repeat("00", range.length).join("") +
+                        bytecodeSansLinkRefs.slice((range.start + range.length) * 2);
                 }
             }
         }
