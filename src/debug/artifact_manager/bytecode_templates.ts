@@ -22,7 +22,7 @@ export function makeTemplate(artifact: BytecodeInfo): BytecodeTemplate {
         skipRanges.push(...makeSkipRanges(ranges));
     }
 
-    skipRanges.sort(([s1, e1], [s2, e2]) => s1 < s2 ? -1 : s1 == s2 ? 0 : 1);
+    skipRanges.sort(([s1], [s2]) => (s1 < s2 ? -1 : s1 == s2 ? 0 : 1));
 
     return {
         object: artifact.bytecode,
