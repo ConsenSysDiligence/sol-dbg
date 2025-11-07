@@ -588,7 +588,7 @@ export class BytesSliceCalldataView
 export class StringSliceCalldataView extends BaseCalldataView<string, BytesType> {
     constructor(
         loc: bigint,
-        protected len: bigint
+        public readonly len: bigint
     ) {
         // Note: The base is 0n on purpose here since this is created from stack values
         super(new StringType(), loc, 0n);

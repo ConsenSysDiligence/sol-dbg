@@ -1,12 +1,28 @@
 import { DataLocation as SolDataLocation } from "solc-typed-ast";
 import { DecodingFailure, Value } from "./value";
 import { ArrayLikeView, IndexableView, PointerView, StateArea, StructView, View } from "./view";
-import { isArrayLikeCalldataView, PointerCalldataView, StructCalldataView } from "./calldata";
-import { isArrayLikeMemView, PointerMemView, StructMemView } from "./memory";
 import {
+    BytesCalldataView,
+    BytesSliceCalldataView,
+    isArrayLikeCalldataView,
+    PointerCalldataView,
+    StringCalldataView,
+    StringSliceCalldataView,
+    StructCalldataView
+} from "./calldata";
+import {
+    BytesMemView,
+    isArrayLikeMemView,
+    PointerMemView,
+    StringMemView,
+    StructMemView
+} from "./memory";
+import {
+    BytesStorageView,
     isArrayLikeStorageView,
     MapStorageView,
     PointerStorageView,
+    StringStorageView,
     StructStorageView
 } from "./storage";
 import { PointerStackView } from "./stack";
@@ -206,4 +222,24 @@ export function decodeLinkMap(bytecodeInfo: BytecodeInfo, actualBytecode: Uint8A
     }
 
     return res;
+}
+
+const bytesT = new rtt.BytesType();
+
+export function castStringToBytes(
+    v: StringMemView | StringCalldataView | StringStorageView | StringSliceCalldataView
+): BytesMemView | BytesCalldataView | BytesStorageView | BytesSliceCalldataView {
+    if (v instanceof StringMemView) {
+        return new BytesMemView(bytesT, v.offset);
+    }
+
+    if (v instanceof StringCalldataView) {
+        return new BytesCalldataView(bytesT, v.offset, v.base);
+    }
+
+    if (v instanceof StringStorageView) {
+        return new BytesStorageView(bytesT, [v.key, v.endOffsetInWord]);
+    }
+
+    return new BytesSliceCalldataView(v.offset, v.len);
 }
