@@ -39,7 +39,9 @@ export function isArrayLikeCalldataView(
     return (
         v instanceof FixedBytesCalldataView ||
         v instanceof ArrayCalldataView ||
-        v instanceof BytesCalldataView
+        v instanceof BytesCalldataView ||
+        v instanceof ArraySliceCalldataView ||
+        v instanceof BytesSliceCalldataView
     );
 }
 
