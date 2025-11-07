@@ -40,15 +40,18 @@ import {
 } from "../utils/sol_types";
 import { createAddressFromString } from "@ethereumjs/util";
 import {
+    ArraySliceCalldataView,
     BaseCalldataView,
+    BytesSliceCalldataView,
     DecodingFailure,
     isArrayLikeCalldataView,
     makeCalldataViews,
     PointerCalldataView,
+    StringSliceCalldataView,
     StructCalldataView
 } from "../../src/debug/decoding/";
 import fse from "fs-extra";
-import { astToRuntimeType, BaseRuntimeType } from "../../src/debug/runtime_types";
+import * as rtt from "../../src/debug/runtime_types";
 
 const tupleS1 = new TupleType([
     int8,
@@ -117,11 +120,6 @@ const samples: Array<[string, Array<TypeNode | TypeGenerator>, Value[]]> = [
         "0xff11557600000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000008abcdef0102030405000000000000000000000000000000000000000000000000",
         [bytesCalldata],
         [hexToBytes("abcdef0102030405")]
-    ],
-    [
-        "0x435f7bac0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000a68656c6c6f776f726c6400000000000000000000000000000000000000000000",
-        [stringCalldata],
-        ["helloworld"]
     ],
     [
         "0x435f7bac0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000a68656c6c6f776f726c6400000000000000000000000000000000000000000000",
@@ -467,7 +465,11 @@ describe(`Calldata Decoding Tests`, () => {
 
         it(`Sample [${typeDesc.map(ppType).join(", ")}]`, () => {
             const types = typeDesc.map((t) =>
-                astToRuntimeType(t instanceof TypeNode ? t : t(unit), infer, DataLocation.CallData)
+                rtt.astToRuntimeType(
+                    t instanceof TypeNode ? t : t(unit),
+                    infer,
+                    DataLocation.CallData
+                )
             );
             const views = makeCalldataViews(types, 4n);
             const value = views.map((v) => v.decode(calldata));
@@ -481,8 +483,44 @@ describe(`Calldata Decoding Tests`, () => {
     }
 });
 
+describe(`Calldata Slice Decoding Tests`, () => {
+    it(`Bytes slice`, () => {
+        const data = hexToBytes(
+            "0xff11557600000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000008abcdef0102030405000000000000000000000000000000000000000000000000"
+        );
+        const view = new BytesSliceCalldataView(0x45n, 4n);
+        const value = view.decode(data);
+        expect(hasPoison(value)).toBeFalsy();
+        expect(value).toEqual(hexToBytes("cdef0102"));
+    });
+
+    it(`String slice`, () => {
+        const data = hexToBytes(
+            "0x435f7bac0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000a68656c6c6f776f726c6400000000000000000000000000000000000000000000"
+        );
+        const view = new StringSliceCalldataView(0x45n, 4n);
+        const value = view.decode(data);
+        expect(hasPoison(value)).toBeFalsy();
+        expect(value).toEqual("ello");
+    });
+
+    it(`Array slice`, () => {
+        const data = hexToBytes(
+            "0x18c7338a00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000006ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000007fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80000000000000000000000000000000000000000000000000000000000000000000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff4"
+        );
+        const view = new ArraySliceCalldataView(
+            new rtt.ArrayType(new rtt.IntType(16, true)),
+            0x64n,
+            3n
+        );
+        const value = view.decode(data);
+        expect(hasPoison(value)).toBeFalsy();
+        expect(value).toEqual([10n, 32767n, -32768n]);
+    });
+});
+
 function recCheckViewDecodesTo(
-    v: BaseCalldataView<Value, BaseRuntimeType>,
+    v: BaseCalldataView<Value, rtt.BaseRuntimeType>,
     value: Value,
     state: Memory
 ): boolean {

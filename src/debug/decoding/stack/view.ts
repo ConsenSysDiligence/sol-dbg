@@ -14,7 +14,13 @@ import {
 import { Address } from "@ethereumjs/util";
 import { makeStorageView } from "../storage";
 import { inRange, isCalldataArrayType, isFailure } from "../utils";
-import { ArraySliceCalldataView, BaseCalldataView, makeCalldataView } from "../calldata/view";
+import {
+    ArraySliceCalldataView,
+    BaseCalldataView,
+    BytesSliceCalldataView,
+    makeCalldataView,
+    StringSliceCalldataView
+} from "../calldata/view";
 import { BaseStorageView } from "../storage/view";
 import { BaseMemoryView, makeMemoryView } from "../memory/view";
 import {
@@ -22,11 +28,13 @@ import {
     ArrayType,
     BaseRuntimeType,
     BoolType,
+    BytesType,
     FixedBytesType,
     IntType,
-    PointerType
+    PointerType,
+    StringType
 } from "../../runtime_types";
-import { DataLocation } from "solc-typed-ast";
+import * as sol from "solc-typed-ast";
 
 export abstract class BaseStackView<Val extends Value, Type extends BaseRuntimeType> extends View<
     Stack,
@@ -196,21 +204,27 @@ export class PointerStackView extends BaseStackView<PointerValue, PointerType> {
                 return len;
             }
 
-            // This cast is weird...
-            return new ArraySliceCalldataView(this.type.toType as ArrayType, off, len);
+            if (this.type.toType instanceof ArrayType) {
+                return new ArraySliceCalldataView(this.type.toType as ArrayType, off, len);
+            } else if (this.type.toType instanceof BytesType) {
+                return new BytesSliceCalldataView(off, len);
+            } else {
+                sol.assert(this.type.toType instanceof StringType, ``);
+                return new StringSliceCalldataView(off, len);
+            }
         }
 
-        if (this.type.location === DataLocation.CallData) {
+        if (this.type.location === sol.DataLocation.CallData) {
             return makeCalldataView(this.type.toType, 0n, off);
         }
 
-        if (this.type.location === DataLocation.Memory) {
+        if (this.type.location === sol.DataLocation.Memory) {
             return makeMemoryView(this.type.toType, off);
         }
 
         if (
-            this.type.location === DataLocation.Storage ||
-            this.type.location === DataLocation.Transient
+            this.type.location === sol.DataLocation.Storage ||
+            this.type.location === sol.DataLocation.Transient
         ) {
             return makeStorageView(this.type.toType, [off, 32]);
         }

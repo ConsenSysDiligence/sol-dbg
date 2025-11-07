@@ -548,6 +548,61 @@ export class ArraySliceCalldataView extends BaseArrayCalldataView {
     }
 }
 
+/**
+ * An BytesSliceView is only created from stack locations. It should not be created in makeCalldataView.
+ */
+export class BytesSliceCalldataView
+    extends BaseCalldataView<Uint8Array, BytesType>
+    implements ArrayLikeCalldataView<SingleByteCalldataView>
+{
+    constructor(
+        loc: bigint,
+        protected len: bigint
+    ) {
+        // Note: The base is 0n on purpose here since this is created from stack values
+        super(new BytesType(), loc, 0n);
+    }
+
+    decode(state: Memory): Uint8Array | DecodingFailure {
+        return this.readMemAt(this.loc, state, this.len);
+    }
+
+    indexView(key: bigint): SingleByteCalldataView | DecodingFailure {
+        if (key >= this.len || key < 0n) {
+            return new DecodingFailure(`Invalid index ${key} in bytes of len ${this.len}`);
+        }
+
+        return new SingleByteCalldataView(this.loc + key, this.base);
+    }
+
+    size(): bigint | DecodingFailure {
+        return this.len;
+    }
+}
+
+/**
+ * An StringSliceView is only created from stack locations. It should not be created in makeCalldataView.
+ */
+export class StringSliceCalldataView extends BaseCalldataView<string, BytesType> {
+    constructor(
+        loc: bigint,
+        protected len: bigint
+    ) {
+        // Note: The base is 0n on purpose here since this is created from stack values
+        super(new StringType(), loc, 0n);
+    }
+
+    decode(state: Memory): string | DecodingFailure {
+        const bytes = this.readMemAt(this.loc, state, this.len);
+
+        if (isFailure(bytes)) {
+            return bytes;
+        }
+
+        return bytesToUtf8(bytes);
+    }
+}
+
 export class StructCalldataView
     extends BaseCalldataView<Struct, StructType>
     implements StructView<Memory, BaseCalldataView<Value, BaseRuntimeType>>
