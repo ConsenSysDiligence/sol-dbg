@@ -288,14 +288,14 @@ export class AddressStorageView extends BaseStorageView<Address, AddressType> {
 }
 
 /**
- * For consisntency with Memory views, add a SingleByteStorage view that returns a number
+ * For consisntency with Memory views, add a SingleByteStorage view that returns a single byte Uint8Array
  */
-export class SingleByteStorageView extends BaseStorageView<bigint, FixedBytesType> {
+export class SingleByteStorageView extends BaseStorageView<Uint8Array, FixedBytesType> {
     constructor(loc: [bigint, number]) {
         super(byte, loc);
     }
 
-    decode(state: Storage): bigint | DecodingFailure {
+    decode(state: Storage): Uint8Array | DecodingFailure {
         if (this.endOffsetInWord < this.type.numBytes) {
             return new DecodingFailure(
                 `Unalighed Read: Can't decode ${this.type.pp()} starting at offset ${this.endOffsetInWord} in word ${this.key}`
@@ -309,17 +309,12 @@ export class SingleByteStorageView extends BaseStorageView<bigint, FixedBytesTyp
             state
         );
 
-        return BigInt(byte[0]);
+        return byte;
     }
 
-    encode(value: bigint, state: Storage): Storage {
+    encode(value: Uint8Array, state: Storage): Storage {
         const word = this.fetchWordCopy(this.key, state);
-
-        if (!inRange(value, 0, 255)) {
-            throw new EncodingError(`${value} not in byte range [0, 255]`);
-        }
-
-        word[this.endOffsetInWord - this.type.numBytes] = Number(value);
+        word.set(value, this.endOffsetInWord - this.type.numBytes);
         return this.setWord(this.key, word, state);
     }
 

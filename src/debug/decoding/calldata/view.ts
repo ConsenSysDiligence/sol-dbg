@@ -313,19 +313,19 @@ export class AddressCalldataView extends BaseCalldataView<Address, AddressType> 
  * We cannot just re-use FixedBytesMemView, since even for a single byte, that will
  * write 32 bytes with padded zeroes.
  */
-export class SingleByteCalldataView extends BaseCalldataView<bigint, FixedBytesType> {
+export class SingleByteCalldataView extends BaseCalldataView<Uint8Array, FixedBytesType> {
     constructor(loc: bigint, base: bigint) {
         super(byte, loc, base);
     }
 
-    decode(state: Memory): bigint | DecodingFailure {
+    decode(state: Memory): Uint8Array | DecodingFailure {
         const off = this.loc + this.base;
 
         if (!inRange(off, 0, state.length - 1)) {
             return new DecodingFailure(`OoB byte access at ${off}`);
         }
 
-        return BigInt(state[Number(off)]);
+        return state.slice(Number(off), Number(off) + 1);
     }
 }
 

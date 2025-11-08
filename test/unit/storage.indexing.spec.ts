@@ -1,6 +1,7 @@
 import expect from "expect";
 import { assert, DataLocation } from "solc-typed-ast";
 import { DecodingFailure, hasPoison, Value } from "../../src/debug/decoding/value";
+import * as rtt from "../../src/debug/runtime_types";
 import { hexToBytes } from "ethereum-cryptography/utils";
 import {
     ArrayStorageView,
@@ -188,8 +189,18 @@ describe(`Storage Indexing Tests`, () => {
                 ).indexView(BigInt(i), storage);
                 expect(idxView).not.toBeInstanceOf(DecodingFailure);
                 let expectedIdxVal = expectedValue[i];
-                expectedIdxVal =
-                    typeof expectedIdxVal === "number" ? BigInt(expectedIdxVal) : expectedIdxVal;
+                if (
+                    type instanceof rtt.FixedBytesType ||
+                    (type instanceof rtt.PointerType && type.toType instanceof rtt.BytesType)
+                ) {
+                    expectedIdxVal = new Uint8Array([expectedIdxVal as number]);
+                } else {
+                    expectedIdxVal =
+                        typeof expectedIdxVal === "number"
+                            ? BigInt(expectedIdxVal)
+                            : expectedIdxVal;
+                }
+
                 expect(
                     (idxView as BaseStorageView<Value, BaseRuntimeType>).decode(storage)
                 ).toEqual(expectedIdxVal);
@@ -235,7 +246,7 @@ describe(`Storage Indexing Tests`, () => {
         const view = new FixedBytesStorageView(bytes5, [1n, 32]);
         const elView = view.indexView(4n); // ef
         expect(elView).not.toBeInstanceOf(DecodingFailure);
-        storage = (elView as SingleByteStorageView).encode(1n, storage);
+        storage = (elView as SingleByteStorageView).encode(new Uint8Array([1]), storage);
         expect(view.decode(storage)).toEqual(hexToBytes("0405060701"));
     });
 

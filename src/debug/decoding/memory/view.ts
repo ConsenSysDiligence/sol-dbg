@@ -160,26 +160,21 @@ export class BoolMemView extends BaseMemoryView<boolean, BoolType> {
  * We cannot just re-use FixedBytesMemView, since even for a single byte, that will
  * write 32 bytes with padded zeroes.
  */
-export class SingleByteMemView extends BaseMemoryView<bigint, FixedBytesType> {
+export class SingleByteMemView extends BaseMemoryView<Uint8Array, FixedBytesType> {
     constructor(loc: bigint) {
         super(byte, loc);
     }
 
-    decode(state: Memory): bigint | DecodingFailure {
+    decode(state: Memory): Uint8Array | DecodingFailure {
         if (!inRange(this.loc, 0, state.length)) {
             return new DecodingFailure(`OoB byte access at ${this.loc}`);
         }
 
-        return BigInt(state[Number(this.loc)]);
+        return state.slice(Number(this.loc), Number(this.loc + 1n));
     }
 
-    encode(value: bigint, state: Memory): void {
-        if (!inRange(value, 0, 255)) {
-            throw new EncodingError(`${value} not in byte range [0, 255]`);
-        }
-
-        const w = new Uint8Array([Number(value)]);
-        this.writeMemAt(w, this.loc, state);
+    encode(value: Uint8Array, state: Memory): void {
+        this.writeMemAt(value, this.loc, state);
     }
 }
 

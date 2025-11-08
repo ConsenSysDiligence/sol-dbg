@@ -4,6 +4,7 @@ import { hasPoison, Value } from "../../src/debug/decoding/value";
 import { hexToBytes } from "ethereum-cryptography/utils";
 import { uint256 } from "../../src";
 import { address, bool, bytes2, bytes3, bytes32, int128, int8, uint16 } from "../utils/rtt_types";
+import * as rtt from "../../src/debug/runtime_types";
 import {
     ArrayMemView,
     BaseMemoryView,
@@ -87,8 +88,15 @@ describe(`Memory Indexing Tests`, () => {
                 const idxView = view.indexView(BigInt(i), memory);
                 expect(idxView).not.toBeInstanceOf(DecodingFailure);
                 let expectedIdxVal = expectedValue[i];
-                expectedIdxVal =
-                    typeof expectedIdxVal === "number" ? BigInt(expectedIdxVal) : expectedIdxVal;
+
+                if (type instanceof rtt.FixedBytesType || type instanceof rtt.BytesType) {
+                    expectedIdxVal = new Uint8Array([expectedIdxVal as number]);
+                } else {
+                    expectedIdxVal =
+                        typeof expectedIdxVal === "number"
+                            ? BigInt(expectedIdxVal)
+                            : expectedIdxVal;
+                }
 
                 expect((idxView as BaseMemoryView<Value, BaseRuntimeType>).decode(memory)).toEqual(
                     expectedIdxVal
@@ -102,7 +110,7 @@ describe(`Memory Indexing Tests`, () => {
         const view = new FixedBytesMemView(bytes32, 0n);
         const elView = view.indexView(31n); // ef
         expect(elView).not.toBeInstanceOf(DecodingFailure);
-        (elView as SingleByteMemView).encode(1n, mem);
+        (elView as SingleByteMemView).encode(new Uint8Array([1]), mem);
         expect(view.decode(mem)).toEqual(
             hexToBytes("0000000000000000000000000000000000000000000000000000000000abcd01")
         );

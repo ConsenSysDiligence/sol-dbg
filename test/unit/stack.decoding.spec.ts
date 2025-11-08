@@ -45,8 +45,8 @@ describe(`Stack Decoding Tests`, () => {
         const fbView = makeStackView(bytes21, 5) as FixedBytesStackView;
         const bView = fbView.indexView(1n) as SingleByteStackView;
         expect(bView).not.toBeInstanceOf(DecodingFailure);
-        expect(bView.decode(stack)).toEqual(0x6an);
-        bView.encode(BigInt(0x01), stack);
+        expect(bView.decode(stack)).toEqual(new Uint8Array([0x6a]));
+        bView.encode(new Uint8Array([0x01]), stack);
         expect(fbView.decode(stack)).toEqual(
             hexToBytes("cD0142782d230D7c13A74ddec5dD140e55499Df900")
         );

@@ -217,8 +217,19 @@ describe(`Calldata Indexing Tests`, () => {
                 const idxView = view.indexView(BigInt(i), calldata);
                 expect(idxView).not.toBeInstanceOf(DecodingFailure);
                 let expectedIdxVal = expectedValue[i];
-                expectedIdxVal =
-                    typeof expectedIdxVal === "number" ? BigInt(expectedIdxVal) : expectedIdxVal;
+
+                if (
+                    type instanceof rtt.FixedBytesType ||
+                    (type instanceof rtt.PointerType && type.toType instanceof rtt.BytesType)
+                ) {
+                    expectedIdxVal = new Uint8Array([expectedIdxVal as number]);
+                } else {
+                    expectedIdxVal =
+                        typeof expectedIdxVal === "number"
+                            ? BigInt(expectedIdxVal)
+                            : expectedIdxVal;
+                }
+
                 expect((idxView as BaseCalldataView<Value, TypeNode>).decode(calldata)).toEqual(
                     expectedIdxVal
                 );
