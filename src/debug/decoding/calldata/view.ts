@@ -559,7 +559,7 @@ export class BytesSliceCalldataView
 {
     constructor(
         loc: bigint,
-        protected len: bigint
+        public len: bigint
     ) {
         // Note: The base is 0n on purpose here since this is created from stack values
         super(new BytesType(), loc, 0n);
