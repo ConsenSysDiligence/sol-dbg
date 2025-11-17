@@ -225,6 +225,7 @@ export function decodeLinkMap(bytecodeInfo: BytecodeInfo, actualBytecode: Uint8A
 }
 
 const bytesT = new rtt.BytesType();
+const stringT = new rtt.StringType();
 
 export function castStringToBytes(
     v: StringMemView | StringCalldataView | StringStorageView | StringSliceCalldataView
@@ -248,15 +249,15 @@ export function castBytesToString(
     v: BytesMemView | BytesCalldataView | BytesStorageView | BytesSliceCalldataView
 ): StringMemView | StringCalldataView | StringStorageView | StringSliceCalldataView {
     if (v instanceof BytesMemView) {
-        return new StringMemView(bytesT, v.offset);
+        return new StringMemView(stringT, v.offset);
     }
 
     if (v instanceof BytesCalldataView) {
-        return new StringCalldataView(bytesT, v.offset, v.base);
+        return new StringCalldataView(stringT, v.offset, v.base);
     }
 
     if (v instanceof BytesStorageView) {
-        return new StringStorageView(bytesT, [v.key, v.endOffsetInWord]);
+        return new StringStorageView(stringT, [v.key, v.endOffsetInWord]);
     }
 
     return new StringSliceCalldataView(v.offset, v.len);
