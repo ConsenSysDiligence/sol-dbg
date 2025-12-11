@@ -5,7 +5,7 @@ import { bytes4, split, uint256, zip } from "../utils";
 import { BaseCalldataView, makeCalldataView, makeCalldataViews } from "./decoding/calldata/view";
 import { DecodingFailure, Value } from "./decoding/value";
 import { IArtifactManager } from "./artifact_manager";
-import { astToRuntimeType, BaseRuntimeType, PointerType } from "./runtime_types";
+import { astToRuntimeType, BaseRuntimeType, getterArgsAndReturn, PointerType, typeIdToRuntimeType } from "./runtime_types";
 
 /**
  * Return true if the given callee requires a selector
@@ -40,10 +40,10 @@ function isTypeUnknownContract(t: sol.TypeName | undefined): boolean {
 
 export function buildMsgViews(
     callee: sol.FunctionDefinition | sol.VariableDeclaration,
-    infer: sol.InferType,
     base?: bigint
 ): Array<[string, View<Memory>]> {
     const res: Array<[string, View]> = [];
+    const ctx = callee.requiredContext
 
     if (base === undefined) {
         base = 0n;
@@ -54,21 +54,19 @@ export function buildMsgViews(
         }
     }
 
-    const formals: Array<[string, sol.TypeNode]> =
+    const formals: Array<[string, sol.TypeIdentifier]> =
         callee instanceof sol.FunctionDefinition
             ? callee.vParameters.vParameters.map((argDef: sol.VariableDeclaration) => [
                   argDef.name,
                   isTypeUnknownContract(argDef.vType)
-                      ? sol.types.address
-                      : infer.variableDeclarationToTypeNode(argDef)
+                      ? new sol.AddressTypeId(false)
+                      : sol.typeOf(argDef)
               ])
-            : infer
-                  .getterArgsAndReturn(callee)[0]
-                  .map((typ: sol.TypeNode, i: number) => [`ARG_${i}`, typ]);
+            : getterArgsAndReturn(callee)[0].map((typ: sol.TypeIdentifier, i: number) => [`ARG_${i}`, typ]);
 
     const views = makeCalldataViews(
         formals.map((x) => {
-            const rtt = astToRuntimeType(x[1], infer, sol.DataLocation.CallData);
+            const rtt = typeIdToRuntimeType(x[1], ctx, sol.DataLocation.CallData);
             return rtt instanceof PointerType && rtt.location === sol.DataLocation.Storage
                 ? uint256
                 : rtt;
