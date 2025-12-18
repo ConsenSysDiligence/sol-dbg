@@ -968,7 +968,6 @@ export class MissingStorageView extends BaseStorageView<DecodingFailure, Missing
  * that need to start in their own word (Arrays and Structs)
  * @param typ
  * @param loc
- * @param infer
  * @returns
  */
 function typeFitsInLoc(typ: BaseRuntimeType, loc: StorageLocation): boolean {

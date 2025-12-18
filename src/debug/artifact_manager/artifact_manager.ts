@@ -1,6 +1,5 @@
 import { bytesToBigInt } from "@ethereumjs/util";
-import { keccak256 } from "ethereum-cryptography/keccak";
-import { bytesToHex, hexToBytes, utf8ToBytes } from "ethereum-cryptography/utils";
+import { bytesToHex, hexToBytes } from "ethereum-cryptography/utils";
 import {
     ASTNode,
     ASTReader,
@@ -11,20 +10,23 @@ import {
     InferType,
     SourceUnit,
     StateVariableVisibility,
-    TypeNode,
+    TypeIdentifier,
     VariableDeclaration,
     assert,
     getABIEncoderVersion,
-    repeat
+    repeat,
+    signatureHash,
+    toABIType,
+    typeOf
 } from "solc-typed-ast";
-import { ABIEncoderVersion, abiTypeToCanonicalName } from "solc-typed-ast/dist/types/abi";
+import { ABIEncoderVersion } from "solc-typed-ast/dist/types/abi";
 import {
     detectArtifactCompilerVersion,
     getCodeHash,
     getCreationCodeHash
 } from "../../artifacts/helpers";
 import { PartialBytecodeDescription, PartialSolcOutput } from "../../artifacts/solc";
-import { getFunctionSelector, zip3 } from "../../utils/misc";
+import { getFunctionSelector } from "../../utils/misc";
 import { findContractDef, findFallbackFun, findReceiveFun } from "../../utils/solidity";
 import { DecodedBytecodeSourceMapEntry, fastParseBytecodeSourceMapping } from "../../utils/srcmap";
 import { OpcodeInfo } from "../opcodes";
@@ -268,28 +270,18 @@ export class ArtifactManager implements IArtifactManager {
 
             // Find all events and add them to the map
             for (const unit of artifactInfo.units) {
-                const infer = this.infer(artifactInfo.compilerVersion);
-
+                const ctx = unit.requiredContext;
                 unit.walkChildren((definition) => {
                     // @todo support anonymous events as well
                     if (definition instanceof EventDefinition && !definition.anonymous) {
-                        const evtType = infer.eventDefToType(definition);
+                        const args: Array<[string, TypeIdentifier, boolean]> =
+                            definition.vParameters.vParameters.map((d) => [
+                                d.name,
+                                toABIType(typeOf(d), ctx),
+                                d.indexed
+                            ]);
 
-                        const args: Array<[string, TypeNode, boolean]> = zip3(
-                            definition.vParameters.vParameters.map((d) => d.name),
-                            evtType.parameters.map((rawTyp) =>
-                                infer.toABIEncodedType(rawTyp, artifactInfo.abiEncoderVersion)
-                            ),
-                            definition.vParameters.vParameters.map((d) => d.indexed)
-                        );
-
-                        const topic = bytesToBigInt(
-                            keccak256(
-                                utf8ToBytes(
-                                    `${definition.name}(${args.map((x) => abiTypeToCanonicalName(x[1])).join(",")})`
-                                )
-                            )
-                        );
+                        const topic = bytesToBigInt(signatureHash(definition));
 
                         const info: EventDefInfo = {
                             definition,

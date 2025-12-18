@@ -48,13 +48,11 @@ function makeCallFrame(
     let args: Array<[string, View]> | undefined;
 
     if (contractInfo && contractInfo.ast) {
-        const infer = artifactManager.infer(contractInfo.artifact.compilerVersion);
-
         callee = artifactManager.findEntryPoint(data, contractInfo);
 
         if (callee !== undefined) {
             try {
-                args = buildMsgViews(callee, infer);
+                args = buildMsgViews(callee);
             } catch (e) {
                 args = undefined;
             }

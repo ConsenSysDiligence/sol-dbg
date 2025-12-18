@@ -48,7 +48,6 @@ export function isArrayLikeCalldataView(
 /**
  * Return true IFF the given type is "dynamic". I,e. its size is not statically known.
  * @param t
- * @param infer
  * @returns
  */
 function isTypeDynamic(t: BaseRuntimeType): boolean {
@@ -88,7 +87,6 @@ function isTypeDynamic(t: BaseRuntimeType): boolean {
  * https://docs.soliditylang.org/en/latest/abi-spec.html#formal-specification-of-the-encoding
  *
  * @param t
- * @param infer
  * @returns
  */
 function headSize(t: BaseRuntimeType): number | undefined {

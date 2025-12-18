@@ -387,13 +387,11 @@ describe("Local tests", () => {
                                 expect(info).toBeDefined();
                                 assert(info !== undefined && info.ast !== undefined, "");
 
-                                const infer = artifactManager.infer(info.artifact.compilerVersion);
                                 const storage = await getStorage(stateBefore, addr);
                                 const keccakPreimages = runner.getKeccakPreimagesBefore(tx);
                                 const mapKeys = getMapKeys(keccakPreimages);
 
                                 const layout = decodeContractState(
-                                    infer,
                                     info.ast,
                                     storage,
                                     mapKeys

@@ -2,11 +2,10 @@ import * as sol from "solc-typed-ast";
 import * as rtt from "./ast";
 import { isTypeUnknownContract, nyi } from "../../utils";
 
-const uint256 = new sol.IntTypeId(256, false);
-const addressT = new sol.AddressTypeId(false);
-const bytesT = new sol.BytesTypeId();
-const stringT = new sol.StringTypeId();
-const boolT = new sol.BoolTypeId()
+const addressT = new rtt.AddressType();
+const bytesT = new rtt.BytesType();
+const stringT = new rtt.StringType();
+const boolT = new rtt.BoolType();
 
 /**
  * Convert the given solc-typed-ast typeIdentifier to a runtime types. This does the following conversions:
@@ -64,7 +63,7 @@ export function typeIdToRuntimeType(
     }
 
     if (rawT instanceof sol.PointerTypeId) {
-        sol.assert(rawT.location !== sol.DataLocation.Default, `Unexpected default location`)
+        sol.assert(rawT.location !== sol.DataLocation.Default, `Unexpected default location`);
         const toT = typeIdToRuntimeType(rawT.toType, ctx, rawT.location);
         return new rtt.PointerType(toT, rawT.location);
     }
@@ -77,19 +76,22 @@ export function typeIdToRuntimeType(
         const def = ctx.locate(rawT.id);
 
         if (!(def instanceof sol.EnumDefinition)) {
-            return new rtt.MissingType(`No EnumDef found for ${rawT.pp()}`)
+            return new rtt.MissingType(`No EnumDef found for ${rawT.pp()}`);
         }
 
-        return typeIdToRuntimeType(sol.enumToIntType(def), ctx, loc);
+        return typeIdToRuntimeType(sol.enumToIntTypeId(def), ctx, loc);
     }
 
     if (rawT instanceof sol.UserDefinedValueTypeId) {
-        const def = ctx.locate(rawT.id)
+        const def = ctx.locate(rawT.id);
 
-        if (!(def instanceof sol.UserDefinedValueTypeDefinition &&
-              def.underlyingType.typeIdentifier !== undefined
-        )) {
-            return new rtt.MissingType(`No EnumDef found for ${rawT.pp()}`)
+        if (
+            !(
+                def instanceof sol.UserDefinedValueTypeDefinition &&
+                def.underlyingType.typeIdentifier !== undefined
+            )
+        ) {
+            return new rtt.MissingType(`No EnumDef found for ${rawT.pp()}`);
         }
 
         return typeIdToRuntimeType(sol.typeOf(def.underlyingType), ctx, loc);
@@ -99,21 +101,20 @@ export function typeIdToRuntimeType(
         const def = ctx.locate(rawT.id);
 
         if (!(def instanceof sol.StructDefinition)) {
-            return new rtt.MissingType(`No EnumDef found for ${rawT.pp()}`)
+            return new rtt.MissingType(`No EnumDef found for ${rawT.pp()}`);
         }
 
         sol.assert(loc !== undefined, `Missing location in struct expansion {0}`, rawT);
-        const fields: Array<[string, rtt.BaseRuntimeType]> = def.vMembers.map(
-            (decl) => 
-                [decl.name, typeIdToRuntimeType(sol.changeLocationTo(sol.typeOf(decl), loc), ctx, loc)]
-        );
-        
+        const fields: Array<[string, rtt.BaseRuntimeType]> = def.vMembers.map((decl) => [
+            decl.name,
+            typeIdToRuntimeType(sol.changeLocationTo(sol.typeOf(decl), loc), ctx, loc)
+        ]);
+
         return new rtt.StructType(rawT.name, fields);
     }
 
     nyi(`typeIdToRuntimeType(${rawT.constructor.name})`);
 }
-
 
 /**
  * Helper for converting `TypeName`s to `TypeNode`s. In some cases when solc-typed-ast conversion fails,

@@ -2,7 +2,7 @@ import { Common } from "@ethereumjs/common";
 import { createTx, TypedTransaction, TypedTxData } from "@ethereumjs/tx";
 import { Address, setLengthLeft, createAddressFromString } from "@ethereumjs/util";
 import { bytesToHex, hexToBytes } from "ethereum-cryptography/utils";
-import { FunctionDefinition, InferType, assert } from "solc-typed-ast";
+import { FunctionDefinition, assert, signatureHash } from "solc-typed-ast";
 import { HexString, Stack, Storage, UnprefixedHexString } from "../debug/types";
 import { AddressType, BoolType, FixedBytesType, IntType } from "../debug/runtime_types";
 
@@ -229,17 +229,12 @@ export function bigIntToNum(
 
 export function getFunctionSelector(
     f: FunctionDefinition,
-    infer: InferType
-): UnprefixedHexString | undefined {
+): UnprefixedHexString {
     if (f.raw !== undefined && f.raw.functionSelector !== undefined) {
         return f.raw.functionSelector;
     }
 
-    try {
-        return infer.signatureHash(f);
-    } catch (e) {
-        return undefined;
-    }
+    return bytesToHex(signatureHash(f));
 }
 
 export function sanitizeBigintFromJson(a: any): any {

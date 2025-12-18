@@ -5,7 +5,7 @@ import { bytes4, split, uint256, zip } from "../utils";
 import { BaseCalldataView, makeCalldataView, makeCalldataViews } from "./decoding/calldata/view";
 import { DecodingFailure, Value } from "./decoding/value";
 import { IArtifactManager } from "./artifact_manager";
-import { astToRuntimeType, BaseRuntimeType, getterArgsAndReturn, PointerType, typeIdToRuntimeType } from "./runtime_types";
+import { BaseRuntimeType, PointerType, typeIdToRuntimeType } from "./runtime_types";
 
 /**
  * Return true if the given callee requires a selector
@@ -43,7 +43,7 @@ export function buildMsgViews(
     base?: bigint
 ): Array<[string, View<Memory>]> {
     const res: Array<[string, View]> = [];
-    const ctx = callee.requiredContext
+    const ctx = callee.requiredContext;
 
     if (base === undefined) {
         base = 0n;
@@ -62,7 +62,9 @@ export function buildMsgViews(
                       ? new sol.AddressTypeId(false)
                       : sol.typeOf(argDef)
               ])
-            : getterArgsAndReturn(callee)[0].map((typ: sol.TypeIdentifier, i: number) => [`ARG_${i}`, typ]);
+            : sol
+                  .getterArgsAndReturn(callee)[0]
+                  .map((typ: sol.TypeIdentifier, i: number) => [`ARG_${i}`, typ]);
 
     const views = makeCalldataViews(
         formals.map((x) => {
@@ -120,12 +122,10 @@ class TopicPayloadView<T extends BaseRuntimeType> extends BaseEventView<Value, n
 }
 
 type GenEventView = BaseEventView<Value, any, BaseRuntimeType>;
-export function buildEventViews(
-    evtDef: EventDefInfo,
-    infer: sol.InferType
-): Array<[string, GenEventView]> {
+export function buildEventViews(evtDef: EventDefInfo): Array<[string, GenEventView]> {
+    const ctx = evtDef.definition.requiredContext;
     const [indexedArgs, nonIndexedArgs] = split(
-        evtDef.args.map<[number, [string, sol.TypeNode, boolean]]>((x, i) => [i, x]),
+        evtDef.args.map<[number, [string, sol.TypeIdentifier, boolean]]>((x, i) => [i, [x[0], sol.specialize(x[1], sol.DataLocation.CallData), x[2]]]),
         ([, [, , indexed]]) => indexed
     );
 
@@ -133,13 +133,13 @@ export function buildEventViews(
     const indexedViews: GenEventView[] = indexedArgs.map(
         ([, [, type]]) =>
             new TopicPayloadView(
-                astToRuntimeType(type, infer, sol.DataLocation.CallData),
+                typeIdToRuntimeType(type, ctx, sol.DataLocation.CallData),
                 topicIdx++
             )
     );
     const nonIndexedViews: GenEventView[] = makeCalldataViews(
         nonIndexedArgs.map(([, [, type]]) =>
-            astToRuntimeType(type, infer, sol.DataLocation.CallData)
+            typeIdToRuntimeType(type, ctx, sol.DataLocation.CallData)
         ),
         0n
     ).map((v) => new EventPayloadView(v.type, v));
@@ -179,8 +179,7 @@ export function decodeEvent(
         return undefined;
     }
 
-    const infer = artifactManager.infer(defInfo.artifact.compilerVersion);
-    const dataViews = buildEventViews(defInfo, infer);
+    const dataViews = buildEventViews(defInfo);
     const argVals: Array<[string, any]> = dataViews.map(([name, view]) => [name, view.decode(evt)]);
 
     return {

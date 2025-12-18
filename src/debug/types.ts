@@ -119,7 +119,7 @@ export interface EventDesc {
 export interface EventDefInfo {
     definition: sol.EventDefinition;
     artifact: ArtifactInfo;
-    args: Array<[string, sol.TypeNode, boolean]>;
+    args: Array<[string, sol.TypeIdentifier, boolean]>;
 }
 
 export interface DecodedEventDesc {

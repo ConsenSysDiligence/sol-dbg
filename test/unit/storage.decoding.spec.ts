@@ -5,7 +5,6 @@ import {
     compileSourceString,
     ContractDefinition,
     DataLocation,
-    InferType,
     SourceUnit,
     XPath
 } from "solc-typed-ast";
@@ -731,7 +730,6 @@ const samples: Array<[StorageDesc, number, number, BaseRuntimeType | TypeGenerat
 ];
 
 let unit: SourceUnit;
-const infer = new InferType("0.8.21");
 
 beforeAll(async () => {
     const file = fse.readFileSync("test/samples/decoding/storage_views_test.sol", {
@@ -868,7 +866,7 @@ describe(`Storage Decoding Tests`, () => {
         ]);
 
         const decl = new XPath(unit).query("//ContractDefinition[@name='MapWithComplexKeys']")[0];
-        const [layout, complete] = getContractLayoutType(decl, infer);
+        const [layout, complete] = getContractLayoutType(decl);
         assert(complete, `Unexpected incomplete layout of ${decl.name}`);
 
         const view = makeStorageView(layout, [0n, 32]);
@@ -894,7 +892,7 @@ describe(`Contract Layout Type Tests`, () => {
                 .filter((c) => c.name === expectedType.name);
             expect(defs.length === 1).toBeTruthy();
             const def = single(defs);
-            const [type, complete] = getContractLayoutType(def, infer);
+            const [type, complete] = getContractLayoutType(def);
 
             expect(complete).toBeTruthy();
             expect(type.pp()).toEqual(expectedType.pp());

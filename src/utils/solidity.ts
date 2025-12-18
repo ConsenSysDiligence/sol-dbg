@@ -70,3 +70,20 @@ export function findContractDef(
 
     return undefined;
 }
+
+/**
+ * Return the lists of argument types and return types for the given function or public state variable.
+ * @param nd 
+ * @returns 
+ */
+export function getArgAndReturnTypeIds(nd: sol.FunctionDefinition | sol.VariableDeclaration): [sol.TypeIdentifier[], sol.TypeIdentifier[]] {
+    if (nd instanceof sol.VariableDeclaration) {
+        const [argTs, retT] = sol.getterArgsAndReturn(nd);
+        return [argTs, retT instanceof sol.TupleTypeId ? retT.components : [retT]]
+    }
+
+    return [
+        nd.vParameters.vParameters.map(sol.typeOf),
+        nd.vReturnParameters.vParameters.map(sol.typeOf),
+    ]
+}
