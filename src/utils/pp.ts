@@ -1,12 +1,6 @@
 import { Address } from "@ethereumjs/util";
 import { bytesToHex } from "ethereum-cryptography/utils";
-import {
-    assert,
-    ContractDefinition,
-    FunctionDefinition,
-    FunctionKind,
-    InferType
-} from "solc-typed-ast";
+import { assert, ContractDefinition, FunctionDefinition, FunctionKind } from "solc-typed-ast";
 import { ArtifactManager } from "../debug/artifact_manager/artifact_manager";
 import { ContractInfo, SourceFileInfo } from "../debug/artifact_manager/types";
 import { decodeView } from "../debug/decoding";
@@ -37,7 +31,7 @@ import {
 const srcLocation = require("src-location");
 const fse = require("fs-extra");
 
-export function ppValue(typ: BaseRuntimeType, v: any, infer: InferType): string {
+export function ppValue(typ: BaseRuntimeType, v: any): string {
     if (v === undefined) {
         return `<failed decoding>`;
     }
@@ -62,7 +56,7 @@ export function ppValue(typ: BaseRuntimeType, v: any, infer: InferType): string 
         if (typ.toType instanceof ArrayType) {
             const elT = typ.toType.elementT;
 
-            return `[${(v as any[]).map((el) => ppValue(elT, el, infer)).join(", ")}]`;
+            return `[${(v as any[]).map((el) => ppValue(elT, el)).join(", ")}]`;
         }
 
         if (typ.toType instanceof BytesType) {
@@ -78,7 +72,7 @@ export function ppValue(typ: BaseRuntimeType, v: any, infer: InferType): string 
 
             for (const [name, fieldT] of typ.toType.fields) {
                 try {
-                    strFields.push(name + ": " + ppValue(fieldT, (v as Struct).field(name), infer));
+                    strFields.push(name + ": " + ppValue(fieldT, (v as Struct).field(name)));
                 } catch (e) {
                     strFields.push(name + ": <failed decoding>");
                 }
@@ -214,11 +208,9 @@ export function ppStackTrace(
 
                 const state = trace[frame.startStep];
                 assert(info !== undefined, ``);
-                const infer = solDbg.artifactManager.infer(info.artifact.compilerVersion);
-
                 const val = decodeView(view, state, mapKeys);
 
-                funArgEls.push(ppValue(view.type, val, infer));
+                funArgEls.push(ppValue(view.type, val));
             }
 
             funArgs = funArgEls.join(", ");

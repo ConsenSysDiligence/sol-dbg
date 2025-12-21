@@ -1,15 +1,14 @@
 import expect from "expect";
 import {
-    ArrayType,
+    ArrayTypeId,
     assert,
     ASTReader,
     compileSourceString,
     DataLocation,
-    InferType,
-    PointerType,
+    PointerTypeId,
     SourceUnit,
-    TupleType,
-    TypeNode
+    TupleTypeId,
+    TypeIdentifier
 } from "solc-typed-ast";
 import { hasPoison, Value } from "../../src/debug/decoding/value";
 import { hexToBytes } from "ethereum-cryptography/utils";
@@ -40,26 +39,25 @@ import {
     StructCalldataView
 } from "../../src/debug/decoding/";
 import fse from "fs-extra";
-import { astToRuntimeType, BaseRuntimeType } from "../../src/debug/runtime_types";
+import { BaseRuntimeType } from "../../src/debug/runtime_types";
 import * as rtt from "../../src/debug/runtime_types";
 import * as rttt from "../utils/rtt_types";
 
-const tupleS1 = new TupleType([
+const tupleS1 = new TupleTypeId([
     int8,
     uint256,
     bool,
-    new PointerType(new ArrayType(address), DataLocation.CallData)
+    new PointerTypeId(new ArrayTypeId(address), DataLocation.CallData, true)
 ]);
 
-const tupleS_static = new TupleType([int8, uint256, bool, address]);
+const tupleS_static = new TupleTypeId([int8, uint256, bool, address]);
 
-const tupleS_struct_arr = new TupleType([
+const tupleS_struct_arr = new TupleTypeId([
     int8,
-    new PointerType(new ArrayType(tupleS1), DataLocation.CallData)
+    new PointerTypeId(new ArrayTypeId(tupleS1), DataLocation.CallData, true)
 ]);
 
-type TypeGenerator = (unit: SourceUnit) => TypeNode;
-const samples: Array<[string, TypeNode | TypeGenerator, Value[] | Uint8Array]> = [
+const samples: Array<[string, TypeIdentifier, Value[] | Uint8Array]> = [
     [
         "0x20a6db030012340000000000000000000000000000000000000000000000000000000000",
         bytes4,
@@ -112,12 +110,12 @@ const samples: Array<[string, TypeNode | TypeGenerator, Value[] | Uint8Array]> =
     ],
     [
         "0x0910fae300000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000000",
-        new PointerType(new ArrayType(tupleS_static), DataLocation.CallData),
+        new PointerTypeId(new ArrayTypeId(tupleS_static), DataLocation.CallData, true),
         []
     ],
     [
         "0x0910fae300000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000002ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001000000000000000000000000ae036c65c649172b43ef7156b009c6221b596b8bfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000010000000000000000000000005b38da6a701c568545dcfcb03fcb875f56beddc4",
-        new PointerType(new ArrayType(tupleS_static), DataLocation.CallData),
+        new PointerTypeId(new ArrayTypeId(tupleS_static), DataLocation.CallData, true),
         [
             [-1n, 1n, true, createAddressFromString("0xaE036c65C649172b43ef7156b009c6221B596B8b")],
             [-2n, 2n, true, createAddressFromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")]
@@ -125,7 +123,7 @@ const samples: Array<[string, TypeNode | TypeGenerator, Value[] | Uint8Array]> =
     ],
     [
         "0x47c4e6460000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000100ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000001000000000000000000000000ae036c65c649172b43ef7156b009c6221b596b8bfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000000",
-        new PointerType(new ArrayType(tupleS1), DataLocation.CallData),
+        new PointerTypeId(new ArrayTypeId(tupleS1), DataLocation.CallData, true),
         [
             [
                 -1n,
@@ -138,7 +136,7 @@ const samples: Array<[string, TypeNode | TypeGenerator, Value[] | Uint8Array]> =
     ],
     [
         "0x998697b7000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000020ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000100ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000010000000000000000000000005b38da6a701c568545dcfcb03fcb875f56beddc4fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000001000000000000000000000000ae036c65c649172b43ef7156b009c6221b596b8b",
-        new PointerType(new ArrayType(tupleS_struct_arr), DataLocation.CallData),
+        new PointerTypeId(new ArrayTypeId(tupleS_struct_arr), DataLocation.CallData, true),
         [
             [
                 -1n,
@@ -172,25 +170,14 @@ beforeAll(async () => {
     unit = single(reader.read(compileResult.data));
 });
 
-function ppType(t: TypeNode | TypeGenerator): string {
-    if (t instanceof TypeNode) {
-        return t.pp();
-    }
-
-    return "<type-generator>";
-}
-
 describe(`Calldata Indexing Tests`, () => {
-    const infer = new InferType("0.8.21");
-    for (const [calldataStr, typeDesc, expectedValue] of samples) {
+    for (const [calldataStr, typ, expectedValue] of samples) {
         const calldata = hexToBytes(calldataStr.slice(2));
 
-        it(`Sample [${ppType(typeDesc)}]`, () => {
-            const type = astToRuntimeType(
-                typeDesc instanceof TypeNode ? typeDesc : typeDesc(unit),
-                infer,
-                DataLocation.CallData
-            );
+        it(`Sample [${typ.pp()}]`, () => {
+            const ctx = unit.requiredContext;
+            const type = rtt.typeIdToRuntimeType(typ, ctx, DataLocation.CallData);
+
             let view: BaseCalldataView<Value, BaseRuntimeType> | DecodingFailure = makeCalldataView(
                 type,
                 0n,
@@ -230,9 +217,9 @@ describe(`Calldata Indexing Tests`, () => {
                             : expectedIdxVal;
                 }
 
-                expect((idxView as BaseCalldataView<Value, TypeNode>).decode(calldata)).toEqual(
-                    expectedIdxVal
-                );
+                expect(
+                    (idxView as BaseCalldataView<Value, TypeIdentifier>).decode(calldata)
+                ).toEqual(expectedIdxVal);
             }
         });
     }
@@ -273,12 +260,12 @@ describe(`Calldata Indexing Tests`, () => {
 
         let sView = view.toView(cd) as StructCalldataView;
         // t
-        let fView = sView.fieldView("t") as BaseCalldataView<Value, TypeNode>;
+        let fView = sView.fieldView("t") as BaseCalldataView<Value, TypeIdentifier>;
         expect(fView.decode(cd)).toEqual(-1n);
-        fView = sView.fieldView("b") as BaseCalldataView<Value, TypeNode>;
+        fView = sView.fieldView("b") as BaseCalldataView<Value, TypeIdentifier>;
         expect(fView.decode(cd)).toEqual(hexToBytes("0x070809"));
         sView = (sView.fieldView("s") as PointerCalldataView).toView(cd) as StructCalldataView;
-        fView = sView.fieldView("y") as BaseCalldataView<Value, TypeNode>;
+        fView = sView.fieldView("y") as BaseCalldataView<Value, TypeIdentifier>;
         expect(fView.decode(cd)).toEqual(101n);
     });
 });

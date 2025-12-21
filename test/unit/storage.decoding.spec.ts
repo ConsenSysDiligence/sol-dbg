@@ -221,13 +221,7 @@ const S = new StructType("S", [
 const CLayoutType = new StructType("C", [
     ["a", uint256],
     ["e", new PointerType(new ArrayType(uint8), DataLocation.Storage)],
-    [
-        "f",
-        new PointerType(
-            new MappingType(uint256, new PointerType(S, DataLocation.Storage)),
-            DataLocation.Storage
-        )
-    ],
+    ["f", new MappingType(uint256, new PointerType(S, DataLocation.Storage))],
     ["g", uint16],
     ["h", uint16],
     ["s", new PointerType(S, DataLocation.Storage)],
@@ -238,7 +232,7 @@ const CLayoutType = new StructType("C", [
     ["o", bytes5]
 ]);
 
-const SimpleTypes = new StructType("MoreStructs.SimpleTypes", [
+const SimpleTypes = new StructType("SimpleTypes", [
     ["a", int8],
     ["b", uint16],
     ["c", uint256],
@@ -248,34 +242,34 @@ const SimpleTypes = new StructType("MoreStructs.SimpleTypes", [
     ["b2", bytes32],
     ["en", uint8]
 ]);
-const S_static = new StructType("MoreStructs.S_static", [
+const S_static = new StructType("S_static", [
     ["x", int8],
     ["y", uint256],
     ["b", bool],
     ["addrs", address]
 ]);
-const S1 = new StructType("MoreStructs.S1", [
+const S1 = new StructType("S1", [
     ["x", int8],
     ["y", uint256],
     ["b", bool],
     ["addrs", new PointerType(new ArrayType(address), DataLocation.Storage)]
 ]);
-const S_nested_static_static = new StructType("MoreStructs.S_nested_static_static", [
+const S_nested_static_static = new StructType("S_nested_static_static", [
     ["t", int16],
     ["s", new PointerType(S_static, DataLocation.Storage)],
     ["b", bytes3]
 ]);
-const S_nested_dynamic_static = new StructType("MoreStructs.S_nested_dynamic_static", [
+const S_nested_dynamic_static = new StructType("S_nested_dynamic_static", [
     ["t", new PointerType(new ArrayType(int16), DataLocation.Storage)],
     ["s", new PointerType(S_static, DataLocation.Storage)],
     ["b", bytes3]
 ]);
-const S_nested_static_dynamic = new StructType("MoreStructs.S_nested_static_dynamic", [
+const S_nested_static_dynamic = new StructType("S_nested_static_dynamic", [
     ["t", int16],
     ["s", new PointerType(S1, DataLocation.Storage)],
     ["b", bytes3]
 ]);
-const S_struct_arr = new StructType("MoreStructs.S_struct_arr", [
+const S_struct_arr = new StructType("S_struct_arr", [
     ["x", int8],
     [
         "sArr",
@@ -285,7 +279,7 @@ const S_struct_arr = new StructType("MoreStructs.S_struct_arr", [
         )
     ]
 ]);
-const ArrTypes = new StructType("MoreStructs.ArrTypes", [
+const ArrTypes = new StructType("ArrTypes", [
     ["a1", new PointerType(new ArrayType(uint16), DataLocation.Storage)],
     ["a2", new PointerType(new ArrayType(int128, 4n), DataLocation.Storage)]
 ]);
@@ -307,24 +301,24 @@ const bytesLayoutType = new StructType("Bytes", [
     ["smallS", new PointerType(new StringType(), DataLocation.Storage)],
     ["bigS", new PointerType(new StringType(), DataLocation.Storage)]
 ]);
-const SmallerThanWordType = new StructType("Misc.SmallerThanWord", [
+const SmallerThanWordType = new StructType("SmallerThanWord", [
     ["a", uint120],
     ["b", uint112]
 ]);
-const OneWordType = new StructType("Misc.OneWord", [
+const OneWordType = new StructType("OneWord", [
     ["a", uint120],
     ["b", uint136]
 ]);
-const MoreThanOneWordType = new StructType("Misc.MoreThanOneWord", [
+const MoreThanOneWordType = new StructType("MoreThanOneWord", [
     ["a", uint120],
     ["b", uint144]
 ]);
-const ThreeWordsType = new StructType("Misc.ThreeWords", [
+const ThreeWordsType = new StructType("ThreeWords", [
     ["a", uint120],
     ["c", uint248],
     ["b", uint144]
 ]);
-const FourWordsType = new StructType("Misc.FourWords", [
+const FourWordsType = new StructType("FourWords", [
     ["a", uint120],
     ["c", uint256],
     ["d", uint248],

@@ -1,68 +1,72 @@
 import {
-    AddressType,
-    ArrayType,
-    BoolType,
-    BytesType,
+    AddressTypeId,
+    ArrayTypeId,
+    BoolTypeId,
+    BytesTypeId,
     DataLocation,
-    FixedBytesType,
-    IntType,
-    PointerType,
-    StringType
+    FixedBytesTypeId,
+    IntTypeId,
+    PointerTypeId,
+    StringTypeId
 } from "solc-typed-ast";
 
-export const bool = new BoolType();
-export const address = new AddressType(false);
-export const bytes1 = new FixedBytesType(1);
-export const bytes2 = new FixedBytesType(2);
-export const bytes3 = new FixedBytesType(3);
-export const bytes4 = new FixedBytesType(4);
-export const bytes5 = new FixedBytesType(5);
-export const bytes21 = new FixedBytesType(21);
-export const bytes32 = new FixedBytesType(32);
+export const bool = new BoolTypeId();
+export const address = new AddressTypeId(false);
+export const bytes1 = new FixedBytesTypeId(1);
+export const bytes2 = new FixedBytesTypeId(2);
+export const bytes3 = new FixedBytesTypeId(3);
+export const bytes4 = new FixedBytesTypeId(4);
+export const bytes5 = new FixedBytesTypeId(5);
+export const bytes21 = new FixedBytesTypeId(21);
+export const bytes32 = new FixedBytesTypeId(32);
 
-export const uint8 = new IntType(8, false);
-export const uint16 = new IntType(16, false);
-export const uint24 = new IntType(24, false);
-export const uint64 = new IntType(64, false);
-export const uint112 = new IntType(112, false);
-export const uint120 = new IntType(120, false);
-export const uint128 = new IntType(128, false);
-export const uint136 = new IntType(136, false);
-export const uint144 = new IntType(144, false);
-export const uint248 = new IntType(248, false);
-export const uint256 = new IntType(256, false);
+export const uint8 = new IntTypeId(8, false);
+export const uint16 = new IntTypeId(16, false);
+export const uint24 = new IntTypeId(24, false);
+export const uint64 = new IntTypeId(64, false);
+export const uint112 = new IntTypeId(112, false);
+export const uint120 = new IntTypeId(120, false);
+export const uint128 = new IntTypeId(128, false);
+export const uint136 = new IntTypeId(136, false);
+export const uint144 = new IntTypeId(144, false);
+export const uint248 = new IntTypeId(248, false);
+export const uint256 = new IntTypeId(256, false);
 
-export const int8 = new IntType(8, true);
-export const int16 = new IntType(16, true);
-export const int32 = new IntType(32, true);
-export const int48 = new IntType(48, true);
-export const int120 = new IntType(120, true);
-export const int128 = new IntType(128, true);
-export const int136 = new IntType(136, true);
-export const int256 = new IntType(256, true);
+export const int8 = new IntTypeId(8, true);
+export const int16 = new IntTypeId(16, true);
+export const int32 = new IntTypeId(32, true);
+export const int48 = new IntTypeId(48, true);
+export const int120 = new IntTypeId(120, true);
+export const int128 = new IntTypeId(128, true);
+export const int136 = new IntTypeId(136, true);
+export const int256 = new IntTypeId(256, true);
 
-export const bytes = new BytesType();
-export const bytesCalldata = new PointerType(bytes, DataLocation.CallData);
+export const bytes = new BytesTypeId();
+export const bytesCalldata = new PointerTypeId(bytes, DataLocation.CallData, true);
 
-export const string = new StringType();
-export const stringCalldata = new PointerType(string, DataLocation.CallData);
+export const string = new StringTypeId();
+export const stringCalldata = new PointerTypeId(string, DataLocation.CallData, true);
 
-export const int16Arr = new PointerType(new ArrayType(int16), DataLocation.CallData);
-export const bytes22DArr = new PointerType(
-    new ArrayType(new PointerType(new ArrayType(bytes2), DataLocation.CallData)),
-    DataLocation.CallData
+export const int16Arr = new PointerTypeId(new ArrayTypeId(int16), DataLocation.CallData, true);
+export const bytes22DArr = new PointerTypeId(
+    new ArrayTypeId(new PointerTypeId(new ArrayTypeId(bytes2), DataLocation.CallData, true)),
+    DataLocation.CallData,
+    true
 );
-export const int8x4 = new PointerType(new ArrayType(int8, 4n), DataLocation.CallData);
-export const int8x4x2 = new PointerType(
-    new ArrayType(new PointerType(new ArrayType(int8, 4n), DataLocation.CallData), 2n),
-    DataLocation.CallData
+export const int8x4 = new PointerTypeId(new ArrayTypeId(int8, 4n), DataLocation.CallData, true);
+export const int8x4x2 = new PointerTypeId(
+    new ArrayTypeId(new PointerTypeId(new ArrayTypeId(int8, 4n), DataLocation.CallData, true), 2n),
+    DataLocation.CallData,
+    true
 );
 
-export const int8xNx2 = new PointerType(
-    new ArrayType(new PointerType(new ArrayType(int8), DataLocation.CallData), 2n),
-    DataLocation.CallData
+export const int8xNx2 = new PointerTypeId(
+    new ArrayTypeId(new PointerTypeId(new ArrayTypeId(int8), DataLocation.CallData, true), 2n),
+    DataLocation.CallData,
+    true
 );
-export const int8x4xN = new PointerType(
-    new ArrayType(new PointerType(new ArrayType(int8, 4n), DataLocation.CallData)),
-    DataLocation.CallData
+export const int8x4xN = new PointerTypeId(
+    new ArrayTypeId(new PointerTypeId(new ArrayTypeId(int8, 4n), DataLocation.CallData, true)),
+    DataLocation.CallData,
+    true
 );

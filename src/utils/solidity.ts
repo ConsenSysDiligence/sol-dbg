@@ -1,14 +1,5 @@
 import * as sol from "solc-typed-ast";
 
-export function isTypeUnknownContract(t: sol.TypeName | undefined): boolean {
-    return (
-        t instanceof sol.UserDefinedTypeName &&
-        t.referencedDeclaration < 0 &&
-        (t.typeString.startsWith("contract ") ||
-            t.typeString.startsWith("interface ") ||
-            t.typeString.startsWith("library "))
-    );
-}
 /**
  * Returns the receive function for a contract (if any). Note that it may be defined on a base class
  */
@@ -72,18 +63,36 @@ export function findContractDef(
 }
 
 /**
- * Return the lists of argument types and return types for the given function or public state variable.
- * @param nd 
- * @returns 
+ * Return a list with the names and types of the callable arguments
+ * @param nd
+ * @returns
  */
-export function getArgAndReturnTypeIds(nd: sol.FunctionDefinition | sol.VariableDeclaration): [sol.TypeIdentifier[], sol.TypeIdentifier[]] {
+export function getArgs(
+    nd: sol.FunctionDefinition | sol.VariableDeclaration
+): Array<[string, sol.TypeIdentifier]> {
     if (nd instanceof sol.VariableDeclaration) {
-        const [argTs, retT] = sol.getterArgsAndReturn(nd);
-        return [argTs, retT instanceof sol.TupleTypeId ? retT.components : [retT]]
+        const [argTs] = sol.getterArgsAndReturn(nd);
+        return argTs.map((argT, i) => [`ARG_${i}`, argT]);
     }
 
-    return [
-        nd.vParameters.vParameters.map(sol.typeOf),
-        nd.vReturnParameters.vParameters.map(sol.typeOf),
-    ]
+    return nd.vParameters.vParameters.map((d) => [d.name, sol.typeOf(d)]);
+}
+
+/**
+ * Return a list with the names and types of the callable returns
+ * @param nd
+ * @returns
+ */
+export function getReturns(
+    nd: sol.FunctionDefinition | sol.VariableDeclaration
+): Array<[string, sol.TypeIdentifier]> {
+    if (nd instanceof sol.VariableDeclaration) {
+        const [, retT] = sol.getterArgsAndReturn(nd);
+        return (retT instanceof sol.TupleTypeId ? retT.components : [retT]).map((argT, i) => [
+            `RET_${i}`,
+            argT
+        ]);
+    }
+
+    return nd.vReturnParameters.vParameters.map((d) => [d.name, sol.typeOf(d)]);
 }

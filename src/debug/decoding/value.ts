@@ -1,6 +1,7 @@
 import { Address } from "@ethereumjs/util";
-import { assert, FunctionDefinition, TypeNode } from "solc-typed-ast";
+import { assert, FunctionDefinition } from "solc-typed-ast";
 import { View } from "./view";
+import { BaseRuntimeType } from "../runtime_types";
 
 export class ExternalFunRef {
     constructor(
@@ -128,7 +129,7 @@ export type PrimitiveValue =
     | Address // address
     | FunctionValue // function types
     | Slice // array slices
-    | View<any, Value, any, TypeNode> // Pointer Values
+    | View<any, Value, any, BaseRuntimeType> // Pointer Values
     | Poison; // Unitialized variables, null tuple components, and other "undefined" values
 
 /**

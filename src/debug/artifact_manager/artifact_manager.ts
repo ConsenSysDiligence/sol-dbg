@@ -7,7 +7,6 @@ import {
     EventDefinition,
     FunctionDefinition,
     FunctionVisibility,
-    InferType,
     SourceUnit,
     StateVariableVisibility,
     TypeIdentifier,
@@ -51,7 +50,6 @@ export interface IArtifactManager {
     contracts(): ContractInfo[];
     // TODO: Need a better way of identifying runtime contracts than (bytecode, isCreation)
     getFileById(id: number, code: Uint8Array, isCreation: boolean): SourceFileInfo | undefined;
-    infer(version: string): InferType;
     findMethod(
         selector: HexString | Uint8Array
     ): [ContractInfo, FunctionDefinition | VariableDeclaration] | undefined;
@@ -175,7 +173,6 @@ export class ArtifactManager implements IArtifactManager {
     private _artifacts: ArtifactInfo[];
     private _contracts: ContractInfo[];
     private _mdHashToContractInfo: Map<string, ContractInfo>;
-    private _inferCache = new Map<string, InferType>();
     private _creationBytecodeTemplates: BytecodeTemplate[];
     private _deployedBytecodeTemplates: BytecodeTemplate[];
     private _topicToEventInfo: Map<bigint, EventDefInfo>;
@@ -466,14 +463,6 @@ export class ArtifactManager implements IArtifactManager {
         return this._contracts;
     }
 
-    infer(version: string): InferType {
-        if (!this._inferCache.has(version)) {
-            this._inferCache.set(version, new InferType(version));
-        }
-
-        return this._inferCache.get(version) as InferType;
-    }
-
     findMethod(
         selector: HexString | Uint8Array,
         info?: ContractInfo
@@ -487,7 +476,6 @@ export class ArtifactManager implements IArtifactManager {
                 continue;
             }
 
-            const inf = this.infer(contract.artifact.compilerVersion);
             const ast = contract.ast;
 
             const candidates = [
@@ -502,7 +490,7 @@ export class ArtifactManager implements IArtifactManager {
             ];
 
             for (const node of candidates) {
-                if (inf.signatureHash(node) === selector) {
+                if (bytesToHex(signatureHash(node)) === selector) {
                     return [contract, node];
                 }
             }
@@ -542,7 +530,6 @@ export class ArtifactManager implements IArtifactManager {
         }
 
         const strSelector: UnprefixedHexString = bytesToHex(data.slice(0, 4));
-        const infer = this.infer(info.artifact.compilerVersion);
 
         for (const base of contract.vLinearizedBaseContracts) {
             if (!base) {
@@ -550,7 +537,7 @@ export class ArtifactManager implements IArtifactManager {
             }
 
             for (const fun of base.vFunctions) {
-                const funSel = getFunctionSelector(fun, infer);
+                const funSel = getFunctionSelector(fun);
                 if (funSel == strSelector) {
                     return fun;
                 }
@@ -561,13 +548,7 @@ export class ArtifactManager implements IArtifactManager {
                     continue;
                 }
 
-                let hash: string | undefined;
-
-                try {
-                    hash = infer.signatureHash(v);
-                } catch (e) {
-                    continue;
-                }
+                const hash = bytesToHex(signatureHash(v));
 
                 if (hash == strSelector) {
                     return v;

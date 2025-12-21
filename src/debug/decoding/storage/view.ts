@@ -28,7 +28,7 @@ import { keccak256 } from "ethereum-cryptography/keccak";
 import { Address, bytesToUtf8, concatBytes } from "@ethereumjs/util";
 import { MapKeys } from "../../tracers";
 import { makeMemoryView } from "../memory";
-import { inRange, isFailure, isTypeStringStatic32BytesInStorage } from "../utils";
+import { inRange, isFailure } from "../utils";
 import { BaseMemoryView, IntMemView } from "../memory/view";
 import { bytesToHex, equalsBytes, utf8ToBytes } from "ethereum-cryptography/utils";
 import {
@@ -40,7 +40,7 @@ import {
     FixedBytesType,
     IntType,
     MappingType,
-    MissingType,
+    MissingTypeDef,
     PointerType,
     StringType,
     StructType
@@ -616,7 +616,7 @@ export class StructStorageView
         for (const [name, fieldT] of this.type.fields) {
             const fieldView: BaseStorageView<Value, BaseRuntimeType> =
                 fieldLoc === undefined
-                    ? new MissingStorageView(new MissingType(undefined), [-1n, 32])
+                    ? new MissingStorageView(fieldT, [-1n, 32])
                     : makeStorageView(fieldT, fieldLoc);
             this.fieldViews.push([name, fieldView]);
             fieldLoc = fieldView.nextLoc();
@@ -923,24 +923,13 @@ export class StringStorageView extends PackedArrayStorageView<string, StringType
     }
 }
 
-export class MissingStorageView extends BaseStorageView<DecodingFailure, MissingType> {
-    constructor(type: MissingType, loc: StorageLocation) {
+export class MissingStorageView extends BaseStorageView<DecodingFailure, BaseRuntimeType> {
+    constructor(type: BaseRuntimeType, loc: StorageLocation) {
         super(type, loc);
-
-        if (this.type.typeString !== undefined) {
-            if (isTypeStringStatic32BytesInStorage(this.type.typeString)) {
-                assert(
-                    this.endOffsetInWord === 32,
-                    `Unexpected non-word aligned {0} in storage`,
-                    this.type.typeString
-                );
-            }
-        }
     }
 
     decode(): DecodingFailure {
-        const typeStr = this.type.typeString;
-        return new DecodingFailure(`missing ${typeStr ? typeStr : "<unknown>"}`);
+        return new DecodingFailure(`failed decoding ${this.type.pp()}`);
     }
 
     encode(): Storage {
@@ -948,16 +937,6 @@ export class MissingStorageView extends BaseStorageView<DecodingFailure, Missing
     }
 
     nextLoc(): StorageLocation | undefined {
-        if (this.type.typeString === undefined) {
-            return undefined;
-        }
-
-        const typeString = this.type.typeString;
-        // If we can guess this is a dynamic array or mapping from the typestring, then we know the nextLoc
-        if (isTypeStringStatic32BytesInStorage(typeString)) {
-            return nextWord(this.loc);
-        }
-
         return undefined;
     }
 }
@@ -989,7 +968,12 @@ function typeStartsInNewWord(t: BaseRuntimeType): boolean {
         return typeStartsInNewWord(t.toType);
     }
 
-    return t instanceof ArrayType || t instanceof MappingType || t instanceof StructType;
+    return (
+        t instanceof ArrayType ||
+        t instanceof MappingType ||
+        t instanceof StructType ||
+        (t instanceof MissingTypeDef && t.type.pp().startsWith("t_struct"))
+    );
 }
 
 /**
@@ -1023,14 +1007,6 @@ function staticSize(typ: BaseRuntimeType): number {
         return staticSize(typ.toType);
     }
 
-    if (
-        typ instanceof MissingType &&
-        typ.typeString !== undefined &&
-        isTypeStringStatic32BytesInStorage(typ.typeString)
-    ) {
-        return 32;
-    }
-
     nyi(`NYI staticSize(${typ.pp()})`);
 }
 
@@ -1038,13 +1014,7 @@ export function makeStorageView(
     type: BaseRuntimeType,
     loc: StorageLocation
 ): BaseStorageView<Value, BaseRuntimeType> {
-    if (type instanceof MissingType) {
-        if (type.typeString !== undefined) {
-            if (isTypeStringStatic32BytesInStorage(type.typeString)) {
-                loc = loc[1] === 32 ? loc : nextWord(loc);
-            }
-        }
-
+    if (type instanceof MissingTypeDef) {
         return new MissingStorageView(type, loc);
     }
 

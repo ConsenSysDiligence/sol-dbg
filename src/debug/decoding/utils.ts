@@ -64,22 +64,6 @@ export function isFailure(t: Value): t is DecodingFailure {
     return t instanceof DecodingFailure;
 }
 
-export function isTypeStringDynamicArray(t: string): boolean {
-    return t.endsWith("[]");
-}
-
-export function isTypeStringMapping(t: string): boolean {
-    return t.startsWith("mapping(");
-}
-
-export function isTypeStringStruct(t: string): boolean {
-    return t.startsWith("struct ");
-}
-
-export function isTypeStringStatic32BytesInStorage(t: string): boolean {
-    return isTypeStringDynamicArray(t) || isTypeStringMapping(t);
-}
-
 export function isPointerView(v: any): v is PointerView<any, View> {
     return (
         v instanceof PointerCalldataView ||
@@ -124,10 +108,8 @@ export function isIndexableView(v: any): v is IndexableView<any, StateArea, View
  *
  * @param def
  */
-export function getContractLayoutType(
-    contract: sol.ContractDefinition,
-): [rtt.StructType, boolean] {
-    const ctx = contract.requiredContext
+export function getContractLayoutType(contract: sol.ContractDefinition): [rtt.StructType, boolean] {
+    const ctx = contract.requiredContext;
     const stateVars: Array<[string, rtt.BaseRuntimeType]> = [];
     let complete = true;
 

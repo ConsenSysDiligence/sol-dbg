@@ -14,7 +14,7 @@ import {
     zip
 } from "../../../utils";
 import { Address, bigIntToHex, bytesToUtf8 } from "@ethereumjs/util";
-import { inRange, isFailure, isTypeStringDynamicArray } from "../utils";
+import { inRange, isFailure } from "../utils";
 import {
     AddressType,
     ArrayType,
@@ -23,7 +23,7 @@ import {
     BytesType,
     FixedBytesType,
     IntType,
-    MissingType,
+    MissingTypeDef,
     PointerType,
     StringType,
     StructType,
@@ -147,18 +147,6 @@ function headSize(t: BaseRuntimeType): number | undefined {
 
     if (t instanceof PointerType) {
         return headSize(t.toType);
-    }
-
-    if (t instanceof MissingType) {
-        if (t.typeString === undefined) {
-            return undefined;
-        }
-
-        // Small optimization - if we can guess this is a dynamic array of an unknown
-        // element type, we still know the head size is 32.
-        if (isTypeStringDynamicArray(t.typeString)) {
-            return 32;
-        }
     }
 
     nyi(`Statically sized type ${t.pp()}`);
@@ -684,9 +672,9 @@ export class PointerCalldataView
     }
 }
 
-export class MissingCalldataView extends BaseCalldataView<DecodingFailure, MissingType> {
+export class MissingCalldataView extends BaseCalldataView<DecodingFailure, BaseRuntimeType> {
     decode(): DecodingFailure {
-        return new DecodingFailure(`${this.type.typeString ? this.type.typeString : "<unknown>"}`);
+        return new DecodingFailure(`failed decoding ${this.type.pp()}`);
     }
 }
 
@@ -739,7 +727,7 @@ export function makeCalldataView(
         return new PointerCalldataView(type, loc, base);
     }
 
-    if (type instanceof MissingType) {
+    if (type instanceof MissingTypeDef) {
         return new MissingCalldataView(type, loc, base);
     }
 
@@ -758,7 +746,7 @@ export function makeCalldataViews(
         // If we have missing type info at an earlier type, and we can't compute its head size,
         // we make all remaining views "missing"
         if (failRemaining) {
-            res.push(new MissingCalldataView(new MissingType(undefined), off, base));
+            res.push(new MissingCalldataView(t, off, base));
             continue;
         }
 

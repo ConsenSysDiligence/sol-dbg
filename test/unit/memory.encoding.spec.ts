@@ -1,18 +1,14 @@
 import expect from "expect";
 import {
-    ArrayType,
     ASTReader,
     compileSourceString,
     DataLocation,
-    InferType,
-    PointerType,
     SourceUnit,
-    TypeNode,
-    UserDefinedType,
+    StructTypeId,
     XPath,
-    types,
-    IntType,
-    FixedBytesType
+    TypeIdentifier,
+    PointerTypeId,
+    ArrayTypeId
 } from "solc-typed-ast";
 import { DecodingFailure, Struct, Value } from "../../src/debug/decoding/value";
 import { hexToBytes } from "ethereum-cryptography/utils";
@@ -22,25 +18,20 @@ import fse from "fs-extra";
 import { bytesToHex, createAddressFromString } from "@ethereumjs/util";
 import { DefaultAllocator } from "../../src/debug/decoding/memory/allocator";
 import { PointerMemView } from "../../src/debug/decoding/memory/view";
-import { astToRuntimeType } from "../../src/debug/runtime_types";
+import { typeIdToRuntimeType } from "../../src/debug/runtime_types";
+import { int8, uint16, bytes2, int128, bool, address, bytes32 } from "../utils/sol_types";
 
-const infer = new InferType("0.8.29");
-type TypeGenerator = (unit: SourceUnit) => TypeNode;
+type TypeGenerator = (unit: SourceUnit) => TypeIdentifier;
 
-const int8 = new IntType(8, true);
-const uint16 = new IntType(16, false);
-const bytes2 = new FixedBytesType(2);
-const int128 = new IntType(128, true);
-
-const valueTypeSamples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
+const valueTypeSamples: Array<[string, number, TypeIdentifier | TypeGenerator, Value]> = [
     ["ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 0, int8, -1n],
     ["000000000000000000000000000000000000000000000000000000000000ffff", 0, uint16, 65535n],
     ["000000000000000000000000000000000000000000000000000000000001e240", 0, uint16, 123456n],
-    ["0000000000000000000000000000000000000000000000000000000000000001", 0, types.bool, true],
+    ["0000000000000000000000000000000000000000000000000000000000000001", 0, bool, true],
     [
         "0000000000000000000000005b38da6a701c568545dcfcb03fcb875f56beddc4",
         0,
-        types.address,
+        address,
         createAddressFromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")
     ],
     [
@@ -52,22 +43,22 @@ const valueTypeSamples: Array<[string, number, TypeNode | TypeGenerator, Value]>
     [
         "0000000000000000000000000000000000000000000000000000000000abcdef",
         0,
-        types.bytes32,
+        bytes32,
         hexToBytes("0000000000000000000000000000000000000000000000000000000000abcdef")
     ]
 ];
 
-const refTypeSamples: Array<[string, number, TypeNode | TypeGenerator, Value]> = [
+const refTypeSamples: Array<[string, number, TypeIdentifier | TypeGenerator, Value]> = [
     [
         "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000000d000000000000000000000000000000000000000000000000000000000000000e",
         128,
-        new PointerType(new ArrayType(uint16), DataLocation.Memory),
+        new PointerTypeId(new ArrayTypeId(uint16), DataLocation.Memory, true),
         [12n, 13n, 14n]
     ],
     [
         "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a0fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffdfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc",
         160,
-        new PointerType(new ArrayType(int128, 4n), DataLocation.Memory),
+        new PointerTypeId(new ArrayTypeId(int128, 4n), DataLocation.Memory, true),
         [-1n, -2n, -3n, -4n]
     ],
     [
@@ -78,7 +69,11 @@ const refTypeSamples: Array<[string, number, TypeNode | TypeGenerator, Value]> =
                 "//ContractDefinition/StructDefinition[@name='SimpleTypes']"
             )[0];
 
-            return new PointerType(new UserDefinedType("SimpleTypes", decl), DataLocation.Memory);
+            return new PointerTypeId(
+                new StructTypeId("SimpleTypes", decl.id),
+                DataLocation.Memory,
+                true
+            );
         },
         new Struct([
             ["a", -1n],
@@ -99,8 +94,11 @@ const refTypeSamples: Array<[string, number, TypeNode | TypeGenerator, Value]> =
                 "//ContractDefinition/StructDefinition[@name='ArrTypes']"
             )[0];
 
-            const t = new UserDefinedType("ArrTypes", decl);
-            return new PointerType(t, DataLocation.Memory);
+            return new PointerTypeId(
+                new StructTypeId("ArrTypes", decl.id),
+                DataLocation.Memory,
+                true
+            );
         },
         new Struct([
             ["a1", [12n, 13n, 14n]],
@@ -115,8 +113,11 @@ const refTypeSamples: Array<[string, number, TypeNode | TypeGenerator, Value]> =
                 "//ContractDefinition/StructDefinition[@name='S_nested_dynamic_static']"
             )[0];
 
-            const t = new UserDefinedType("S_nested_dynamic_static", decl);
-            return new PointerType(t, DataLocation.Memory);
+            return new PointerTypeId(
+                new StructTypeId("S_nested_dynamic_static", decl.id),
+                DataLocation.Memory,
+                true
+            );
         },
         new Struct([
             ["t", []],
@@ -140,8 +141,11 @@ const refTypeSamples: Array<[string, number, TypeNode | TypeGenerator, Value]> =
                 "//ContractDefinition/StructDefinition[@name='S_nested_static_dynamic']"
             )[0];
 
-            const t = new UserDefinedType("S_nested_static_dynamic", decl);
-            return new PointerType(t, DataLocation.Memory);
+            return new PointerTypeId(
+                new StructTypeId("S_nested_static_dynamic", decl.id),
+                DataLocation.Memory,
+                true
+            );
         },
         new Struct([
             ["t", -1234n],
@@ -171,8 +175,11 @@ const refTypeSamples: Array<[string, number, TypeNode | TypeGenerator, Value]> =
                 "//ContractDefinition/StructDefinition[@name='S_nested_static_static']"
             )[0];
 
-            const t = new UserDefinedType("S_nested_static_static", decl);
-            return new PointerType(t, DataLocation.Memory);
+            return new PointerTypeId(
+                new StructTypeId("S_nested_static_static", decl.id),
+                DataLocation.Memory,
+                true
+            );
         },
         new Struct([
             ["t", -1n],
@@ -196,8 +203,11 @@ const refTypeSamples: Array<[string, number, TypeNode | TypeGenerator, Value]> =
                 "//ContractDefinition/StructDefinition[@name='S_static']"
             )[0];
 
-            const t = new UserDefinedType("S_static", decl);
-            return new PointerType(t, DataLocation.Memory);
+            return new PointerTypeId(
+                new StructTypeId("S_static", decl.id),
+                DataLocation.Memory,
+                true
+            );
         },
         new Struct([
             ["x", -1n],
@@ -214,8 +224,11 @@ const refTypeSamples: Array<[string, number, TypeNode | TypeGenerator, Value]> =
                 "//ContractDefinition/StructDefinition[@name='S_struct_arr']"
             )[0];
 
-            const t = new UserDefinedType("S_struct_arr", decl);
-            return new PointerType(t, DataLocation.Memory);
+            return new PointerTypeId(
+                new StructTypeId("S_struct_arr", decl.id),
+                DataLocation.Memory,
+                true
+            );
         },
         new Struct([
             ["x", -128n],
@@ -261,8 +274,8 @@ beforeAll(async () => {
     unit = single(reader.read(compileResult.data));
 });
 
-function ppType(t: TypeNode | TypeGenerator): string {
-    if (t instanceof TypeNode) {
+function ppType(t: TypeIdentifier | TypeGenerator): string {
+    if (t instanceof TypeIdentifier) {
         return t.pp();
     }
 
@@ -275,9 +288,10 @@ describe(`Memory Value Types Encoding Tests`, () => {
         const expectedMem = hexToBytes(expectedMemoryStr);
 
         it(`Sample ${ppType(typeDesc)}`, () => {
-            const type = astToRuntimeType(
-                typeDesc instanceof TypeNode ? typeDesc : typeDesc(unit),
-                infer,
+            const ctx = unit.requiredContext;
+            const type = typeIdToRuntimeType(
+                typeDesc instanceof TypeIdentifier ? typeDesc : typeDesc(unit),
+                ctx,
                 DataLocation.Memory
             );
             const view = makeMemoryView(type, BigInt(offset));
@@ -291,11 +305,12 @@ describe(`Memory Reference Types Encoding Tests`, () => {
     for (const [expectedMemoryStr, , typeDesc, value] of refTypeSamples) {
         const expectedMem = hexToBytes(expectedMemoryStr);
         it(`Sample ${ppType(typeDesc)}`, () => {
+            const ctx = unit.requiredContext;
             const alloc = new DefaultAllocator();
             const ptrOff = alloc.alloc(32);
-            const type = astToRuntimeType(
-                typeDesc instanceof TypeNode ? typeDesc : typeDesc(unit),
-                infer,
+            const type = typeIdToRuntimeType(
+                typeDesc instanceof TypeIdentifier ? typeDesc : typeDesc(unit),
+                ctx,
                 DataLocation.Memory
             );
 
@@ -306,24 +321,30 @@ describe(`Memory Reference Types Encoding Tests`, () => {
     }
 });
 
-const rttSamples: Array<[TypeNode | TypeGenerator, Value]> = [
+const rttSamples: Array<[TypeIdentifier | TypeGenerator, Value]> = [
     [int8, -1n],
     [uint16, 65535n],
     [uint16, 12345n],
-    [types.bool, true],
-    [types.address, createAddressFromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")],
+    [bool, true],
+    [address, createAddressFromString("0x5B38Da6a701c568545dCfcB03FcB875f56beddC4")],
     [bytes2, hexToBytes("0102")],
-    [types.bytes32, hexToBytes("0000000000000000000000000000000000000000000000000000000000abcdef")],
-    [new PointerType(new ArrayType(uint16), DataLocation.Memory), [12n, 13n, 14n]],
-    [new PointerType(new ArrayType(int128, 4n), DataLocation.Memory), [-1n, -2n, -3n, -4n]],
+    [bytes32, hexToBytes("0000000000000000000000000000000000000000000000000000000000abcdef")],
+    [new PointerTypeId(new ArrayTypeId(uint16), DataLocation.Memory, true), [12n, 13n, 14n]],
+    [
+        new PointerTypeId(new ArrayTypeId(int128, 4n), DataLocation.Memory, true),
+        [-1n, -2n, -3n, -4n]
+    ],
     [
         (unit) => {
             const decl = new XPath(unit).query(
                 "//ContractDefinition/StructDefinition[@name='SimpleTypes']"
             )[0];
 
-            const t = new UserDefinedType("SimpleTypes", decl);
-            return new PointerType(t, DataLocation.Memory);
+            return new PointerTypeId(
+                new StructTypeId("SimpleTypes", decl.id),
+                DataLocation.Memory,
+                true
+            );
         },
         new Struct([
             ["a", -1n],
@@ -342,8 +363,11 @@ const rttSamples: Array<[TypeNode | TypeGenerator, Value]> = [
                 "//ContractDefinition/StructDefinition[@name='ArrTypes']"
             )[0];
 
-            const t = new UserDefinedType("ArrTypes", decl);
-            return new PointerType(t, DataLocation.Memory);
+            return new PointerTypeId(
+                new StructTypeId("ArrTypes", decl.id),
+                DataLocation.Memory,
+                true
+            );
         },
         new Struct([
             ["a1", [12n, 13n, 14n]],
@@ -356,8 +380,11 @@ const rttSamples: Array<[TypeNode | TypeGenerator, Value]> = [
                 "//ContractDefinition/StructDefinition[@name='S_nested_dynamic_static']"
             )[0];
 
-            const t = new UserDefinedType("S_nested_dynamic_static", decl);
-            return new PointerType(t, DataLocation.Memory);
+            return new PointerTypeId(
+                new StructTypeId("S_nested_dynamic_static", decl.id),
+                DataLocation.Memory,
+                true
+            );
         },
         new Struct([
             ["t", []],
@@ -379,8 +406,11 @@ const rttSamples: Array<[TypeNode | TypeGenerator, Value]> = [
                 "//ContractDefinition/StructDefinition[@name='S_nested_static_dynamic']"
             )[0];
 
-            const t = new UserDefinedType("S_nested_static_dynamic", decl);
-            return new PointerType(t, DataLocation.Memory);
+            return new PointerTypeId(
+                new StructTypeId("S_nested_static_dynamic", decl.id),
+                DataLocation.Memory,
+                true
+            );
         },
         new Struct([
             ["t", -1234n],
@@ -408,8 +438,11 @@ const rttSamples: Array<[TypeNode | TypeGenerator, Value]> = [
                 "//ContractDefinition/StructDefinition[@name='S_nested_static_static']"
             )[0];
 
-            const t = new UserDefinedType("S_nested_static_static", decl);
-            return new PointerType(t, DataLocation.Memory);
+            return new PointerTypeId(
+                new StructTypeId("S_nested_static_static", decl.id),
+                DataLocation.Memory,
+                true
+            );
         },
         new Struct([
             ["t", -1n],
@@ -431,8 +464,11 @@ const rttSamples: Array<[TypeNode | TypeGenerator, Value]> = [
                 "//ContractDefinition/StructDefinition[@name='S_static']"
             )[0];
 
-            const t = new UserDefinedType("S_static", decl);
-            return new PointerType(t, DataLocation.Memory);
+            return new PointerTypeId(
+                new StructTypeId("S_static", decl.id),
+                DataLocation.Memory,
+                true
+            );
         },
         new Struct([
             ["x", -1n],
@@ -447,8 +483,11 @@ const rttSamples: Array<[TypeNode | TypeGenerator, Value]> = [
                 "//ContractDefinition/StructDefinition[@name='S_struct_arr']"
             )[0];
 
-            const t = new UserDefinedType("S_struct_arr", decl);
-            return new PointerType(t, DataLocation.Memory);
+            return new PointerTypeId(
+                new StructTypeId("S_struct_arr", decl.id),
+                DataLocation.Memory,
+                true
+            );
         },
         new Struct([
             ["x", -128n],
@@ -482,9 +521,10 @@ const rttSamples: Array<[TypeNode | TypeGenerator, Value]> = [
         ])
     ],
     [
-        new PointerType(
-            new ArrayType(new PointerType(new ArrayType(uint16), DataLocation.Memory)),
-            DataLocation.Memory
+        new PointerTypeId(
+            new ArrayTypeId(new PointerTypeId(new ArrayTypeId(uint16), DataLocation.Memory, true)),
+            DataLocation.Memory,
+            true
         ),
         [
             [1n, 2n, 3n],
@@ -492,9 +532,13 @@ const rttSamples: Array<[TypeNode | TypeGenerator, Value]> = [
         ]
     ],
     [
-        new PointerType(
-            new ArrayType(new PointerType(new ArrayType(uint16), DataLocation.Memory), 2n),
-            DataLocation.Memory
+        new PointerTypeId(
+            new ArrayTypeId(
+                new PointerTypeId(new ArrayTypeId(uint16), DataLocation.Memory, true),
+                2n
+            ),
+            DataLocation.Memory,
+            true
         ),
         [
             [1n, 2n, 3n],
@@ -502,9 +546,12 @@ const rttSamples: Array<[TypeNode | TypeGenerator, Value]> = [
         ]
     ],
     [
-        new PointerType(
-            new ArrayType(new PointerType(new ArrayType(uint16, 3n), DataLocation.Memory)),
-            DataLocation.Memory
+        new PointerTypeId(
+            new ArrayTypeId(
+                new PointerTypeId(new ArrayTypeId(uint16, 3n), DataLocation.Memory, true)
+            ),
+            DataLocation.Memory,
+            true
         ),
         [
             [1n, 2n, 3n],
@@ -512,9 +559,13 @@ const rttSamples: Array<[TypeNode | TypeGenerator, Value]> = [
         ]
     ],
     [
-        new PointerType(
-            new ArrayType(new PointerType(new ArrayType(uint16, 3n), DataLocation.Memory), 2n),
-            DataLocation.Memory
+        new PointerTypeId(
+            new ArrayTypeId(
+                new PointerTypeId(new ArrayTypeId(uint16, 3n), DataLocation.Memory, true),
+                2n
+            ),
+            DataLocation.Memory,
+            true
         ),
         [
             [1n, 2n, 3n],
@@ -526,10 +577,11 @@ const rttSamples: Array<[TypeNode | TypeGenerator, Value]> = [
 describe(`Memory encoding/decoding RTT tests`, () => {
     for (const [typeDesc, value] of rttSamples) {
         it(`Sample ${ppType(typeDesc)}`, () => {
+            const ctx = unit.requiredContext;
             const alloc = new DefaultAllocator();
-            const type = astToRuntimeType(
-                typeDesc instanceof TypeNode ? typeDesc : typeDesc(unit),
-                infer,
+            const type = typeIdToRuntimeType(
+                typeDesc instanceof TypeIdentifier ? typeDesc : typeDesc(unit),
+                ctx,
                 DataLocation.Memory
             );
             const ptrOff = alloc.alloc(PointerMemView.allocSize(value, type));

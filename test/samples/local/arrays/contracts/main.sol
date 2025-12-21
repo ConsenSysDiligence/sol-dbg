@@ -9,6 +9,12 @@ contract Arrays {
         }
     }
 
+    function allNonZeroFixed(uint[2] memory arr) public {
+        for (uint i = 0; i < arr.length; i++) {
+            assert(arr[i] != 0);
+        }
+    }
+
     function allNonZeroExt(uint[] calldata arr) public {
         for (uint i = 0; i < arr.length; i++) {
             assert(arr[i] != 0);

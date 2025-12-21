@@ -2,14 +2,7 @@ import { Address, createAddressFromString } from "@ethereumjs/util";
 import { bytesToHex } from "ethereum-cryptography/utils";
 import expect from "expect";
 import fse from "fs-extra";
-import {
-    assert,
-    ASTNode,
-    DecodedBytecodeSourceMapEntry,
-    forAny,
-    FunctionDefinition,
-    InferType
-} from "solc-typed-ast";
+import { assert, DecodedBytecodeSourceMapEntry, forAny, FunctionDefinition } from "solc-typed-ast";
 import {
     ArtifactManager,
     ContractInfo,
@@ -203,7 +196,7 @@ function valueToJSON(s: Value): any {
     }
 
     if (s instanceof DecodingFailure) {
-        return undefined;
+        return null;
     }
 
     if (
@@ -391,11 +384,7 @@ describe("Local tests", () => {
                                 const keccakPreimages = runner.getKeccakPreimagesBefore(tx);
                                 const mapKeys = getMapKeys(keccakPreimages);
 
-                                const layout = decodeContractState(
-                                    info.ast,
-                                    storage,
-                                    mapKeys
-                                );
+                                const layout = decodeContractState(info.ast, storage, mapKeys);
 
                                 expect(layout).toBeDefined();
 
@@ -518,16 +507,11 @@ describe("Local tests", () => {
                                 expect(lastExtFrame.callee instanceof FunctionDefinition);
                                 expect(lastExtFrame.arguments !== undefined);
 
-                                const artifact = artifactManager.getArtifact(
-                                    lastExtFrame.callee as ASTNode
-                                );
-                                const infer = new InferType(artifact.compilerVersion);
-
                                 const msg = `${(lastExtFrame.callee as FunctionDefinition).name}(${lastExtFrame.arguments
                                     ?.slice(1)
                                     .map(
                                         ([, view]) =>
-                                            `${ppValue(view.type, view.decode(lastExtFrame.msgData), infer)}`
+                                            `${ppValue(view.type, view.decode(lastExtFrame.msgData))}`
                                     )})`;
 
                                 expect(msg).toEqual(curStep.expectedLastMsg);

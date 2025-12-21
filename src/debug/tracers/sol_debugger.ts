@@ -33,7 +33,7 @@ export class SolTxDebugger extends MapOnlyTracer<StepState> {
             this.artifactManager,
             tx
         );
-        const retInfo = await addReturnInfo(vm, step, extFrameInfo, trace, this.artifactManager);
+        const retInfo = await addReturnInfo(vm, step, extFrameInfo);
         const excInfo = await addExceptionInfo(vm, step, retInfo, trace, this.artifactManager);
         const source = await addSource(vm, step, excInfo);
         const intStack = await addInternalFrameInfo(

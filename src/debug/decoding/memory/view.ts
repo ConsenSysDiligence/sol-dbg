@@ -28,7 +28,7 @@ import {
     FixedBytesType,
     IntType,
     MappingType,
-    MissingType,
+    MissingTypeDef,
     PointerType,
     StringType,
     StructType
@@ -483,9 +483,9 @@ export class PointerMemView
     }
 }
 
-export class MissingMemView extends BaseMemoryView<Value, MissingType> {
+export class MissingMemView extends BaseMemoryView<Value, MissingTypeDef> {
     decode(): DecodingFailure {
-        return new DecodingFailure(`${this.type.typeString ? this.type.typeString : "<unknown>"}`);
+        return new DecodingFailure(`<failed decoding ${this.type.pp()}>`);
     }
 
     encode(): void {
@@ -549,7 +549,7 @@ export function makeMemoryView(
         return new MapMemView(type, loc);
     }
 
-    if (type instanceof MissingType) {
+    if (type instanceof MissingTypeDef) {
         return new MissingMemView(type, loc);
     }
 

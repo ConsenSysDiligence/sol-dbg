@@ -1,7 +1,7 @@
 import * as sol from "solc-typed-ast";
 import { View } from "./decoding/view";
 import { DecodedEventDesc, EventDefInfo, EventDesc, Memory } from "./types";
-import { bytes4, split, uint256, zip } from "../utils";
+import { bytes4, getArgs, split, uint256, zip } from "../utils";
 import { BaseCalldataView, makeCalldataView, makeCalldataViews } from "./decoding/calldata/view";
 import { DecodingFailure, Value } from "./decoding/value";
 import { IArtifactManager } from "./artifact_manager";
@@ -28,16 +28,6 @@ export function hasSelector(callee: sol.FunctionDefinition | sol.VariableDeclara
     return true;
 }
 
-function isTypeUnknownContract(t: sol.TypeName | undefined): boolean {
-    return (
-        t instanceof sol.UserDefinedTypeName &&
-        t.referencedDeclaration < 0 &&
-        (t.typeString.startsWith("contract ") ||
-            t.typeString.startsWith("interface ") ||
-            t.typeString.startsWith("library "))
-    );
-}
-
 export function buildMsgViews(
     callee: sol.FunctionDefinition | sol.VariableDeclaration,
     base?: bigint
@@ -54,18 +44,9 @@ export function buildMsgViews(
         }
     }
 
-    const formals: Array<[string, sol.TypeIdentifier]> =
-        callee instanceof sol.FunctionDefinition
-            ? callee.vParameters.vParameters.map((argDef: sol.VariableDeclaration) => [
-                  argDef.name,
-                  isTypeUnknownContract(argDef.vType)
-                      ? new sol.AddressTypeId(false)
-                      : sol.typeOf(argDef)
-              ])
-            : sol
-                  .getterArgsAndReturn(callee)[0]
-                  .map((typ: sol.TypeIdentifier, i: number) => [`ARG_${i}`, typ]);
+    const formals = getArgs(callee);
 
+    // Note that we do not o=convert types to ABI types here. The calldata views transparently decode high-levle types (e.g. structs, fixed arrays)
     const views = makeCalldataViews(
         formals.map((x) => {
             const rtt = typeIdToRuntimeType(x[1], ctx, sol.DataLocation.CallData);
@@ -125,7 +106,10 @@ type GenEventView = BaseEventView<Value, any, BaseRuntimeType>;
 export function buildEventViews(evtDef: EventDefInfo): Array<[string, GenEventView]> {
     const ctx = evtDef.definition.requiredContext;
     const [indexedArgs, nonIndexedArgs] = split(
-        evtDef.args.map<[number, [string, sol.TypeIdentifier, boolean]]>((x, i) => [i, [x[0], sol.specialize(x[1], sol.DataLocation.CallData), x[2]]]),
+        evtDef.args.map<[number, [string, sol.TypeIdentifier, boolean]]>((x, i) => [
+            i,
+            [x[0], sol.specialize(x[1], sol.DataLocation.CallData), x[2]]
+        ]),
         ([, [, , indexed]]) => indexed
     );
 

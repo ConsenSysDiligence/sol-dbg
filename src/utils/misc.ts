@@ -227,9 +227,7 @@ export function bigIntToNum(
     return Number(n);
 }
 
-export function getFunctionSelector(
-    f: FunctionDefinition,
-): UnprefixedHexString {
+export function getFunctionSelector(f: FunctionDefinition): UnprefixedHexString {
     if (f.raw !== undefined && f.raw.functionSelector !== undefined) {
         return f.raw.functionSelector;
     }
