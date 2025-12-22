@@ -1,15 +1,16 @@
 import expect from "expect";
 import {
-    ArrayType,
+    ArrayTypeId,
     ASTReader,
     compileSourceString,
+    ContractTypeId,
     DataLocation,
-    InferType,
-    PointerType,
+    EnumTypeId,
+    PointerTypeId,
     SourceUnit,
-    TupleType,
-    TypeNode,
-    UserDefinedType,
+    StructTypeId,
+    TupleTypeId,
+    TypeIdentifier,
     XPath
 } from "solc-typed-ast";
 import { hasPoison, Struct, Value } from "../../src/debug/decoding/value";
@@ -53,32 +54,32 @@ import {
 import fse from "fs-extra";
 import * as rtt from "../../src/debug/runtime_types";
 
-const tupleS1 = new TupleType([
+const tupleS1 = new TupleTypeId([
     int8,
     uint256,
     bool,
-    new PointerType(new ArrayType(address), DataLocation.CallData)
+    new PointerTypeId(new ArrayTypeId(address), DataLocation.CallData, true)
 ]);
 
-const tupleS_static = new TupleType([int8, uint256, bool, address]);
+const tupleS_static = new TupleTypeId([int8, uint256, bool, address]);
 
-const tupleS_nested_static_static = new TupleType([int16, tupleS_static, bytes3]);
+const tupleS_nested_static_static = new TupleTypeId([int16, tupleS_static, bytes3]);
 
-const tupleS_nested_dynamic_static = new TupleType([
-    new PointerType(new ArrayType(int16), DataLocation.CallData),
+const tupleS_nested_dynamic_static = new TupleTypeId([
+    new PointerTypeId(new ArrayTypeId(int16), DataLocation.CallData, true),
     tupleS_static,
     bytes3
 ]);
 
-const tupleS_nested_static_dynamic = new TupleType([int16, tupleS1, bytes3]);
+const tupleS_nested_static_dynamic = new TupleTypeId([int16, tupleS1, bytes3]);
 
-const tupleS_struct_arr = new TupleType([
+const tupleS_struct_arr = new TupleTypeId([
     int8,
-    new PointerType(new ArrayType(tupleS1), DataLocation.CallData)
+    new PointerTypeId(new ArrayTypeId(tupleS1), DataLocation.CallData, true)
 ]);
 
-type TypeGenerator = (unit: SourceUnit) => TypeNode;
-const samples: Array<[string, Array<TypeNode | TypeGenerator>, Value[]]> = [
+type TypeGenerator = (unit: SourceUnit) => TypeIdentifier;
+const samples: Array<[string, Array<TypeIdentifier | TypeGenerator>, Value[]]> = [
     [
         "0x83a25b8a000000000000000000000000000000000000000000000000000000000000007b",
         [uint256],
@@ -238,12 +239,12 @@ const samples: Array<[string, Array<TypeNode | TypeGenerator>, Value[]]> = [
     ],
     [
         "0x0910fae300000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000000",
-        [new PointerType(new ArrayType(tupleS_static), DataLocation.CallData)],
+        [new PointerTypeId(new ArrayTypeId(tupleS_static), DataLocation.CallData, true)],
         [[]]
     ],
     [
         "0x0910fae300000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000002ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001000000000000000000000000ae036c65c649172b43ef7156b009c6221b596b8bfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000010000000000000000000000005b38da6a701c568545dcfcb03fcb875f56beddc4",
-        [new PointerType(new ArrayType(tupleS_static), DataLocation.CallData)],
+        [new PointerTypeId(new ArrayTypeId(tupleS_static), DataLocation.CallData, true)],
         [
             [
                 [
@@ -263,7 +264,7 @@ const samples: Array<[string, Array<TypeNode | TypeGenerator>, Value[]]> = [
     ],
     [
         "0x47c4e6460000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000100ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000001000000000000000000000000ae036c65c649172b43ef7156b009c6221b596b8bfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000000",
-        [new PointerType(new ArrayType(tupleS1), DataLocation.CallData)],
+        [new PointerTypeId(new ArrayTypeId(tupleS1), DataLocation.CallData, true)],
         [
             [
                 [
@@ -278,7 +279,7 @@ const samples: Array<[string, Array<TypeNode | TypeGenerator>, Value[]]> = [
     ],
     [
         "0x998697b7000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000020ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000100ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000010000000000000000000000005b38da6a701c568545dcfcb03fcb875f56beddc4fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000001000000000000000000000000ae036c65c649172b43ef7156b009c6221b596b8b",
-        [new PointerType(new ArrayType(tupleS_struct_arr), DataLocation.CallData)],
+        [new PointerTypeId(new ArrayTypeId(tupleS_struct_arr), DataLocation.CallData, true)],
         [
             [
                 [
@@ -309,9 +310,10 @@ const samples: Array<[string, Array<TypeNode | TypeGenerator>, Value[]]> = [
                     "//ContractDefinition/StructDefinition[@name='S_static']"
                 )[0];
 
-                const t = new PointerType(
-                    new UserDefinedType("S_static", decl),
-                    DataLocation.CallData
+                const t = new PointerTypeId(
+                    new StructTypeId("S_static", decl.id),
+                    DataLocation.CallData,
+                    true
                 );
                 return t;
             }
@@ -333,9 +335,10 @@ const samples: Array<[string, Array<TypeNode | TypeGenerator>, Value[]]> = [
                     "//ContractDefinition/StructDefinition[@name='S_nested_dynamic_static']"
                 )[0];
 
-                const t = new PointerType(
-                    new UserDefinedType("S_nested_dynamic_static", decl),
-                    DataLocation.CallData
+                const t = new PointerTypeId(
+                    new StructTypeId("S_nested_dynamic_static", decl.id),
+                    DataLocation.CallData,
+                    true
                 );
                 return t;
             }
@@ -364,9 +367,7 @@ const samples: Array<[string, Array<TypeNode | TypeGenerator>, Value[]]> = [
         [
             (unit) => {
                 const decl = new XPath(unit).query("//ContractDefinition[@name='Foo']")[0];
-
-                const t = new UserDefinedType("Foo", decl);
-                return t;
+                return new ContractTypeId("Foo", decl.id);
             }
         ],
         [createAddressFromString("0x5FD6eB55D12E759a21C09eF703fe0CBa1DC9d88D")]
@@ -378,9 +379,7 @@ const samples: Array<[string, Array<TypeNode | TypeGenerator>, Value[]]> = [
                 const decl = new XPath(unit).query(
                     "//ContractDefinition/EnumDefinition[@name='E']"
                 )[0];
-
-                const t = new UserDefinedType("E", decl);
-                return t;
+                return new EnumTypeId("E", decl.id);
             }
         ],
         [2n]
@@ -394,12 +393,17 @@ const samples: Array<[string, Array<TypeNode | TypeGenerator>, Value[]]> = [
                     "//ContractDefinition/StructDefinition[@name='S1']"
                 )[0];
 
-                const t = new PointerType(
-                    new ArrayType(
-                        new PointerType(new UserDefinedType("S1", decl), DataLocation.CallData),
+                const t = new PointerTypeId(
+                    new ArrayTypeId(
+                        new PointerTypeId(
+                            new StructTypeId("S1", decl.id),
+                            DataLocation.CallData,
+                            true
+                        ),
                         3n
                     ),
-                    DataLocation.CallData
+                    DataLocation.CallData,
+                    true
                 );
                 return t;
             }
@@ -450,8 +454,8 @@ beforeAll(async () => {
     unit = single(reader.read(compileResult.data));
 });
 
-function ppType(t: TypeNode | TypeGenerator): string {
-    if (t instanceof TypeNode) {
+function ppType(t: TypeIdentifier | TypeGenerator): string {
+    if (t instanceof TypeIdentifier) {
         return t.pp();
     }
 
@@ -459,15 +463,14 @@ function ppType(t: TypeNode | TypeGenerator): string {
 }
 
 describe(`Calldata Decoding Tests`, () => {
-    const infer = new InferType("0.8.21");
     for (const [calldataStr, typeDesc, expectedValues] of samples) {
         const calldata = hexToBytes(calldataStr.slice(2));
 
         it(`Sample [${typeDesc.map(ppType).join(", ")}]`, () => {
             const types = typeDesc.map((t) =>
-                rtt.astToRuntimeType(
-                    t instanceof TypeNode ? t : t(unit),
-                    infer,
+                rtt.typeIdToRuntimeType(
+                    t instanceof TypeIdentifier ? t : t(unit),
+                    unit.requiredContext,
                     DataLocation.CallData
                 )
             );
@@ -526,7 +529,7 @@ function recCheckViewDecodesTo(
 ): boolean {
     if (v instanceof PointerCalldataView) {
         return recCheckViewDecodesTo(
-            v.toView(state) as BaseCalldataView<Value, TypeNode>,
+            v.toView(state) as BaseCalldataView<Value, rtt.BaseRuntimeType>,
             value,
             state
         );

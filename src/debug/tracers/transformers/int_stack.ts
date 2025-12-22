@@ -1,7 +1,7 @@
 import { InterpreterStep } from "@ethereumjs/evm";
 import { VM } from "@ethereumjs/vm";
-import { assert, FunctionDefinition, TypeNode, VariableDeclaration } from "solc-typed-ast";
-import { ContractInfo, IArtifactManager } from "../../artifact_manager";
+import { assert, FunctionDefinition, VariableDeclaration } from "solc-typed-ast";
+import { IArtifactManager } from "../../artifact_manager";
 import { isCalldataArrayType } from "../../decoding/utils";
 import { OPCODES } from "../../opcodes";
 import { Frame, FrameKind, InternalCallFrame, Stack } from "../../types";
@@ -10,7 +10,8 @@ import { ExternalFrameInfo, topExtFrame } from "./ext_stack";
 import { SourceInfo } from "./source";
 import { View } from "../../decoding/view";
 import { makeStackView } from "../../decoding";
-import { astToRuntimeType } from "../../runtime_types";
+import { typeIdToRuntimeType } from "../../runtime_types";
+import { getArgs } from "../../../utils";
 
 export interface InternalFrameInfo {
     intStack: InternalCallFrame[];
@@ -31,35 +32,17 @@ function topFrame(step: InternalFrameInfo & ExternalFrameInfo & BasicStepInfo): 
  */
 function buildFunArgViews(
     callee: FunctionDefinition | VariableDeclaration,
-    stack: Stack,
-    contractInfo: ContractInfo,
-    artifactManager: IArtifactManager
+    stack: Stack
 ): Array<[string, View]> | undefined {
     const res: Array<[string, View]> = [];
-    let formals: Array<[string, TypeNode]>;
-    const infer = artifactManager.infer(contractInfo.artifact.compilerVersion);
+    const ctx = callee.requiredContext;
 
-    try {
-        formals =
-            callee instanceof FunctionDefinition
-                ? callee.vParameters.vParameters.map((argDef: VariableDeclaration) => [
-                      argDef.name,
-                      infer.variableDeclarationToTypeNode(argDef)
-                  ])
-                : infer
-                      .getterArgsAndReturn(callee)[0]
-                      .map((typ: TypeNode, i: number) => [`ARG_${i}`, typ]);
-    } catch (e) {
-        // `variableDeclarationToTypeNode` may fail when referencing structs/contracts that are defined
-        // in SourceUnits that are missing
-        return undefined;
-    }
-
+    const formals = getArgs(callee);
     let offsetFromTop = -1;
 
     for (let i = formals.length - 1; i >= 0; i--) {
         const [name, typ] = formals[i];
-        const rttTyp = astToRuntimeType(typ, infer);
+        const rttTyp = typeIdToRuntimeType(typ, ctx);
         const stackSize = isCalldataArrayType(rttTyp) ? 2 : 1;
 
         offsetFromTop += stackSize;
@@ -165,7 +148,7 @@ export async function addInternalFrameInfo<
             (ast instanceof VariableDeclaration && ast.stateVariable)
         ) {
             assert(curExtFrame.info !== undefined, ``);
-            args = buildFunArgViews(ast, state.evmStack, curExtFrame.info, artifactManager);
+            args = buildFunArgViews(ast, state.evmStack);
         }
 
         const newFrame: InternalCallFrame = {

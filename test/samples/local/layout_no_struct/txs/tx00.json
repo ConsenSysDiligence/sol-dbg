@@ -56,7 +56,9 @@
         "value": ""
       },
       "layoutBefore": {
-        "a": "1"
+        "a": "1",
+        "f": null,
+        "b": null
       }
     }
   ]

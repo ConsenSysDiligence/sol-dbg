@@ -1,6 +1,5 @@
 import { bytesToBigInt } from "@ethereumjs/util";
-import { keccak256 } from "ethereum-cryptography/keccak";
-import { bytesToHex, hexToBytes, utf8ToBytes } from "ethereum-cryptography/utils";
+import { bytesToHex, hexToBytes } from "ethereum-cryptography/utils";
 import {
     ASTNode,
     ASTReader,
@@ -8,23 +7,25 @@ import {
     EventDefinition,
     FunctionDefinition,
     FunctionVisibility,
-    InferType,
     SourceUnit,
     StateVariableVisibility,
-    TypeNode,
+    TypeIdentifier,
     VariableDeclaration,
     assert,
     getABIEncoderVersion,
-    repeat
+    repeat,
+    signatureHash,
+    toABIType,
+    typeOf
 } from "solc-typed-ast";
-import { ABIEncoderVersion, abiTypeToCanonicalName } from "solc-typed-ast/dist/types/abi";
+import { ABIEncoderVersion } from "solc-typed-ast/dist/types/abi";
 import {
     detectArtifactCompilerVersion,
     getCodeHash,
     getCreationCodeHash
 } from "../../artifacts/helpers";
 import { PartialBytecodeDescription, PartialSolcOutput } from "../../artifacts/solc";
-import { getFunctionSelector, zip3 } from "../../utils/misc";
+import { getFunctionSelector } from "../../utils/misc";
 import { findContractDef, findFallbackFun, findReceiveFun } from "../../utils/solidity";
 import { DecodedBytecodeSourceMapEntry, fastParseBytecodeSourceMapping } from "../../utils/srcmap";
 import { OpcodeInfo } from "../opcodes";
@@ -49,7 +50,6 @@ export interface IArtifactManager {
     contracts(): ContractInfo[];
     // TODO: Need a better way of identifying runtime contracts than (bytecode, isCreation)
     getFileById(id: number, code: Uint8Array, isCreation: boolean): SourceFileInfo | undefined;
-    infer(version: string): InferType;
     findMethod(
         selector: HexString | Uint8Array
     ): [ContractInfo, FunctionDefinition | VariableDeclaration] | undefined;
@@ -173,7 +173,6 @@ export class ArtifactManager implements IArtifactManager {
     private _artifacts: ArtifactInfo[];
     private _contracts: ContractInfo[];
     private _mdHashToContractInfo: Map<string, ContractInfo>;
-    private _inferCache = new Map<string, InferType>();
     private _creationBytecodeTemplates: BytecodeTemplate[];
     private _deployedBytecodeTemplates: BytecodeTemplate[];
     private _topicToEventInfo: Map<bigint, EventDefInfo>;
@@ -268,28 +267,18 @@ export class ArtifactManager implements IArtifactManager {
 
             // Find all events and add them to the map
             for (const unit of artifactInfo.units) {
-                const infer = this.infer(artifactInfo.compilerVersion);
-
+                const ctx = unit.requiredContext;
                 unit.walkChildren((definition) => {
                     // @todo support anonymous events as well
                     if (definition instanceof EventDefinition && !definition.anonymous) {
-                        const evtType = infer.eventDefToType(definition);
+                        const args: Array<[string, TypeIdentifier, boolean]> =
+                            definition.vParameters.vParameters.map((d) => [
+                                d.name,
+                                toABIType(typeOf(d), ctx),
+                                d.indexed
+                            ]);
 
-                        const args: Array<[string, TypeNode, boolean]> = zip3(
-                            definition.vParameters.vParameters.map((d) => d.name),
-                            evtType.parameters.map((rawTyp) =>
-                                infer.toABIEncodedType(rawTyp, artifactInfo.abiEncoderVersion)
-                            ),
-                            definition.vParameters.vParameters.map((d) => d.indexed)
-                        );
-
-                        const topic = bytesToBigInt(
-                            keccak256(
-                                utf8ToBytes(
-                                    `${definition.name}(${args.map((x) => abiTypeToCanonicalName(x[1])).join(",")})`
-                                )
-                            )
-                        );
+                        const topic = bytesToBigInt(signatureHash(definition));
 
                         const info: EventDefInfo = {
                             definition,
@@ -474,14 +463,6 @@ export class ArtifactManager implements IArtifactManager {
         return this._contracts;
     }
 
-    infer(version: string): InferType {
-        if (!this._inferCache.has(version)) {
-            this._inferCache.set(version, new InferType(version));
-        }
-
-        return this._inferCache.get(version) as InferType;
-    }
-
     findMethod(
         selector: HexString | Uint8Array,
         info?: ContractInfo
@@ -495,7 +476,6 @@ export class ArtifactManager implements IArtifactManager {
                 continue;
             }
 
-            const inf = this.infer(contract.artifact.compilerVersion);
             const ast = contract.ast;
 
             const candidates = [
@@ -510,7 +490,7 @@ export class ArtifactManager implements IArtifactManager {
             ];
 
             for (const node of candidates) {
-                if (inf.signatureHash(node) === selector) {
+                if (bytesToHex(signatureHash(node)) === selector) {
                     return [contract, node];
                 }
             }
@@ -550,7 +530,6 @@ export class ArtifactManager implements IArtifactManager {
         }
 
         const strSelector: UnprefixedHexString = bytesToHex(data.slice(0, 4));
-        const infer = this.infer(info.artifact.compilerVersion);
 
         for (const base of contract.vLinearizedBaseContracts) {
             if (!base) {
@@ -558,7 +537,7 @@ export class ArtifactManager implements IArtifactManager {
             }
 
             for (const fun of base.vFunctions) {
-                const funSel = getFunctionSelector(fun, infer);
+                const funSel = getFunctionSelector(fun);
                 if (funSel == strSelector) {
                     return fun;
                 }
@@ -569,13 +548,7 @@ export class ArtifactManager implements IArtifactManager {
                     continue;
                 }
 
-                let hash: string | undefined;
-
-                try {
-                    hash = infer.signatureHash(v);
-                } catch (e) {
-                    continue;
-                }
+                const hash = bytesToHex(signatureHash(v));
 
                 if (hash == strSelector) {
                     return v;

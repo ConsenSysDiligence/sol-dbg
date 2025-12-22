@@ -28,15 +28,14 @@ import {
 import { PointerStackView } from "./stack";
 import {
     ArrayType,
-    astToRuntimeType,
     BaseRuntimeType,
     BytesType,
     PointerType,
-    StringType
+    StringType,
+    typeIdToRuntimeType
 } from "../runtime_types";
 import * as sol from "solc-typed-ast";
 import * as rtt from "../runtime_types/ast";
-import { isTypeUnknownContract } from "../../utils";
 import { BytecodeInfo, LinkMap } from "../artifact_manager";
 import { Address } from "@ethereumjs/util";
 
@@ -63,22 +62,6 @@ export function inRange(n: number | bigint, min: number | bigint, max: number | 
 
 export function isFailure(t: Value): t is DecodingFailure {
     return t instanceof DecodingFailure;
-}
-
-export function isTypeStringDynamicArray(t: string): boolean {
-    return t.endsWith("[]");
-}
-
-export function isTypeStringMapping(t: string): boolean {
-    return t.startsWith("mapping(");
-}
-
-export function isTypeStringStruct(t: string): boolean {
-    return t.startsWith("struct ");
-}
-
-export function isTypeStringStatic32BytesInStorage(t: string): boolean {
-    return isTypeStringDynamicArray(t) || isTypeStringMapping(t);
 }
 
 export function isPointerView(v: any): v is PointerView<any, View> {
@@ -112,27 +95,6 @@ export function isIndexableView(v: any): v is IndexableView<any, StateArea, View
 }
 
 /**
- * Helper for converting `VariableDeclartaion`s to `TypeNode`s. In some cases when solc-typed-ast conversion fails,
- * it can try and guess the correct simplified type from the typeString
- *
- * - unknown contracts - retun address
- */
-function variableDeclarationToTypeNode(
-    v: sol.VariableDeclaration,
-    infer: sol.InferType
-): sol.TypeNode {
-    try {
-        return infer.variableDeclarationToTypeNode(v);
-    } catch (e) {
-        if (v.vType && isTypeUnknownContract(v.vType)) {
-            return new sol.AddressType(false);
-        }
-
-        throw e;
-    }
-}
-
-/**
  * Given a `ContractDefinition` try and compute an `ExpStructType` struct that
  * describes the layout of the class.  This takes into account all base classes,
  * and simplifies types using `simplifyType`.
@@ -145,12 +107,9 @@ function variableDeclarationToTypeNode(
  * the layout is complete.
  *
  * @param def
- * @param infer
  */
-export function getContractLayoutType(
-    contract: sol.ContractDefinition,
-    infer: sol.InferType
-): [rtt.StructType, boolean] {
+export function getContractLayoutType(contract: sol.ContractDefinition): [rtt.StructType, boolean] {
+    const ctx = contract.requiredContext;
     const stateVars: Array<[string, rtt.BaseRuntimeType]> = [];
     let complete = true;
 
@@ -170,31 +129,10 @@ export function getContractLayoutType(
                 continue;
             }
 
-            let typeNode: sol.TypeNode;
-
-            try {
-                typeNode = variableDeclarationToTypeNode(varDecl, infer);
-            } catch (e) {
-                /**
-                 * Missing type info. If this is a:
-                 *  - map type
-                 *  - array type
-                 *
-                 * then we can continue decoding as it takes exactly 32 bytes
-                 * statically in the layout. Otherwise we have to abort decoding
-                 */
-                complete = false;
-                if (isTypeStringStatic32BytesInStorage(varDecl.typeString)) {
-                    stateVars.push([varDecl.name, new rtt.MissingType(varDecl.typeString)]);
-                    continue;
-                } else {
-                    break;
-                }
-            }
-
+            const type = sol.typeOf(varDecl);
             stateVars.push([
                 varDecl.name,
-                astToRuntimeType(typeNode, infer, sol.DataLocation.Storage)
+                typeIdToRuntimeType(type, ctx, sol.DataLocation.Storage)
             ]);
         }
     }

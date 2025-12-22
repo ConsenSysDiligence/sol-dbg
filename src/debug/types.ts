@@ -48,8 +48,7 @@ export interface BaseFrame {
      */
     readonly callee: sol.ASTNode | undefined;
     /**
-     * If we have a `callee` try and infer where the arguments are placed in the VM state. Some arguments may not
-     * exist in the case of msg.data generated from a fuzzer for example.
+     * If we have a `callee` AST node this contains the arguments names and Views. Otherwise undefined.
      */
     readonly arguments: Array<[string, View]> | undefined;
     readonly startStep: number;
@@ -119,7 +118,7 @@ export interface EventDesc {
 export interface EventDefInfo {
     definition: sol.EventDefinition;
     artifact: ArtifactInfo;
-    args: Array<[string, sol.TypeNode, boolean]>;
+    args: Array<[string, sol.TypeIdentifier, boolean]>;
 }
 
 export interface DecodedEventDesc {

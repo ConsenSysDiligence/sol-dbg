@@ -1,6 +1,6 @@
 import { StateManagerInterface } from "@ethereumjs/common";
 import { Address } from "@ethereumjs/util";
-import { assert, ContractDefinition, InferType } from "solc-typed-ast";
+import { assert, ContractDefinition } from "solc-typed-ast";
 import { IArtifactManager } from "./artifact_manager";
 import { getStorage } from "./tracers/transformers/basic_info";
 import { getMapKeys, KeccakPreimageMap, MapKeys } from "./tracers/transformers/keccak256_invert";
@@ -29,10 +29,8 @@ export async function decodeContractStates(
             continue;
         }
 
-        const infer = artifactManager.infer(info.artifact.compilerVersion);
         const storage = await getStorage(state, addr);
-
-        const contractState = decodeContractState(infer, info.ast, storage, mapKeys);
+        const contractState = decodeContractState(info.ast, storage, mapKeys);
 
         if (contractState) {
             res[addr.toString()] = contractState;
@@ -43,12 +41,11 @@ export async function decodeContractStates(
 }
 
 export function decodeContractState(
-    infer: InferType,
     contract: ContractDefinition,
     storage: Storage,
     mapKeys?: MapKeys
 ): Struct {
-    const [layout] = getContractLayoutType(contract, infer);
+    const [layout] = getContractLayoutType(contract);
     const view = makeStorageView(layout, [0n, 32]);
     const structState = view.decode(storage, mapKeys);
 

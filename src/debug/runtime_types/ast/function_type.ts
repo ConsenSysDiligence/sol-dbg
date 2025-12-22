@@ -1,22 +1,12 @@
-import { FunctionStateMutability } from "solc-typed-ast";
+import { FunctionTypeId } from "solc-typed-ast";
 import { BaseRuntimeType } from "./base_type";
 
 export class FunctionType extends BaseRuntimeType {
-    constructor(
-        public readonly argTs: BaseRuntimeType[],
-        public readonly external: boolean,
-        public readonly mutability: FunctionStateMutability,
-        public readonly retTs: BaseRuntimeType[]
-    ) {
+    constructor(public readonly solType: FunctionTypeId) {
         super();
     }
 
     pp(): string {
-        const argStr = this.argTs.map((argT) => argT.pp()).join(", ");
-        const retStr =
-            this.retTs.length > 0
-                ? `returns (${this.retTs.map((retT) => retT.pp()).join(", ")})`
-                : "";
-        return `function (${argStr})${this.external ? " external " : " "}${this.mutability} ${retStr}`;
+        return `<function ${this.solType.pp()}>`;
     }
 }
