@@ -12,6 +12,5 @@ export class MissingTypeDef extends BaseRuntimeType {
 
     pp(): string {
         return `<missing type def for ${this.type.pp()}"}>`;
-
     }
 }

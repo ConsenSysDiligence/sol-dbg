@@ -2,9 +2,7 @@ import { FunctionTypeId } from "solc-typed-ast";
 import { BaseRuntimeType } from "./base_type";
 
 export class FunctionType extends BaseRuntimeType {
-    constructor(
-        public readonly solType: FunctionTypeId,
-    ) {
+    constructor(public readonly solType: FunctionTypeId) {
         super();
     }
 

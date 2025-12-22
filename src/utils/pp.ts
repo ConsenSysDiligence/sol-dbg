@@ -69,13 +69,10 @@ export function ppValue(typ: BaseRuntimeType, v: any): string {
 
         if (typ.toType instanceof StructType) {
             const strFields: string[] = [];
+            assert(v instanceof Struct, `Expected a struct of type {0} not {1}`, typ.toType, v);
 
             for (const [name, fieldT] of typ.toType.fields) {
-                try {
-                    strFields.push(name + ": " + ppValue(fieldT, (v as Struct).field(name)));
-                } catch (e) {
-                    strFields.push(name + ": <failed decoding>");
-                }
+                strFields.push(name + ": " + ppValue(fieldT, (v as Struct).field(name)));
             }
 
             return `{${strFields.join(", ")}}`;
