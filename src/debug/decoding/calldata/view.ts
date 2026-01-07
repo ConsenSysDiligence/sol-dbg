@@ -30,8 +30,9 @@ import {
     TupleType
 } from "../../runtime_types";
 
-interface ArrayLikeCalldataView<ValViewT extends BaseCalldataView<Value, BaseRuntimeType>>
-    extends ArrayLikeView<Memory, ValViewT> {}
+interface ArrayLikeCalldataView<
+    ValViewT extends BaseCalldataView<Value, BaseRuntimeType>
+> extends ArrayLikeView<Memory, ValViewT> {}
 
 export function isArrayLikeCalldataView(
     v: any

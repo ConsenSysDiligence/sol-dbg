@@ -34,8 +34,9 @@ import {
     StructType
 } from "../../runtime_types";
 
-interface ArrayLikeMemView<ValViewT extends BaseMemoryView<Value, BaseRuntimeType>>
-    extends ArrayLikeView<Memory, ValViewT> {}
+interface ArrayLikeMemView<
+    ValViewT extends BaseMemoryView<Value, BaseRuntimeType>
+> extends ArrayLikeView<Memory, ValViewT> {}
 
 export function isArrayLikeMemView(
     v: any

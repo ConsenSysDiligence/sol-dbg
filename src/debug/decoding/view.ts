@@ -46,8 +46,10 @@ export interface IndexableView<
     indexView(key: IdxType, state: State): ValViewT | DecodingFailure;
 }
 
-export interface ArrayLikeView<State extends StateArea, KeyViewT extends View<State>>
-    extends IndexableView<bigint, State, KeyViewT> {
+export interface ArrayLikeView<
+    State extends StateArea,
+    KeyViewT extends View<State>
+> extends IndexableView<bigint, State, KeyViewT> {
     size(state: State): bigint | DecodingFailure;
 }
 

@@ -46,8 +46,9 @@ import {
     StructType
 } from "../../runtime_types";
 
-interface ArrayLikeStorageView<ValViewT extends BaseStorageView<Value, BaseRuntimeType>>
-    extends ArrayLikeView<Storage, ValViewT> {}
+interface ArrayLikeStorageView<
+    ValViewT extends BaseStorageView<Value, BaseRuntimeType>
+> extends ArrayLikeView<Storage, ValViewT> {}
 type StorageLocation = [bigint, number];
 
 export function isArrayLikeStorageView(
