@@ -878,8 +878,17 @@ export class BytesStorageView
         return this.decodeBytes(state);
     }
 
+    decodeStr(state: Storage): string | DecodingFailure {
+        const bs = this.decode(state);
+        return isFailure(bs) ? bs : bytesToUtf8(bs);
+    }
+
     encode(value: Uint8Array, state: Storage): Storage {
         return this.encodeBytesAt(value, this.key, state);
+    }
+
+    encodeStr(value: string, state: Storage): Storage {
+        return this.encodeBytesAt(utf8ToBytes(value), this.key, state);
     }
 
     indexView(key: bigint, state: Storage): DecodingFailure | SingleByteStorageView {

@@ -245,8 +245,17 @@ export class BytesMemView
         return this.decodeBytesAt(this.loc, state);
     }
 
+    decodeStr(state: Memory): string | DecodingFailure {
+        const bts = this.decode(state);
+        return isFailure(bts) ? bts : bytesToUtf8(bts);
+    }
+
     encode(value: Uint8Array, state: Memory): void {
         this.encodeBytesAt(value, this.loc, state);
+    }
+
+    encodeStr(value: string, state: Memory): void {
+        this.encodeBytesAt(utf8ToBytes(value), this.loc, state);
     }
 
     indexView(key: bigint, state: Memory): DecodingFailure | SingleByteMemView {

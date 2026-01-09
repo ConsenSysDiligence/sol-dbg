@@ -348,6 +348,11 @@ export class BytesCalldataView
         return this.decodeBytesAt(this.loc, state);
     }
 
+    decodeStr(state: Memory): string | DecodingFailure {
+        const bs = this.decode(state);
+        return isFailure(bs) ? bs : bytesToUtf8(bs);
+    }
+
     indexView(key: bigint, state: Memory): DecodingFailure | SingleByteCalldataView {
         const len = this.decodeIntAt(this.loc, uint256, state);
 
@@ -554,6 +559,11 @@ export class BytesSliceCalldataView
 
     decode(state: Memory): Uint8Array | DecodingFailure {
         return this.readMemAt(this.loc, state, this.len);
+    }
+
+    decodeStr(state: Memory): string | DecodingFailure {
+        const bs = this.decode(state);
+        return isFailure(bs) ? bs : bytesToUtf8(bs);
     }
 
     indexView(key: bigint): SingleByteCalldataView | DecodingFailure {
