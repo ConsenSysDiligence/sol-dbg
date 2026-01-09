@@ -108,7 +108,7 @@ export function buildEventViews(evtDef: EventDefInfo): Array<[string, GenEventVi
     const [indexedArgs, nonIndexedArgs] = split(
         evtDef.args.map<[number, [string, sol.TypeIdentifier, boolean]]>((x, i) => [
             i,
-            [x[0], sol.specialize(x[1], sol.DataLocation.CallData), x[2]]
+            [x[0], sol.changeLocationTo(x[1], sol.DataLocation.CallData), x[2]]
         ]),
         ([, [, , indexed]]) => indexed
     );

@@ -1,6 +1,13 @@
 import { assert } from "solc-typed-ast";
 import { Memory } from "../../types";
-import { ArrayLikeView, EncodingError, PointerView, StructView, View } from "../view";
+import {
+    ArrayLikeView,
+    EncodingError,
+    PointerView,
+    shouldTreatStringsAsBytes,
+    StructView,
+    View
+} from "../view";
 import { DecodingFailure, Struct, Value } from "../value";
 import {
     bigEndianBufToBigint,
@@ -231,7 +238,7 @@ export abstract class PackedArrayMemView<
 }
 
 export class BytesMemView
-    extends PackedArrayMemView<Uint8Array, BytesType>
+    extends PackedArrayMemView<Uint8Array, BytesType | StringType>
     implements ArrayLikeMemView<SingleByteMemView>
 {
     decode(state: Memory): Uint8Array | DecodingFailure {
@@ -535,7 +542,9 @@ export function makeMemoryView(
     }
 
     if (type instanceof StringType) {
-        return new StringMemView(type, loc);
+        return shouldTreatStringsAsBytes()
+            ? new BytesMemView(type, loc)
+            : new StringMemView(type, loc);
     }
 
     if (type instanceof ArrayType) {
