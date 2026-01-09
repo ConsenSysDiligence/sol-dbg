@@ -5,6 +5,7 @@ import {
     EncodingError,
     IndexableView,
     PointerView,
+    shouldTreatStringsAsBytes,
     StructView,
     View
 } from "../view";
@@ -870,15 +871,24 @@ export abstract class PackedArrayStorageView<
 }
 
 export class BytesStorageView
-    extends PackedArrayStorageView<Uint8Array, BytesType>
+    extends PackedArrayStorageView<Uint8Array, BytesType | StringType>
     implements ArrayLikeStorageView<SingleByteStorageView>
 {
     decode(state: Storage): Uint8Array | DecodingFailure {
         return this.decodeBytes(state);
     }
 
+    decodeStr(state: Storage): string | DecodingFailure {
+        const bs = this.decode(state);
+        return isFailure(bs) ? bs : bytesToUtf8(bs);
+    }
+
     encode(value: Uint8Array, state: Storage): Storage {
         return this.encodeBytesAt(value, this.key, state);
+    }
+
+    encodeStr(value: string, state: Storage): Storage {
+        return this.encodeBytesAt(utf8ToBytes(value), this.key, state);
     }
 
     indexView(key: bigint, state: Storage): DecodingFailure | SingleByteStorageView {
@@ -1044,7 +1054,9 @@ export function makeStorageView(
     }
 
     if (type instanceof StringType) {
-        return new StringStorageView(type, loc);
+        return shouldTreatStringsAsBytes()
+            ? new BytesStorageView(type, loc)
+            : new StringStorageView(type, loc);
     }
 
     if (type instanceof ArrayType) {

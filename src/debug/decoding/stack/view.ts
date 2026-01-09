@@ -1,6 +1,6 @@
 import { Stack } from "../../types";
 import { DecodingFailure, Value } from "../value";
-import { ArrayLikeView, EncodingError, View } from "../view";
+import { ArrayLikeView, EncodingError, shouldTreatStringsAsBytes, View } from "../view";
 import {
     bigEndianBufToBigint,
     byte,
@@ -206,7 +206,9 @@ export class PointerStackView extends BaseStackView<PointerValue, PointerType> {
                 return new BytesSliceCalldataView(off, len);
             } else {
                 sol.assert(this.type.toType instanceof StringType, ``);
-                return new StringSliceCalldataView(off, len);
+                return shouldTreatStringsAsBytes()
+                    ? new BytesSliceCalldataView(off, len)
+                    : new StringSliceCalldataView(off, len);
             }
         }
 

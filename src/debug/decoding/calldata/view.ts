@@ -1,7 +1,7 @@
 import { assert } from "solc-typed-ast";
 import { Memory } from "../../types";
 import { DecodingFailure, Struct, Value } from "../value";
-import { ArrayLikeView, PointerView, StructView, View } from "../view";
+import { ArrayLikeView, PointerView, shouldTreatStringsAsBytes, StructView, View } from "../view";
 import {
     bigEndianBufToBigint,
     bigIntToNum,
@@ -341,11 +341,16 @@ export class FixedBytesCalldataView
 }
 
 export class BytesCalldataView
-    extends BaseCalldataView<Uint8Array, BytesType>
+    extends BaseCalldataView<Uint8Array, BytesType | StringType>
     implements ArrayLikeCalldataView<SingleByteCalldataView>
 {
     decode(state: Memory): Uint8Array | DecodingFailure {
         return this.decodeBytesAt(this.loc, state);
+    }
+
+    decodeStr(state: Memory): string | DecodingFailure {
+        const bs = this.decode(state);
+        return isFailure(bs) ? bs : bytesToUtf8(bs);
     }
 
     indexView(key: bigint, state: Memory): DecodingFailure | SingleByteCalldataView {
@@ -556,6 +561,11 @@ export class BytesSliceCalldataView
         return this.readMemAt(this.loc, state, this.len);
     }
 
+    decodeStr(state: Memory): string | DecodingFailure {
+        const bs = this.decode(state);
+        return isFailure(bs) ? bs : bytesToUtf8(bs);
+    }
+
     indexView(key: bigint): SingleByteCalldataView | DecodingFailure {
         if (key >= this.len || key < 0n) {
             return new DecodingFailure(`Invalid index ${key} in bytes of len ${this.len}`);
@@ -709,7 +719,9 @@ export function makeCalldataView(
     }
 
     if (type instanceof StringType) {
-        return new StringCalldataView(type, loc, base);
+        return shouldTreatStringsAsBytes()
+            ? new BytesCalldataView(type, loc, base)
+            : new StringCalldataView(type, loc, base);
     }
 
     if (type instanceof ArrayType) {

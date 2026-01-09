@@ -11,6 +11,21 @@ export class EncodingError extends Error {
 }
 
 /**
+ * Global switch for wether strings should be treated as bytes in all views.
+ * Its hacky to use global switches for such deep cutting semantic behavior, but I
+ * can't think of a cleaner way to do this.
+ */
+let treatStringsAsBytes = false;
+
+export function shouldTreatStringsAsBytes(): boolean {
+    return treatStringsAsBytes;
+}
+
+export function setTreatStringAsBytes(v: boolean): void {
+    treatStringsAsBytes = v;
+}
+
+/**
  * Base class for all data {@link View}s. Views are parametrized by the {@link State} they project from (e.g. Memory, Storage, Calldata),
  * the Solidity {@link Type} of the element they are decoding as well as Typescript type of the {@link Value} they decode.
  */
