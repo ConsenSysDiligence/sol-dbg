@@ -681,13 +681,11 @@ function decodeMapRefKey(type: BaseRuntimeType, data: Uint8Array): string {
 
 function encodeMapKey(keyT: BaseRuntimeType, value: Value): Uint8Array {
     if (keyT instanceof PointerType) {
-        if (!(keyT.toType instanceof StringType || keyT.toType instanceof BytesType)) {
+        if (!(value instanceof Uint8Array || typeof value === "string")) {
             throw new Error(`Invalid map reference key type ${keyT.pp()}`);
         }
 
-        return keyT.toType instanceof StringType
-            ? utf8ToBytes(value as string)
-            : (value as Uint8Array);
+        return typeof value === "string" ? utf8ToBytes(value as string) : (value as Uint8Array);
     }
 
     const buf = new Uint8Array(32);

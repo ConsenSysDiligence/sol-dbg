@@ -203,11 +203,11 @@ export class PointerStackView extends BaseStackView<PointerValue, PointerType> {
             if (this.type.toType instanceof ArrayType) {
                 return new ArraySliceCalldataView(this.type.toType as ArrayType, off, len);
             } else if (this.type.toType instanceof BytesType) {
-                return new BytesSliceCalldataView(off, len);
+                return new BytesSliceCalldataView(this.type.toType, off, len);
             } else {
                 sol.assert(this.type.toType instanceof StringType, ``);
                 return shouldTreatStringsAsBytes()
-                    ? new BytesSliceCalldataView(off, len)
+                    ? new BytesSliceCalldataView(this.type.toType, off, len)
                     : new StringSliceCalldataView(off, len);
             }
         }

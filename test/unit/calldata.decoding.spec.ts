@@ -491,7 +491,7 @@ describe(`Calldata Slice Decoding Tests`, () => {
         const data = hexToBytes(
             "0xff11557600000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000008abcdef0102030405000000000000000000000000000000000000000000000000"
         );
-        const view = new BytesSliceCalldataView(0x45n, 4n);
+        const view = new BytesSliceCalldataView(new rtt.BytesType(), 0x45n, 4n);
         const value = view.decode(data);
         expect(hasPoison(value)).toBeFalsy();
         expect(value).toEqual(hexToBytes("cdef0102"));

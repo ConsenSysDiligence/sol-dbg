@@ -546,15 +546,16 @@ export class ArraySliceCalldataView extends BaseArrayCalldataView {
  * An BytesSliceView is only created from stack locations. It should not be created in makeCalldataView.
  */
 export class BytesSliceCalldataView
-    extends BaseCalldataView<Uint8Array, BytesType>
+    extends BaseCalldataView<Uint8Array, BytesType | StringType>
     implements ArrayLikeCalldataView<SingleByteCalldataView>
 {
     constructor(
+        type: BytesType | StringType,
         loc: bigint,
         public len: bigint
     ) {
         // Note: The base is 0n on purpose here since this is created from stack values
-        super(new BytesType(), loc, 0n);
+        super(type, loc, 0n);
     }
 
     decode(state: Memory): Uint8Array | DecodingFailure {
