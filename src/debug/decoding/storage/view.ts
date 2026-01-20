@@ -23,7 +23,6 @@ import {
     nyi,
     uint256,
     uint8,
-    ZERO_BYTES32
 } from "../../../utils";
 import { keccak256 } from "ethereum-cryptography/keccak";
 import { Address, bytesToUtf8, concatBytes } from "@ethereumjs/util";
@@ -31,7 +30,7 @@ import { MapKeys } from "../../tracers";
 import { makeMemoryView } from "../memory";
 import { inRange, isFailure } from "../utils";
 import { BaseMemoryView, IntMemView } from "../memory/view";
-import { bytesToHex, equalsBytes, utf8ToBytes } from "ethereum-cryptography/utils";
+import { bytesToHex, utf8ToBytes } from "ethereum-cryptography/utils";
 import {
     AddressType,
     ArrayType,
@@ -111,10 +110,6 @@ export abstract class BaseStorageView<
 
     protected setWord(key: bigint, value: Uint8Array, storage: Storage): Storage {
         const keyHash = bigEndianBufToBigint(keccak256(bigIntToBuf(key, 32, "big")));
-
-        if (equalsBytes(value, ZERO_BYTES32)) {
-            return storage.delete(keyHash);
-        }
 
         return storage.set(keyHash, value);
     }
