@@ -22,7 +22,7 @@ import {
     min,
     nyi,
     uint256,
-    uint8,
+    uint8
 } from "../../../utils";
 import { keccak256 } from "ethereum-cryptography/keccak";
 import { Address, bytesToUtf8, concatBytes } from "@ethereumjs/util";
