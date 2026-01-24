@@ -324,12 +324,12 @@ export class ArtifactManager implements IArtifactManager {
                     }
 
                     if (contractInfo.bytecode !== undefined) {
-                        this._creationBytecodeTemplates.push(makeTemplate(contractInfo.bytecode));
+                        this._creationBytecodeTemplates.push(makeTemplate(contractInfo.bytecode, contractInfo));
                     }
 
                     if (contractInfo.deployedBytecode !== undefined) {
                         this._deployedBytecodeTemplates.push(
-                            makeTemplate(contractInfo.deployedBytecode)
+                            makeTemplate(contractInfo.deployedBytecode, contractInfo)
                         );
                     }
                 }
@@ -408,7 +408,7 @@ export class ArtifactManager implements IArtifactManager {
             const templ = this._deployedBytecodeTemplates[i];
 
             if (matchesTemplate(bytecode, templ, false)) {
-                return this._contracts[i];
+                return templ.contractInfo;
             }
         }
 
@@ -426,7 +426,7 @@ export class ArtifactManager implements IArtifactManager {
             const templ = this._creationBytecodeTemplates[i];
 
             if (matchesTemplate(creationBytecode, templ, true)) {
-                return this._contracts[i];
+                return templ.contractInfo;
             }
         }
 
