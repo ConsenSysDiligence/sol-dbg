@@ -85,13 +85,13 @@ export interface ContractInfo {
      */
     ast: ContractDefinition | undefined;
     /**
-     * Creation bytecode info
+     * Creation bytecode info. May be undefined for abstract classes/interfaces.
      */
-    bytecode: BytecodeInfo;
+    bytecode: BytecodeInfo | undefined;
     /**
-     * Deployed bytecode info
+     * Deployed bytecode info. May be undefined for abstract classes/interfaces.
      */
-    deployedBytecode: BytecodeInfo;
+    deployedBytecode: BytecodeInfo | undefined;
     /**
      * Metadata hash found in either the deployed or creation bytecode (if any).
      */

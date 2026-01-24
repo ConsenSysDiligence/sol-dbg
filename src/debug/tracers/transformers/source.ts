@@ -32,6 +32,10 @@ export function decodeSourceLoc(
     const bytecodeInfo =
         ctx.kind === FrameKind.Creation ? ctx.info.bytecode : ctx.info.deployedBytecode;
 
+    if (bytecodeInfo === undefined) {
+        return [undefined, undefined];
+    }
+
     const src = getOffsetSrc(instrOffset, bytecodeInfo);
 
     const astNode = ctx.info.artifact.srcMap.get(`${src.start}:${src.length}:${src.sourceIndex}`);

@@ -3,6 +3,7 @@ import { ArtifactManager, BytecodeReference, LinkMap, ZERO_ADDRESS } from "../..
 import * as fse from "fs-extra";
 import { createAddressFromString } from "@ethereumjs/util";
 import { decodeLinkMap } from "../../src/debug/decoding/utils";
+import * as sol from "solc-typed-ast";
 
 describe(`Link references test`, () => {
     it("Can load an artifact with link references", () => {
@@ -18,13 +19,15 @@ describe(`Link references test`, () => {
             fse.readJSONSync("test/samples/static/link_ref/artifacts/main.json")
         ]);
         const lib = artifactManager.contracts().filter((info) => info.contractName === "Lib")[0];
-        const linkRefs = lib.bytecode.linkReferences;
+        const libBytecode = lib.bytecode;
+        sol.assert(libBytecode !== undefined, ``)
+        const linkRefs = libBytecode.linkReferences;
         const libId = "test/samples/static/link_ref/contracts/libraries.sol:Lib1";
         const addr = createAddressFromString("0xAaaaAaAAaaaAAaAAaAaaaaAAAAAaAaaaAaAaaAA0");
 
         const linkMap: LinkMap = new Map([[libId, addr]]);
 
-        const linkedBytecode = artifactManager.link(lib.bytecode, linkMap);
+        const linkedBytecode = artifactManager.link(libBytecode, linkMap);
 
         // All the link ranges are set correctly
         for (const range of linkRefs.get(libId) as BytecodeReference[]) {
@@ -34,7 +37,7 @@ describe(`Link references test`, () => {
         }
 
         // Decoding works
-        const decodedLinkMap = decodeLinkMap(lib.bytecode, linkedBytecode);
+        const decodedLinkMap = decodeLinkMap(libBytecode, linkedBytecode);
         expect(decodedLinkMap).toEqual(linkMap);
 
         // If we zero them out we get the original bytecode
@@ -42,10 +45,10 @@ describe(`Link references test`, () => {
             linkedBytecode.set(ZERO_ADDRESS.bytes, range.start);
         }
 
-        expect(linkedBytecode).toEqual(lib.bytecode.bytecode);
+        expect(linkedBytecode).toEqual(libBytecode.bytecode);
 
         expect(() => {
-            artifactManager.link(lib.bytecode, new Map());
+            artifactManager.link(libBytecode, new Map());
         }).toThrow();
     });
 });
