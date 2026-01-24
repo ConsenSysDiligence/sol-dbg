@@ -324,7 +324,9 @@ export class ArtifactManager implements IArtifactManager {
                     }
 
                     if (contractInfo.bytecode !== undefined) {
-                        this._creationBytecodeTemplates.push(makeTemplate(contractInfo.bytecode, contractInfo));
+                        this._creationBytecodeTemplates.push(
+                            makeTemplate(contractInfo.bytecode, contractInfo)
+                        );
                     }
 
                     if (contractInfo.deployedBytecode !== undefined) {
