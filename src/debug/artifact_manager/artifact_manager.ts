@@ -304,12 +304,13 @@ export class ArtifactManager implements IArtifactManager {
                         ast: contractDef,
                         bytecode: undefined,
                         deployedBytecode: undefined,
-                        mdHash: undefined 
+                        mdHash: undefined
                     };
 
-
                     if (contractArtifact.evm.deployedBytecode.object.length > 0) {
-                        contractInfo.mdHash= getCodeHash(contractArtifact.evm.deployedBytecode.object);
+                        contractInfo.mdHash = getCodeHash(
+                            contractArtifact.evm.deployedBytecode.object
+                        );
                         contractInfo.bytecode = buildBytecodeInfo(contractArtifact.evm.bytecode);
                         contractInfo.deployedBytecode = buildBytecodeInfo(
                             contractArtifact.evm.deployedBytecode
@@ -327,7 +328,9 @@ export class ArtifactManager implements IArtifactManager {
                     }
 
                     if (contractInfo.deployedBytecode !== undefined) {
-                        this._deployedBytecodeTemplates.push(makeTemplate(contractInfo.deployedBytecode));
+                        this._deployedBytecodeTemplates.push(
+                            makeTemplate(contractInfo.deployedBytecode)
+                        );
                     }
                 }
             }
@@ -449,12 +452,10 @@ export class ArtifactManager implements IArtifactManager {
             return undefined;
         }
 
-        const bytecodeInfo = isCreation
-            ? contractInfo.bytecode
-            : contractInfo.deployedBytecode;
+        const bytecodeInfo = isCreation ? contractInfo.bytecode : contractInfo.deployedBytecode;
 
         if (bytecodeInfo === undefined) {
-            return undefined
+            return undefined;
         }
 
         const res = bytecodeInfo.generatedFileMap.get(id);

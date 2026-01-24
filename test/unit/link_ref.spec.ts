@@ -20,7 +20,7 @@ describe(`Link references test`, () => {
         ]);
         const lib = artifactManager.contracts().filter((info) => info.contractName === "Lib")[0];
         const libBytecode = lib.bytecode;
-        sol.assert(libBytecode !== undefined, ``)
+        sol.assert(libBytecode !== undefined, ``);
         const linkRefs = libBytecode.linkReferences;
         const libId = "test/samples/static/link_ref/contracts/libraries.sol:Lib1";
         const addr = createAddressFromString("0xAaaaAaAAaaaAAaAAaAaaaaAAAAAaAaaaAaAaaAA0");
