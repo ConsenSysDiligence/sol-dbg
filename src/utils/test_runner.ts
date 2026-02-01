@@ -76,6 +76,7 @@ export class TxRunner {
     private _txToBlock: Map<string, Block>;
     private _results: FoundryTxResult[];
     private _stateRootBeforeTx = new Map<string, StateManagerInterface>();
+    private _stateRootAfterTx = new Map<string, StateManagerInterface>();
     private _contractsBeforeTx = new Map<string, Set<PrefixedHexString>>();
     private _keccakPreimagesBeforeTx = new Map<string, Map<bigint, Uint8Array>>();
 
@@ -142,6 +143,7 @@ export class TxRunner {
             this._results.push(res);
 
             stateManager = stateAfter;
+            this._stateRootAfterTx.set(txHash, stateAfter);
         }
     }
 
@@ -241,6 +243,15 @@ export class TxRunner {
         const res = this._stateRootBeforeTx.get(txHash);
 
         assert(res !== undefined, `Unable to find state before tx ${txHash}`);
+
+        return res;
+    }
+
+    getStateAfterTx(tx: TypedTransaction): StateManagerInterface {
+        const txHash = bytesToHex(tx.hash());
+        const res = this._stateRootAfterTx.get(txHash);
+
+        assert(res !== undefined, `Unable to find state after tx ${txHash}`);
 
         return res;
     }
