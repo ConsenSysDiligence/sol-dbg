@@ -37,7 +37,8 @@
             "result": {
                 "kind": "contract_created",
                 "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c"
-            }
+            },
+            "nonce": 0
         },
         {
             "address": "0x0000000000000000000000000000000000000000",
@@ -54,7 +55,8 @@
             "result": {
                 "kind": "contract_created",
                 "address": "0x1faca6f2f8e169c54e0b1fe6d889dfc21ab5737e"
-            }
+            },
+            "nonce": 1
         },
         {
             "address": "0x1faca6f2f8e169c54e0b1fe6d889dfc21ab5737e",
@@ -76,7 +78,8 @@
                 "test/samples/local/lib_storage_ptr/contracts/libraries.sol Lib.mustBeEmpty([1])",
                 "test/samples/local/lib_storage_ptr/contracts/libraries.sol Foo.main()"
             ],
-            "expectedLastMsg": "mustBeEmpty(0)"
+            "expectedLastMsg": "mustBeEmpty(0)",
+            "nonce": 2
         }
     ]
 }

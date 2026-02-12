@@ -37,7 +37,8 @@
             "result": {
                 "kind": "contract_created",
                 "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c"
-            }
+            },
+            "nonce": 0
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -59,8 +60,15 @@
                 "test/samples/local/indexing/contracts/main.sol Test.indexCalldataArray([44, 43, 42, 41, 40])"
             ],
             "expectedIndices": [
-                ["a", [3], "41"]
-            ]
+                [
+                    "a",
+                    [
+                        3
+                    ],
+                    "41"
+                ]
+            ],
+            "nonce": 1
         }
     ]
 }

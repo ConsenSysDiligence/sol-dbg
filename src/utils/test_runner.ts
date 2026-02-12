@@ -38,6 +38,7 @@ export interface TxDesc {
     blockGasLimit: HexString;
     blockNumber: HexString;
     blockTime: HexString;
+    nonce: number;
 }
 
 export interface AccountDescription {
@@ -58,6 +59,39 @@ export interface InitialState {
 export interface Scenario {
     initialState: InitialState;
     steps: TxDesc[];
+}
+
+export function txDescToTx(step: TxDesc, common: Common): TypedTransaction {
+    const txData: TypedTxData = {
+        value: hexToBigInt(step.value),
+        gasLimit: hexToBigInt(step.gasLimit),
+        gasPrice: 8,
+        data: hexToBytes(step.input),
+        nonce: step.nonce
+    };
+
+    if (step.address !== ZERO_ADDRESS_STRING) {
+        txData.to = createAddressFromString(step.address);
+    }
+
+    return makeFakeTransaction(txData, step.origin, common);
+}
+
+export function blockFromTxDesc(step: TxDesc, common: Common): Block {
+    return createBlock(
+        {
+            header: {
+                coinbase: step.origin,
+                difficulty: common.hardfork() === Hardfork.Shanghai ? 0 : step.blockDifficulty,
+                gasLimit: step.blockGasLimit,
+                number: step.blockNumber,
+                timestamp: step.blockTime
+            }
+        },
+        {
+            common: common
+        }
+    );
 }
 
 /**
@@ -114,9 +148,9 @@ export class TxRunner {
         const keccakPreimages: KeccakPreimageMap = new Map();
 
         for (let i = 0; i < scenario.steps.length; i++) {
-            const tx = await this.txDescToTx(scenario.steps[i], stateManager, common);
+            const tx = txDescToTx(scenario.steps[i], common);
 
-            const block = this.blockFromTxDesc(scenario.steps[i], common);
+            const block = blockFromTxDesc(scenario.steps[i], common);
 
             const txHash = bytesToHex(tx.hash());
 
@@ -187,47 +221,6 @@ export class TxRunner {
         await state.flush();
 
         return initialContracts;
-    }
-
-    async txDescToTx(
-        step: TxDesc,
-        stateManager: StateManagerInterface,
-        common: Common
-    ): Promise<TypedTransaction> {
-        const senderAddress = createAddressFromString(step.origin);
-        const senderAccount = await stateManager.getAccount(senderAddress);
-        const senderNonce = senderAccount !== undefined ? senderAccount.nonce : 0;
-
-        const txData: TypedTxData = {
-            value: hexToBigInt(step.value),
-            gasLimit: hexToBigInt(step.gasLimit),
-            gasPrice: 8,
-            data: hexToBytes(step.input),
-            nonce: senderNonce
-        };
-
-        if (step.address !== ZERO_ADDRESS_STRING) {
-            txData.to = createAddressFromString(step.address);
-        }
-
-        return makeFakeTransaction(txData, step.origin, common);
-    }
-
-    private blockFromTxDesc(step: TxDesc, common: Common): Block {
-        return createBlock(
-            {
-                header: {
-                    coinbase: step.origin,
-                    difficulty: common.hardfork() === Hardfork.Shanghai ? 0 : step.blockDifficulty,
-                    gasLimit: step.blockGasLimit,
-                    number: step.blockNumber,
-                    timestamp: step.blockTime
-                }
-            },
-            {
-                common: common
-            }
-        );
     }
 
     get txs(): TypedTransaction[] {

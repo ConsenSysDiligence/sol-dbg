@@ -37,7 +37,8 @@
             "result": {
                 "kind": "contract_created",
                 "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c"
-            }
+            },
+            "nonce": 0
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -54,7 +55,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "nonce": 1
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -74,7 +76,8 @@
             "errorString": "assert(arr[i] != 0)",
             "errorStack": [
                 "test/samples/local/arrays/contracts/main.sol Arrays.allNonZero([1, 2, 0])"
-            ]
+            ],
+            "nonce": 2
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -91,7 +94,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "nonce": 3
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -111,7 +115,8 @@
             "errorString": "assert(arr[i] != 0)",
             "errorStack": [
                 "test/samples/local/arrays/contracts/main.sol Arrays.allNonZeroExt([5, 0, 7])"
-            ]
+            ],
+            "nonce": 4
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -128,7 +133,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "nonce": 5
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -148,7 +154,8 @@
             "errorString": "assert(b[i] != 0x2a)",
             "errorStack": [
                 "test/samples/local/arrays/contracts/main.sol Arrays.noByte42(0x2b2b2b2a)"
-            ]
+            ],
+            "nonce": 6
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -165,7 +172,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "nonce": 7
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -185,7 +193,8 @@
             "errorString": "assert(a.length == b.length)",
             "errorStack": [
                 "test/samples/local/arrays/contracts/main.sol Arrays.checkBytesEq(0x2a2b2c2d2e2f, 0x2a2b2c2d2e)"
-            ]
+            ],
+            "nonce": 8
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -205,7 +214,8 @@
             "errorString": "assert(a[i] == b[i])",
             "errorStack": [
                 "test/samples/local/arrays/contracts/main.sol Arrays.checkBytesEq(0x2a2b2c2d2e2f, 0x2a2b2c2d2e3f)"
-            ]
+            ],
+            "nonce": 9
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -222,7 +232,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "nonce": 10
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -243,7 +254,8 @@
             "errorStack": [
                 "test/samples/local/arrays/contracts/main.sol Arrays.checkBytesEq(0x7768617420616d204920646f696e673f, 0x7768617420616d204920646f696e3f)",
                 "test/samples/local/arrays/contracts/main.sol Arrays.checkStrEq(\"what am I doing?\", \"what am I doin?\")"
-            ]
+            ],
+            "nonce": 11
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -260,7 +272,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "nonce": 12
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -280,7 +293,8 @@
             "errorString": "assert(arr[i][j] != 0)",
             "errorStack": [
                 "test/samples/local/arrays/contracts/main.sol Arrays.noZeros2D([[1, 2, 3], [4, 0], [6, 7, 8, 9]])"
-            ]
+            ],
+            "nonce": 13
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -297,7 +311,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "nonce": 14
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -317,7 +332,8 @@
             "errorString": "assert(arr[i][j][k] != 0)",
             "errorStack": [
                 "test/samples/local/arrays/contracts/main.sol Arrays.noZeros3D([[[1, 2, 3], [], [4]], [[5, 6, 7], [0], [8, 9]]])"
-            ]
+            ],
+            "nonce": 15
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -334,7 +350,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "nonce": 16
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -355,7 +372,8 @@
             "errorStack": [
                 "test/samples/local/arrays/contracts/main.sol Arrays.noByte42(0x0a0b2a0d0e0f)",
                 "test/samples/local/arrays/contracts/main.sol Arrays.noByte422D([0x2babde10fa, 0x2b, 0x0a0b2a0d0e0f])"
-            ]
+            ],
+            "nonce": 17
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -372,7 +390,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "nonce": 18
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -393,7 +412,8 @@
             "errorStack": [
                 "test/samples/local/arrays/contracts/main.sol Arrays.checkStrNEq(\"bruh\", \"bruh\")",
                 "test/samples/local/arrays/contracts/main.sol Arrays.noStringInArr([\"sup\", \"bruh\"], \"bruh\")"
-            ]
+            ],
+            "nonce": 19
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -410,7 +430,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "nonce": 20
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -430,7 +451,8 @@
             "errorString": "assert(arr[i] != 0)",
             "errorStack": [
                 "test/samples/local/arrays/contracts/main.sol Arrays.allNonZeroFixed([1, 0])"
-            ]
+            ],
+            "nonce": 21
         }
     ]
 }

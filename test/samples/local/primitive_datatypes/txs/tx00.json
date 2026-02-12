@@ -37,7 +37,8 @@
             "result": {
                 "kind": "contract_created",
                 "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c"
-            }
+            },
+            "nonce": 0
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -54,7 +55,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "nonce": 1
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -74,7 +76,8 @@
             "errorString": "assert(a != address(this))",
             "errorStack": [
                 "test/samples/local/primitive_datatypes/contracts/main.sol Failing.wasntMe(0xf084a83954ce917799e0b4dbd03934a2ea65888c)"
-            ]
+            ],
+            "nonce": 2
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -91,7 +94,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "nonce": 3
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -111,7 +115,8 @@
             "errorString": "assert(b[i] == bytes1(0x2a))",
             "errorStack": [
                 "test/samples/local/primitive_datatypes/contracts/main.sol Failing.isAll42(2a2a2a2a2a2a2b)"
-            ]
+            ],
+            "nonce": 4
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -128,7 +133,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "nonce": 5
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -148,7 +154,8 @@
             "errorString": "assert(c == bytes5(uint40((1 << 40) - 1)))",
             "errorStack": [
                 "test/samples/local/primitive_datatypes/contracts/main.sol Failing.areDifferent(true, ffffffffff, 0100000000)"
-            ]
+            ],
+            "nonce": 6
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -165,7 +172,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "nonce": 7
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -185,7 +193,8 @@
             "errorString": "assert(c == bytes5(uint40(0x0)))",
             "errorStack": [
                 "test/samples/local/primitive_datatypes/contracts/main.sol Failing.areDifferent(false, 1a0b0c0d0e, 0a0b0c0d0e)"
-            ]
+            ],
+            "nonce": 8
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -202,7 +211,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "nonce": 9
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -222,7 +232,8 @@
             "errorString": "assert(n == t)",
             "errorStack": [
                 "test/samples/local/primitive_datatypes/contracts/main.sol Failing.isConcat(25994377907754200443621621894611996396710692477276620992200926367528997506143, 95401788518828737164849068496112995423, 76390610959261840103023727920302156121)"
-            ]
+            ],
+            "nonce": 10
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -239,7 +250,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "nonce": 11
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -259,7 +271,8 @@
             "errorString": "assert(e == E.O3)",
             "errorStack": [
                 "test/samples/local/primitive_datatypes/contracts/main.sol Failing.shouldBeO3(3)"
-            ]
+            ],
+            "nonce": 12
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -276,7 +289,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "nonce": 13
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -297,7 +311,8 @@
             "errorStack": [
                 "test/samples/local/primitive_datatypes/contracts/main.sol Failing.checkItsNotMe(0xf084a83954ce917799e0b4dbd03934a2ea65888c, 0xf084a83954ce917799e0b4dbd03934a2ea65888c)",
                 "test/samples/local/primitive_datatypes/contracts/main.sol Failing.wasntMe2(0xf084a83954ce917799e0b4dbd03934a2ea65888c)"
-            ]
+            ],
+            "nonce": 14
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -314,7 +329,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "nonce": 15
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -334,7 +350,8 @@
             "errorString": "assert(DummyInt16.unwrap(t) > 0)",
             "errorStack": [
                 "test/samples/local/primitive_datatypes/contracts/main.sol Failing.isPositive(-1)"
-            ]
+            ],
+            "nonce": 16
         }
     ]
 }

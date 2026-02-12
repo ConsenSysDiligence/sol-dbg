@@ -37,7 +37,8 @@
             "result": {
                 "kind": "contract_created",
                 "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c"
-            }
+            },
+            "nonce": 0
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -54,7 +55,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "nonce": 1
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -74,7 +76,8 @@
             "errorString": "assert(arr[i] != 0)",
             "errorStack": [
                 "test/samples/local/arrays_cd_05/contracts/main.sol Arrays.allNonZero([1, 2, 0])"
-            ]
+            ],
+            "nonce": 2
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -91,7 +94,8 @@
             "result": {
                 "kind": "value_returned",
                 "value": ""
-            }
+            },
+            "nonce": 3
         },
         {
             "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
@@ -111,7 +115,8 @@
             "errorString": "assert(arr[i] != 0)",
             "errorStack": [
                 "test/samples/local/arrays_cd_05/contracts/main.sol Arrays.allNonZeroExt([5, 0, 7])"
-            ]
+            ],
+            "nonce": 4
         }
     ]
 }

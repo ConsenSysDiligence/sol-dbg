@@ -89,22 +89,43 @@
                 "test/Cheatcodes.t.sol:21:8 CheatcodeTest.testRoll()"
             ],
             "decodedEvents": [
-                ["log", [["", "Error: a == b not satisfied [uint]"]]],
                 [
-                    "log_named_uint",
+                    "log",
                     [
-                        ["key", "      Left"],
-                        ["val", "18"]
+                        [
+                            "",
+                            "Error: a == b not satisfied [uint]"
+                        ]
                     ]
                 ],
                 [
                     "log_named_uint",
                     [
-                        ["key", "     Right"],
-                        ["val", "19"]
+                        [
+                            "key",
+                            "      Left"
+                        ],
+                        [
+                            "val",
+                            "18"
+                        ]
+                    ]
+                ],
+                [
+                    "log_named_uint",
+                    [
+                        [
+                            "key",
+                            "     Right"
+                        ],
+                        [
+                            "val",
+                            "19"
+                        ]
                     ]
                 ]
-            ]
+            ],
+            "nonce": 0
         }
     ]
 }
