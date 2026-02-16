@@ -101,8 +101,8 @@ export enum OPCODES {
     CHAINID,
     SELFBALANCE,
     BASEFEE,
-    Invalid_49,
-    Invalid_4a,
+    BLOBHASH,
+    BLOBBASEFEE,
     Invalid_4b,
     Invalid_4c,
     Invalid_4d,
@@ -120,9 +120,9 @@ export enum OPCODES {
     MSIZE,
     GAS,
     JUMPDEST,
-    Invalid_5c,
-    Invalid_5d,
-    Invalid_5e,
+    TLOAD,
+    TSTORE,
+    MCOPY,
     PUSH0,
     PUSH1,
     PUSH2,
@@ -1019,23 +1019,23 @@ export const OpcodeInfo: EVMOpInfo[] = [
     },
     {
         opcode: 0x49,
-        mnemonic: "Invalid",
+        mnemonic: "BLOBHASH",
         length: 1,
         immediates: [],
-        nPop: 0,
-        nPush: 0,
-        valid: false,
-        controlFlow: InstructionControlFlow.StopInvalid
+        nPop: 1,
+        nPush: 1,
+        valid: true,
+        controlFlow: InstructionControlFlow.NextInstruction
     },
     {
         opcode: 0x4a,
-        mnemonic: "Invalid",
+        mnemonic: "BLOBBASEFEE",
         length: 1,
         immediates: [],
         nPop: 0,
-        nPush: 0,
-        valid: false,
-        controlFlow: InstructionControlFlow.StopInvalid
+        nPush: 1,
+        valid: true,
+        controlFlow: InstructionControlFlow.NextInstruction
     },
     {
         opcode: 0x4b,
@@ -1209,33 +1209,33 @@ export const OpcodeInfo: EVMOpInfo[] = [
     },
     {
         opcode: 0x5c,
-        mnemonic: "Invalid",
+        mnemonic: "TLOAD",
         length: 1,
         immediates: [],
-        nPop: 0,
-        nPush: 0,
-        valid: false,
-        controlFlow: InstructionControlFlow.StopInvalid
+        nPop: 1,
+        nPush: 1,
+        valid: true,
+        controlFlow: InstructionControlFlow.NextInstruction
     },
     {
         opcode: 0x5d,
-        mnemonic: "Invalid",
+        mnemonic: "TSTORE",
         length: 1,
         immediates: [],
-        nPop: 0,
+        nPop: 2,
         nPush: 0,
-        valid: false,
-        controlFlow: InstructionControlFlow.StopInvalid
+        valid: true,
+        controlFlow: InstructionControlFlow.NextInstruction
     },
     {
         opcode: 0x5e,
-        mnemonic: "Invalid",
+        mnemonic: "MCOPY",
         length: 1,
         immediates: [],
-        nPop: 0,
+        nPop: 3,
         nPush: 0,
-        valid: false,
-        controlFlow: InstructionControlFlow.StopInvalid
+        valid: true,
+        controlFlow: InstructionControlFlow.NextInstruction
     },
     {
         opcode: 0x5f,
@@ -2928,7 +2928,8 @@ export function changesMemory(op: EVMOpInfo): boolean {
         op.opcode === OPCODES.CALL ||
         op.opcode === OPCODES.CALLCODE ||
         op.opcode === OPCODES.DELEGATECALL ||
-        op.opcode === OPCODES.STATICCALL
+        op.opcode === OPCODES.STATICCALL ||
+        op.opcode === OPCODES.MCOPY
     );
 }
 
