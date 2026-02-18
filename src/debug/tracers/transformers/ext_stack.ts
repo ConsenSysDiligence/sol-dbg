@@ -4,7 +4,13 @@ import { Address } from "@ethereumjs/util";
 import { VM } from "@ethereumjs/vm";
 import { assert, FunctionDefinition, VariableDeclaration } from "solc-typed-ast";
 import { getCodeHash, getCreationCodeHash } from "../../../artifacts";
-import { mustReadMem, stackTop, wordToAddress, ZERO_ADDRESS } from "../../../utils/misc";
+import {
+    bigEndianBufToNumber,
+    mustReadMem,
+    stackTop,
+    wordToAddress,
+    ZERO_ADDRESS
+} from "../../../utils/misc";
 import { ContractInfo, IArtifactManager } from "../../artifact_manager";
 import { createsContract, increasesDepth, OPCODES } from "../../opcodes";
 import { CallFrame, CreationFrame, ExternalFrame, FrameKind, HexString } from "../../types";
@@ -134,11 +140,9 @@ function decodeCall(step: BasicStepInfo): [Address, Address, Uint8Array] {
 
     const receiver = op.opcode === OPCODES.DELEGATECALL ? step.address : receiverArg;
     const codeAddr = receiverArg;
-    const msgData = mustReadMem(
-        step.evmStack[stackTop - argStackOff],
-        step.evmStack[stackTop - argSizeStackOff],
-        step.memory
-    );
+    const start = bigEndianBufToNumber(step.evmStack[stackTop - argStackOff]);
+    const size = bigEndianBufToNumber(step.evmStack[stackTop - argSizeStackOff]);
+    const msgData = size === 0 ? new Uint8Array() : mustReadMem(start, size, step.memory);
 
     return [receiver, codeAddr, msgData];
 }

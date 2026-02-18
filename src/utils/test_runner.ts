@@ -1,5 +1,5 @@
 import { Block, createBlock } from "@ethereumjs/block";
-import { Common, StateManagerInterface, Hardfork } from "@ethereumjs/common";
+import { Common, StateManagerInterface } from "@ethereumjs/common";
 import { MerkleStateManager } from "@ethereumjs/statemanager";
 import { TypedTransaction, TypedTxData } from "@ethereumjs/tx";
 import {
@@ -82,7 +82,7 @@ export function blockFromTxDesc(step: TxDesc, common: Common): Block {
         {
             header: {
                 coinbase: step.origin,
-                difficulty: common.hardfork() === Hardfork.Shanghai ? 0 : step.blockDifficulty,
+                difficulty: 0,
                 gasLimit: step.blockGasLimit,
                 number: step.blockNumber,
                 timestamp: step.blockTime

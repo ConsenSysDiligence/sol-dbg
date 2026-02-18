@@ -135,6 +135,11 @@ export function readMem(
         length = bigIntToNum(length);
     }
 
+    // Allow 0-length reads even OoB
+    if (length === 0) {
+        return new Uint8Array();
+    }
+
     if (start < 0 || start + length > mem.length) {
         return undefined;
     }
