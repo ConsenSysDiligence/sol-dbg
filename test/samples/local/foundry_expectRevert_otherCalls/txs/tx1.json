@@ -94,7 +94,7 @@
             "origin": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
             "value": "0x0",
             "blockCoinbase": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
-            "blockDifficulty": "0x10",
+            "blockDifficulty": "0x0",
             "blockGasLimit": "0xff0000",
             "blockNumber": "0x4",
             "blockTime": "0x4",

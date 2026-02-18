@@ -81,7 +81,7 @@
             "origin": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
             "value": "0x0",
             "blockCoinbase": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
-            "blockDifficulty": "0xa",
+            "blockDifficulty": "0x0",
             "blockGasLimit": "0xff0000",
             "blockNumber": "0x13726",
             "blockTime": "0x56",

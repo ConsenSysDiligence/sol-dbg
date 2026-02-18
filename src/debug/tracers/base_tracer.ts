@@ -112,7 +112,7 @@ export abstract class BaseSolTxTracer<TraceT, CtxT> {
         stateManager: StateManagerInterface | undefined,
         foundryCheatcodes: boolean
     ): Promise<VM> {
-        const common = new Common({ chain: Mainnet, hardfork: Hardfork.Shanghai });
+        const common = new Common({ chain: Mainnet, hardfork: Hardfork.Cancun });
         const blockchain = await createBlockchain({ common });
 
         if (!stateManager) {
