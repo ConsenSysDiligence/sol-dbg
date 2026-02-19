@@ -31,14 +31,16 @@ export interface ReturnInfo {
 /**
  * Make Views to the return values of the given method
  */
-function getReturnViews(callee: FunctionDefinition | VariableDeclaration): BaseCalldataView<Value, BaseRuntimeType>[] {
+function getReturnViews(
+    callee: FunctionDefinition | VariableDeclaration
+): Array<BaseCalldataView<Value, BaseRuntimeType>> {
     // fallback() methods either have no returns, or return raw unencoded bytes.
     if (callee instanceof FunctionDefinition && callee.kind === FunctionKind.Fallback) {
         if (callee.vReturnParameters.vParameters.length === 0) {
-            return []
+            return [];
         }
 
-        return [new RawBytesView()]
+        return [new RawBytesView()];
     }
 
     const returns = getReturns(callee);

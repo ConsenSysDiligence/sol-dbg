@@ -1,5 +1,5 @@
 import { Address } from "@ethereumjs/util";
-import { assert, FunctionDefinition } from "solc-typed-ast";
+import { assert } from "solc-typed-ast";
 import { View } from "./view";
 import { BaseRuntimeType } from "../runtime_types";
 
@@ -11,7 +11,7 @@ export class ExternalFunRef {
 }
 
 export class InternalFunRef {
-    constructor(public readonly fun: FunctionDefinition) {}
+    constructor(public readonly opaque: bigint) {}
 }
 
 export type FunctionValue = ExternalFunRef | InternalFunRef;

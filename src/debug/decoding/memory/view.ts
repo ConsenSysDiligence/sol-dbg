@@ -8,7 +8,7 @@ import {
     StructView,
     View
 } from "../view";
-import { DecodingFailure, Struct, Value } from "../value";
+import { DecodingFailure, ExternalFunRef, InternalFunRef, Struct, Value } from "../value";
 import {
     bigEndianBufToBigint,
     bigIntToNum,
@@ -22,7 +22,7 @@ import {
     uint256,
     ZERO_BYTES32
 } from "../../../utils";
-import { Address, bigIntToHex, bytesToUtf8 } from "@ethereumjs/util";
+import { Address, bigIntToHex, bytesToUtf8, concatBytes } from "@ethereumjs/util";
 import { inRange, isFailure } from "../utils";
 import { Allocator } from "./allocator";
 import { utf8ToBytes } from "ethereum-cryptography/utils";
@@ -33,6 +33,7 @@ import {
     BoolType,
     BytesType,
     FixedBytesType,
+    FunctionType,
     IntType,
     MappingType,
     MissingTypeDef,
@@ -67,15 +68,15 @@ export abstract class BaseMemoryView<
 
     protected readMemAt(
         off: bigint,
-        calldata: Memory,
+        mem: Memory,
         len: bigint | number
     ): Uint8Array | DecodingFailure {
-        const res = readMem(off, len, calldata);
+        const res = readMem(off, len, mem);
 
         if (!res) {
             // OoB access
             return new DecodingFailure(
-                `OoB access at ${off}:${off + BigInt(len)} in memory of size ${calldata.length}`
+                `OoB access at ${off}:${off + BigInt(len)} in memory of size ${mem.length}`
             );
         }
 
@@ -522,6 +523,37 @@ export class MapMemView extends BaseMemoryView<Map<Value, Value>, MappingType> {
     }
 }
 
+export class InternalFunctionMemoryView extends BaseMemoryView<InternalFunRef, FunctionType> {
+    encode(value: InternalFunRef, state: Memory): void {
+        this.encodeIntAt(value.opaque, this.loc, state);
+    }
+    decode(state: Memory): InternalFunRef | DecodingFailure {
+        const opaque = this.decodeIntAt(this.loc, uint256, state);
+        if (isFailure(opaque)) {
+            return opaque;
+        }
+
+        return new InternalFunRef(opaque);
+    }
+}
+
+export class ExternalFunctionMemoryView extends BaseMemoryView<ExternalFunRef, FunctionType> {
+    encode(value: ExternalFunRef, state: Memory): void {
+        const word = concatBytes(value.address.bytes, value.selector);
+        this.writeMemAt(word, this.loc, state);
+    }
+
+    decode(state: Memory): ExternalFunRef | DecodingFailure {
+        const word = this.readMemAt(this.loc, state, 24);
+
+        if (isFailure(word)) {
+            return new DecodingFailure(`OoB access at ${this.loc} in stack`);
+        }
+
+        return new ExternalFunRef(new Address(word.slice(0, 20)), word.slice(20, 24));
+    }
+}
+
 export function makeMemoryView(
     type: BaseRuntimeType,
     loc: bigint
@@ -570,6 +602,15 @@ export function makeMemoryView(
 
     if (type instanceof MissingTypeDef) {
         return new MissingMemView(type, loc);
+    }
+
+    if (type instanceof FunctionType) {
+        if (type.solType.kind === "external") {
+            return new ExternalFunctionMemoryView(type, loc);
+        }
+
+        assert(type.solType.kind === "internal", `Unexpected function type in memory {0}`, type);
+        return new InternalFunctionMemoryView(type, loc);
     }
 
     nyi(`makeMemoryView(${type.pp()})`);

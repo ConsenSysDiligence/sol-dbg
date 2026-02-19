@@ -1,8 +1,8 @@
-import * as sol from "solc-typed-ast"
+import * as sol from "solc-typed-ast";
 import { BaseRuntimeType } from "../../src/debug/runtime_types";
 import { ArtifactManager, PartialSolcOutput } from "../../src";
 import { bytesToUtf8 } from "@ethereumjs/util";
-const fse = require("fs-extra")
+const fse = require("fs-extra");
 
 export type TypeGenerator = (unit: sol.SourceUnit) => BaseRuntimeType;
 
@@ -13,7 +13,6 @@ export function ppType(t: BaseRuntimeType | TypeGenerator): string {
 
     return "<type-generator>";
 }
-
 
 function getVersion(source: string): string {
     const version = source.match(/pragma solidity ([0-9.]*);/);

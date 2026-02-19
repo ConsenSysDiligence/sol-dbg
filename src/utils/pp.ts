@@ -3,7 +3,7 @@ import { bytesToHex } from "ethereum-cryptography/utils";
 import { assert, ContractDefinition, FunctionDefinition, FunctionKind } from "solc-typed-ast";
 import { ArtifactManager } from "../debug/artifact_manager/artifact_manager";
 import { ContractInfo, SourceFileInfo } from "../debug/artifact_manager/types";
-import { decodeView } from "../debug/decoding";
+import { decodeView, ExternalFunRef, InternalFunRef } from "../debug/decoding";
 import { SolTxDebugger } from "../debug/tracers";
 import {
     decodeSourceLoc,
@@ -22,6 +22,7 @@ import {
     BoolType,
     BytesType,
     FixedBytesType,
+    FunctionType,
     IntType,
     PointerType,
     StringType,
@@ -79,6 +80,28 @@ export function ppValue(typ: BaseRuntimeType, v: any): string {
         }
 
         throw new Error(`NYI ppValue of referenced type ${typ.toType.pp()}`);
+    }
+
+    if (typ instanceof FunctionType) {
+        if (typ.solType.kind === "external") {
+            assert(
+                v instanceof ExternalFunRef,
+                `Expected an external fun ref of type {0} not {1}`,
+                typ,
+                v
+            );
+            return `<external fun@${v.address.toString()}:${bytesToHex(v.selector)}>`;
+        }
+
+        assert(typ.solType.kind === "internal", ``);
+        assert(
+            v instanceof InternalFunRef,
+            `Expected an external fun ref of type {0} not {1}`,
+            typ,
+            v
+        );
+
+        return `<internal fun@${v.opaque}>`;
     }
 
     throw new Error(`NYI ppValue of type ${typ.pp()}`);

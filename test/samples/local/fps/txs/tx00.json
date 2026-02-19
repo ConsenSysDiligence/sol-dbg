@@ -1,0 +1,78 @@
+{
+    "initialState": {
+        "accounts": {
+            "0xAaaaAaAAaaaAAaAAaAaaaaAAAAAaAaaaAaAaaAA0": {
+                "nonce": 0,
+                "balance": "0x0000000000000000000000f000000000",
+                "code": "",
+                "storage": {}
+            },
+            "0xAaAaaAAAaAaaAaAaAaaAAaAaAAAAAaAAAaaAaAa2": {
+                "nonce": 0,
+                "balance": "0x0000000000000000000000f000000000",
+                "code": "",
+                "storage": {}
+            },
+            "0xafFEaFFEAFfeAfFEAffeaFfEAfFEaffeafFeAFfE": {
+                "nonce": 0,
+                "balance": "0x0000000000000000000000f000000000",
+                "code": "",
+                "storage": {}
+            }
+        }
+    },
+    "steps": [
+        {
+            "address": "0x0000000000000000000000000000000000000000",
+            "gasLimit": "0xff0000",
+            "gasPrice": "0x1",
+            "input": "0x6080604052348015600e575f5ffd5b506104858061001c5f395ff3fe608060405234801561000f575f5ffd5b506004361061003f575f3560e01c80634807fd6314610043578063b1a6942114610073578063dffeadd01461008f575b5f5ffd5b61005d6004803603810190610058919061025a565b610099565b60405161006a9190610294565b60405180910390f35b61008d60048036038101906100889190610370565b6100a2565b005b6100976100b4565b005b5f819050919050565b5f6100b0576100af61039f565b5b5050565b5f604051806040016040528061012281526020013073ffffffffffffffffffffffffffffffffffffffff16634807fd6363ffffffff169060201b1760401b815250905061011f6101223073ffffffffffffffffffffffffffffffffffffffff16634807fd638461012b565b50565b5f819050919050565b835f5f6101000a81548167ffffffffffffffff021916908367ffffffffffffffff16021790555082825f60086101000a81548177ffffffffffffffffffffffffffffffffffffffffffffffff02191690848463ffffffff169073ffffffffffffffffffffffffffffffffffffffff1660201b170217905550503073ffffffffffffffffffffffffffffffffffffffff1663b1a6942182602001518060601c9060401c63ffffffff166040518363ffffffff1660e01b81526004016101f0929190610434565b5f604051808303815f87803b158015610207575f5ffd5b505af1158015610219573d5f5f3e3d5ffd5b5050505050505050565b5f5ffd5b5f819050919050565b61023981610227565b8114610243575f5ffd5b50565b5f8135905061025481610230565b92915050565b5f6020828403121561026f5761026e610223565b5b5f61027c84828501610246565b91505092915050565b61028e81610227565b82525050565b5f6020820190506102a75f830184610285565b92915050565b5f7fffffffffffffffffffffffffffffffffffffffffffffffff000000000000000082169050919050565b5f6102e2826102ad565b9050919050565b6102f2816102d8565b81146102fc575f5ffd5b50565b5f8135905061030d816102e9565b92915050565b5f8160201c9050919050565b5f8160401c9050919050565b5f5f6103368361031f565b925063ffffffff8316905061034a83610313565b9150915091565b5f5f61036561036085856102ff565b61032b565b915091509250929050565b5f5f6020838503121561038657610385610223565b5b5f61039385828601610351565b92509250509250929050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52600160045260245ffd5b5f8160201b9050919050565b5f8160401b9050919050565b5f6103fe63ffffffff84166103f8846103cc565b176103d8565b905092915050565b5f5f8291508390509250929050565b61041f8282610406565b9250905061042d82826103e4565b8352505050565b5f6020820190506104485f83018486610415565b939250505056fea2646970667358221220045f5464283f3db311b35280b9efb2b2e4db3690ab9ff62d592553de8faebb1f64736f6c634300081d0033",
+            "origin": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+            "value": "0x0",
+            "blockCoinbase": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+            "blockDifficulty": "0x0",
+            "blockGasLimit": "0xff0000",
+            "blockNumber": "0x1",
+            "blockTime": "0x1",
+            "result": {
+                "kind": "contract_created",
+                "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c"
+            },
+            "nonce": 0
+        },
+        {
+            "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
+            "gasLimit": "0xff0000",
+            "gasPrice": "0x1",
+            "input": "0xdffeadd0",
+            "origin": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+            "value": "0x0",
+            "blockCoinbase": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+            "blockDifficulty": "0x0",
+            "blockGasLimit": "0xff0000",
+            "blockNumber": "0x2",
+            "blockTime": "0x2",
+            "result": {
+                "kind": "revert"
+            },
+            "errorString": "assert(false)",
+            "errorStack": [
+                "test/samples/local/fps/contracts/fps.sol FunctionPointers.extFunArg(<external fun@0xf084a83954ce917799e0b4dbd03934a2ea65888c:4807fd63>)",
+                "test/samples/local/fps/contracts/fps.sol FunctionPointers.funArgs(<internal fun@290>, <external fun@0xf084a83954ce917799e0b4dbd03934a2ea65888c:4807fd63>, {a: <internal fun@290>, b: <external fun@0xf084a83954ce917799e0b4dbd03934a2ea65888c:4807fd63>})",
+                "test/samples/local/fps/contracts/fps.sol FunctionPointers.main()"
+            ],
+            "nonce": 2,
+            "layoutAtFailure": {
+                "0xf084a83954ce917799e0b4dbd03934a2ea65888c": {
+                    "a": {
+                        "opaque": "0x122"
+                    },
+                    "b": {
+                        "address": "0xf084a83954ce917799e0b4dbd03934a2ea65888c",
+                        "selector": "4807fd63"
+                    }
+                }
+            }
+        }
+    ]
+}

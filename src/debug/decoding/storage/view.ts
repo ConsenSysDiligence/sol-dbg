@@ -1,5 +1,5 @@
 import { assert, stringToBytes } from "solc-typed-ast";
-import { DecodingFailure, Struct, Value } from "../value";
+import { DecodingFailure, ExternalFunRef, InternalFunRef, Struct, Value } from "../value";
 import {
     ArrayLikeView,
     EncodingError,
@@ -22,6 +22,7 @@ import {
     min,
     nyi,
     uint256,
+    uint64,
     uint8
 } from "../../../utils";
 import { keccak256 } from "ethereum-cryptography/keccak";
@@ -38,6 +39,7 @@ import {
     BoolType,
     BytesType,
     FixedBytesType,
+    FunctionType,
     IntType,
     MappingType,
     MissingTypeDef,
@@ -208,6 +210,44 @@ export abstract class BaseStorageView<
         return this.setWord(key, word, state);
     }
 
+    /**
+     * Helper to decode fixed bytes at a given location
+     * @param state
+     * @returns
+     */
+    decodeFixedBytesAt(
+        key: bigint,
+        endOffsetInWord: number,
+        numBytes: number,
+        state: Storage
+    ): Uint8Array | DecodingFailure {
+        if (endOffsetInWord < numBytes) {
+            return new DecodingFailure(
+                `Unalighed Read: Can't decode ${numBytes} bytes starting at offset ${endOffsetInWord} in word ${key}`
+            );
+        }
+
+        return this.fetchBytes(key, endOffsetInWord - numBytes, numBytes, state);
+    }
+
+    encodeFixedBytesAt(
+        value: Uint8Array,
+        key: bigint,
+        endOffsetInWord: number,
+        numBytes: number,
+        state: Storage
+    ): Storage {
+        if (endOffsetInWord < numBytes) {
+            throw new EncodingError(
+                `Unalighed read: Can't decode ${numBytes} bytes starting at offset ${endOffsetInWord} in word ${key}`
+            );
+        }
+
+        const word = this.fetchWordCopy(key, state);
+        word.set(value, endOffsetInWord - numBytes);
+        return this.setWord(key, word, state);
+    }
+
     pp(): string {
         return `<${this.type.pp()}@${this.loc} in storage>`;
     }
@@ -325,30 +365,17 @@ export class FixedBytesStorageView
     implements ArrayLikeStorageView<SingleByteStorageView>
 {
     decode(state: Storage): Uint8Array | DecodingFailure {
-        if (this.endOffsetInWord < this.type.numBytes) {
-            return new DecodingFailure(
-                `Unalighed Read: Can't decode ${this.type.pp()} starting at offset ${this.endOffsetInWord} in word ${this.key}`
-            );
-        }
-
-        return this.fetchBytes(
-            this.key,
-            this.endOffsetInWord - this.type.numBytes,
-            this.type.numBytes,
-            state
-        );
+        return this.decodeFixedBytesAt(this.key, this.endOffsetInWord, this.type.numBytes, state);
     }
 
     encode(value: Uint8Array, state: Storage): Storage {
-        if (this.endOffsetInWord < this.type.numBytes) {
-            throw new EncodingError(
-                `Unalighed read: Can't decode ${this.type.pp()} starting at offset ${this.endOffsetInWord} in word ${this.key}`
-            );
-        }
-
-        const word = this.fetchWordCopy(this.key, state);
-        word.set(value, this.endOffsetInWord - this.type.numBytes);
-        return this.setWord(this.key, word, state);
+        return this.encodeFixedBytesAt(
+            value,
+            this.key,
+            this.endOffsetInWord,
+            this.type.numBytes,
+            state
+        );
     }
 
     indexView(key: bigint): DecodingFailure | SingleByteStorageView {
@@ -945,6 +972,46 @@ export class MissingStorageView extends BaseStorageView<DecodingFailure, BaseRun
     }
 }
 
+export class InternalFunctionStorageView extends BaseStorageView<InternalFunRef, FunctionType> {
+    nextLoc(): StorageLocation | undefined {
+        return move(this.loc, 8);
+    }
+
+    encode(value: InternalFunRef, state: Storage): Storage {
+        return this.encodeIntAt(value.opaque, this.key, this.endOffsetInWord, uint64, state);
+    }
+
+    decode(state: Storage): InternalFunRef | DecodingFailure {
+        const opaque = this.decodeIntAt(this.key, this.endOffsetInWord, uint64, state);
+        if (isFailure(opaque)) {
+            return opaque;
+        }
+
+        return new InternalFunRef(opaque);
+    }
+}
+
+export class ExternalFunctionStorageView extends BaseStorageView<ExternalFunRef, FunctionType> {
+    nextLoc(): StorageLocation | undefined {
+        return move(this.loc, 24);
+    }
+
+    encode(value: ExternalFunRef, state: Storage): Storage {
+        const word = concatBytes(value.address.bytes, value.selector);
+        assert(word.length === 24, ``);
+        return this.encodeFixedBytesAt(word, this.key, this.endOffsetInWord, 24, state);
+    }
+
+    decode(state: Storage): ExternalFunRef | DecodingFailure {
+        const word = this.decodeFixedBytesAt(this.key, this.endOffsetInWord, 24, state);
+        if (isFailure(word)) {
+            return word;
+        }
+
+        return new ExternalFunRef(new Address(word.slice(0, 20)), word.slice(20, 24));
+    }
+}
+
 /**
  * Return true if the given type `typ` fits in the storage word location pointed by
  * `loc`. This checks that the type actually fits, and that its not one of the types
@@ -1011,6 +1078,10 @@ function staticSize(typ: BaseRuntimeType): number {
         return staticSize(typ.toType);
     }
 
+    if (typ instanceof FunctionType) {
+        return typ.solType.kind === "external" ? 24 : 32;
+    }
+
     nyi(`NYI staticSize(${typ.pp()})`);
 }
 
@@ -1066,6 +1137,15 @@ export function makeStorageView(
 
     if (type instanceof MappingType) {
         return new MapStorageView(type, loc);
+    }
+
+    if (type instanceof FunctionType) {
+        if (type.solType.kind === "external") {
+            return new ExternalFunctionStorageView(type, loc);
+        }
+
+        assert(type.solType.kind === "internal", "Unexpected function type in storage {0}", type);
+        return new InternalFunctionStorageView(type, loc);
     }
 
     nyi(`makeStoragView(${type.pp()})`);
