@@ -1,0 +1,42 @@
+{
+    "initialState": {
+        "accounts": {
+            "0x4838b106fce9647bdf1e7877bf73ce8b0bad5f97": {
+                "nonce": "0x0",
+                "balance": "0xf4240",
+                "code": "0x",
+                "storage": {}
+            }
+        }
+    },
+    "steps": [
+        {
+            "address": "0x0000000000000000000000000000000000000000",
+            "gasLimit": "0xff0000",
+            "gasPrice": "0x1",
+            "input": "0x6080604052348015600f57600080fd5b506101868061001f6000396000f3fe608060405260043610601c5760003560e01c8063dffeadd0146021575b600080fd5b60276029565b005b60006040516035906056565b604051809103906000f0801580156050573d6000803e3d6000fd5b50905050565b60ee806100638339019056fe608060405234801561001057600080fd5b5060cf8061001f6000396000f3fe6080604052348015600f57600080fd5b506004361060325760003560e01c80634b3df200146037578063c2985578146060575b600080fd5b603d6089565b60405180826002811115604c57fe5b60ff16815260200191505060405180910390f35b60666091565b60405180826002811115607557fe5b60ff16815260200191505060405180910390f35b600080905090565b60008090509056fea2646970667358221220fdbd0080c4cb4b862a8fe81cc670ce2f278fb1c3709ab37e787af1655bac32b664736f6c634300060a0033a2646970667358221220accf0c41e16a51080b0f991f19c80b1f47c598613fcaaf34f044f1e4dc87162a64736f6c634300060a0033",
+            "origin": "0x4838b106fce9647bdf1e7877bf73ce8b0bad5f97",
+            "value": "0x0",
+            "blockCoinbase": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+            "blockDifficulty": "0x0",
+            "blockGasLimit": "0xff0000",
+            "blockNumber": "0x1",
+            "blockTime": "0x1",
+            "nonce": 0
+        },
+        {
+            "address": "0x93a5b04040b9d24ea0bb4aaa19967294bcbf44d2",
+            "gasLimit": "0xff0000",
+            "gasPrice": "0x1",
+            "input": "0xdffeadd0",
+            "origin": "0x4838b106fce9647bdf1e7877bf73ce8b0bad5f97",
+            "value": "0xf4240",
+            "blockCoinbase": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+            "blockDifficulty": "0x0",
+            "blockGasLimit": "0xff0000",
+            "blockNumber": "0x1",
+            "blockTime": "0x1",
+            "nonce": 1
+        }
+    ]
+}

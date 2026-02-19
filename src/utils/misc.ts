@@ -1,7 +1,7 @@
 import { Common } from "@ethereumjs/common";
 import { createTx, TypedTransaction, TypedTxData } from "@ethereumjs/tx";
 import { Address, setLengthLeft, createAddressFromString } from "@ethereumjs/util";
-import { bytesToHex, hexToBytes } from "ethereum-cryptography/utils";
+import { bytesToHex, concatBytes, hexToBytes } from "ethereum-cryptography/utils";
 import { FunctionDefinition, assert, signatureHash } from "solc-typed-ast";
 import { HexString, Stack, Storage, UnprefixedHexString } from "../debug/types";
 import { AddressType, BoolType, FixedBytesType, IntType } from "../debug/runtime_types";
@@ -140,11 +140,17 @@ export function readMem(
         return new Uint8Array();
     }
 
-    if (start < 0 || start + length > mem.length) {
+    if (start < 0) {
         return undefined;
     }
 
-    return mem.slice(start, start + length);
+    const nonZeroSlice = mem.slice(start, min(start + length, mem.length));
+
+    if (start + length <= mem.length) {
+        return nonZeroSlice;
+    }
+
+    return concatBytes(nonZeroSlice, new Uint8Array(start + length - mem.length));
 }
 
 /**

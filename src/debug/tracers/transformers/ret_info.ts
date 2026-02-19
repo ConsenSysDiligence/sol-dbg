@@ -3,6 +3,7 @@ import { VM } from "@ethereumjs/vm";
 import {
     DataLocation,
     FunctionDefinition,
+    FunctionKind,
     StateVariableVisibility,
     VariableDeclaration
 } from "solc-typed-ast";
@@ -11,9 +12,10 @@ import { OPCODES } from "../../opcodes";
 import { FrameKind } from "../../types";
 import { BasicStepInfo } from "./basic_info";
 import { ExternalFrameInfo, topExtFrame } from "./ext_stack";
-import { makeCalldataViews } from "../../decoding/calldata/view";
-import { typeIdToRuntimeType } from "../../runtime_types";
+import { BaseCalldataView, makeCalldataViews, RawBytesView } from "../../decoding/calldata/view";
+import { BaseRuntimeType, typeIdToRuntimeType } from "../../runtime_types";
 import { getReturns } from "../../../utils";
+import { Value } from "../../decoding";
 
 export interface ReturnInfo {
     retInfo?: {
@@ -24,6 +26,27 @@ export interface ReturnInfo {
         // Decoded returned data (if ast info is available)
         decodedReturnData?: any[];
     };
+}
+
+/**
+ * Make Views to the return values of the given method
+ */
+function getReturnViews(callee: FunctionDefinition | VariableDeclaration): BaseCalldataView<Value, BaseRuntimeType>[] {
+    // fallback() methods either have no returns, or return raw unencoded bytes.
+    if (callee instanceof FunctionDefinition && callee.kind === FunctionKind.Fallback) {
+        if (callee.vReturnParameters.vParameters.length === 0) {
+            return []
+        }
+
+        return [new RawBytesView()]
+    }
+
+    const returns = getReturns(callee);
+    const ctx = callee.requiredContext;
+    return makeCalldataViews(
+        returns.map(([, t]) => typeIdToRuntimeType(t, ctx, DataLocation.CallData)),
+        0n
+    );
 }
 
 /**
@@ -76,9 +99,9 @@ export async function addReturnInfo<T extends object & BasicStepInfo & ExternalF
         };
     }
 
-    const returns = getReturns(extFrame.callee);
+    const views = getReturnViews(extFrame.callee);
 
-    if (returns.length === 0) {
+    if (views.length === 0) {
         return {
             ...state,
             retInfo: {
@@ -90,11 +113,6 @@ export async function addReturnInfo<T extends object & BasicStepInfo & ExternalF
     }
 
     // We treat these as in calldata, since they should already be abi-encoded in memory for the Return instruction
-    const ctx = extFrame.callee.requiredContext;
-    const views = makeCalldataViews(
-        returns.map(([, t]) => typeIdToRuntimeType(t, ctx, DataLocation.CallData)),
-        0n
-    );
     const decodedReturnData = views.map((v) => v.decode(rawReturnData));
 
     return {

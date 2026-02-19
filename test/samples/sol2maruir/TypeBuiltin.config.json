@@ -1,0 +1,42 @@
+{
+    "initialState": {
+        "accounts": {
+            "0x4838b106fce9647bdf1e7877bf73ce8b0bad5f97": {
+                "nonce": "0x0",
+                "balance": "0xf4240",
+                "code": "0x",
+                "storage": {}
+            }
+        }
+    },
+    "steps": [
+        {
+            "address": "0x0000000000000000000000000000000000000000",
+            "gasLimit": "0xff0000",
+            "gasPrice": "0x1",
+            "input": "0x6080604052348015600f57600080fd5b50606180601d6000396000f3fe608060405260043610601c5760003560e01c8063dffeadd0146021575b600080fd5b60276029565b005b56fea2646970667358221220ac743ba20593a87cf48e3a478930eafa155ed7b98746ef1b364aa8efcf804fa164736f6c63430007060033",
+            "origin": "0x4838b106fce9647bdf1e7877bf73ce8b0bad5f97",
+            "value": "0x0",
+            "blockCoinbase": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+            "blockDifficulty": "0x0",
+            "blockGasLimit": "0xff0000",
+            "blockNumber": "0x1",
+            "blockTime": "0x1",
+            "nonce": 0
+        },
+        {
+            "address": "0x93a5b04040b9d24ea0bb4aaa19967294bcbf44d2",
+            "gasLimit": "0xff0000",
+            "gasPrice": "0x1",
+            "input": "0xdffeadd0",
+            "origin": "0x4838b106fce9647bdf1e7877bf73ce8b0bad5f97",
+            "value": "0xf4240",
+            "blockCoinbase": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+            "blockDifficulty": "0x0",
+            "blockGasLimit": "0xff0000",
+            "blockNumber": "0x1",
+            "blockTime": "0x1",
+            "nonce": 1
+        }
+    ]
+}

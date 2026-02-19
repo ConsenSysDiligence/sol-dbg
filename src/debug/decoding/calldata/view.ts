@@ -690,6 +690,19 @@ export class MissingCalldataView extends BaseCalldataView<DecodingFailure, BaseR
     }
 }
 
+/**
+ * View to the entire msg.data/return data. This view is used for the arguments/returns of a fallback() function.
+ */
+export class RawBytesView extends BaseCalldataView<Uint8Array, BytesType> {
+    constructor() {
+        super(new BytesType(), 0n, 0n);
+    }
+
+    decode(state: Memory): DecodingFailure | Uint8Array<ArrayBufferLike> {
+        return state;
+    }
+}
+
 export function makeCalldataView(
     type: BaseRuntimeType,
     loc: bigint,

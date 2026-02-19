@@ -1,6 +1,7 @@
 import * as sol from "solc-typed-ast"
 import { BaseRuntimeType } from "../../src/debug/runtime_types";
 import { ArtifactManager, PartialSolcOutput } from "../../src";
+import { bytesToUtf8 } from "@ethereumjs/util";
 const fse = require("fs-extra")
 
 export type TypeGenerator = (unit: sol.SourceUnit) => BaseRuntimeType;
@@ -26,6 +27,26 @@ export interface SampleInfo {
 }
 
 export type SampleMap = Map<string, SampleInfo>;
+
+/**
+ * Temporary hack
+ * @todo remove after https://github.com/d1m0/sol-interp/issues/14 is fixed
+ */
+export function addSources(
+    compilerOutput: PartialSolcOutput,
+    fileMap: sol.FileMap
+): PartialSolcOutput {
+    for (const fileName in compilerOutput.sources) {
+        const fileContents = fileMap.get(fileName);
+        if (fileContents === undefined) {
+            continue;
+        }
+
+        compilerOutput.sources[fileName].contents = bytesToUtf8(fileContents);
+    }
+
+    return compilerOutput;
+}
 
 export async function loadSamples(
     samples: Array<string | [string, any]>,
