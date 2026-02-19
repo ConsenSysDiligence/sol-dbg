@@ -1,5 +1,5 @@
 import { Stack } from "../../types";
-import { DecodingFailure, Value } from "../value";
+import { DecodingFailure, ExternalFunRef, InternalFunRef, Value } from "../value";
 import { ArrayLikeView, EncodingError, shouldTreatStringsAsBytes, View } from "../view";
 import {
     bigEndianBufToBigint,
@@ -13,7 +13,7 @@ import {
 } from "../../../utils";
 import { Address } from "@ethereumjs/util";
 import { makeStorageView } from "../storage";
-import { inRange, isCalldataArrayType, isFailure } from "../utils";
+import { inRange, is2SlotStackType, isFailure } from "../utils";
 import {
     ArraySliceCalldataView,
     BaseCalldataView,
@@ -30,6 +30,7 @@ import {
     BoolType,
     BytesType,
     FixedBytesType,
+    FunctionType,
     IntType,
     PointerType,
     StringType
@@ -192,7 +193,7 @@ export class PointerStackView extends BaseStackView<PointerValue, PointerType> {
             return off;
         }
 
-        if (isCalldataArrayType(this.type)) {
+        if (is2SlotStackType(this.type)) {
             // Calldata Array slice - fetch 2 words from stack
             const len = this.decodeIntAt(this.loc - 1, uint256, state);
 
@@ -247,6 +248,50 @@ export class PointerStackView extends BaseStackView<PointerValue, PointerType> {
     }
 }
 
+export class InternalFunctionStackView extends BaseStackView<InternalFunRef, FunctionType> {
+    encode(value: InternalFunRef, state: Stack): void {
+        this.encodeIntAt(value.opaque, uint256, this.loc, state);
+    }
+    decode(state: Stack): InternalFunRef | DecodingFailure {
+        const opaque = this.decodeIntAt(this.loc, uint256, state);
+        if (isFailure(opaque)) {
+            return opaque;
+        }
+
+        return new InternalFunRef(opaque);
+    }
+}
+
+export class ExternalFunctionStackView extends BaseStackView<ExternalFunRef, FunctionType> {
+    encode(value: ExternalFunRef, state: Stack): void {
+        const addrWord = this.fetchStackWord(this.loc, state);
+        const selectorWord = this.fetchStackWord(this.loc - 1, state);
+
+        if (isFailure(addrWord) || isFailure(selectorWord)) {
+            throw new EncodingError(`OoB access at ${this.loc} in stack`);
+        }
+
+        addrWord.set(value.address.bytes, 12);
+        selectorWord.set(value.selector, 28);
+    }
+
+    decode(state: Stack): ExternalFunRef | DecodingFailure {
+        const addr = this.fetchStackWord(this.loc, state);
+
+        if (isFailure(addr)) {
+            return new DecodingFailure(`OoB access at ${this.loc} in stack`);
+        }
+
+        const selector = this.fetchStackWord(this.loc - 1, state);
+
+        if (isFailure(selector)) {
+            return new DecodingFailure(`OoB access at ${this.loc - 1} in stack`);
+        }
+
+        return new ExternalFunRef(new Address(addr.slice(12)), selector.slice(28));
+    }
+}
+
 export function makeStackView(
     type: BaseRuntimeType,
     loc: number
@@ -269,6 +314,16 @@ export function makeStackView(
 
     if (type instanceof PointerType) {
         return new PointerStackView(type, loc);
+    }
+
+    if (type instanceof FunctionType) {
+        if (type.solType.kind === "external") {
+            return new ExternalFunctionStackView(type, loc);
+        }
+
+        sol.assert(type.solType.kind === "internal", `Unexpected function type on stack {0}`, type);
+
+        return new InternalFunctionStackView(type, loc);
     }
 
     nyi(`makeStackView(${type.pp()}, ${loc})`);

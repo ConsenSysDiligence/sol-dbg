@@ -1,0 +1,42 @@
+{
+    "initialState": {
+        "accounts": {
+            "0x4838b106fce9647bdf1e7877bf73ce8b0bad5f97": {
+                "nonce": "0x0",
+                "balance": "0xf4240",
+                "code": "0x",
+                "storage": {}
+            }
+        }
+    },
+    "steps": [
+        {
+            "address": "0x0000000000000000000000000000000000000000",
+            "gasLimit": "0xff0000",
+            "gasPrice": "0x1",
+            "input": "0x608060405234801561001057600080fd5b5061020c806100206000396000f3fe60806040526004361061001e5760003560e01c8063dffeadd014610023575b600080fd5b61002b61002d565b005b600060405161003b9061011c565b604051809103906000f080158015610057573d6000803e3d6000fd5b50905061006381610066565b50565b60008173ffffffffffffffffffffffffffffffffffffffff1663dffeadd06040518163ffffffff1660e01b8152600401602060405180830381600087803b1580156100b057600080fd5b505af11580156100c4573d6000803e3d6000fd5b505050506040513d60208110156100da57600080fd5b810190808051906020019092919050505090507ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffd8114151561011857fe5b5050565b60b8806101298339019056fe6080604052348015600f57600080fd5b50609a8061001e6000396000f3fe608060405260043610601c5760003560e01c8063dffeadd0146021575b600080fd5b6027603d565b6040518082815260200191505060405180910390f35b6000807ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffb9050600181901d9150509056fea165627a7a72305820d6bc116b47584ca1a62af2d946c022b0c4217f0b899efa844fa75a0e1f3a42ca0029a165627a7a72305820ca7c2edf239deddaa52ee02f67abe696036364f6679f7f72a8dc62947bb4e3ba0029",
+            "origin": "0x4838b106fce9647bdf1e7877bf73ce8b0bad5f97",
+            "value": "0x0",
+            "blockCoinbase": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+            "blockDifficulty": "0x0",
+            "blockGasLimit": "0xff0000",
+            "blockNumber": "0x1",
+            "blockTime": "0x1",
+            "nonce": 0
+        },
+        {
+            "address": "0x93a5b04040b9d24ea0bb4aaa19967294bcbf44d2",
+            "gasLimit": "0xff0000",
+            "gasPrice": "0x1",
+            "input": "0xdffeadd0",
+            "origin": "0x4838b106fce9647bdf1e7877bf73ce8b0bad5f97",
+            "value": "0xf4240",
+            "blockCoinbase": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+            "blockDifficulty": "0x0",
+            "blockGasLimit": "0xff0000",
+            "blockNumber": "0x1",
+            "blockTime": "0x1",
+            "nonce": 1
+        }
+    ]
+}

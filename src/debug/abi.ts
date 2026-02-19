@@ -2,7 +2,12 @@ import * as sol from "solc-typed-ast";
 import { View } from "./decoding/view";
 import { DecodedEventDesc, EventDefInfo, EventDesc, Memory } from "./types";
 import { bytes4, getArgs, split, uint256, zip } from "../utils";
-import { BaseCalldataView, makeCalldataView, makeCalldataViews } from "./decoding/calldata/view";
+import {
+    BaseCalldataView,
+    makeCalldataView,
+    makeCalldataViews,
+    RawBytesView
+} from "./decoding/calldata/view";
 import { DecodingFailure, Value } from "./decoding/value";
 import { IArtifactManager } from "./artifact_manager";
 import { BaseRuntimeType, PointerType, typeIdToRuntimeType } from "./runtime_types";
@@ -32,6 +37,14 @@ export function buildMsgViews(
     callee: sol.FunctionDefinition | sol.VariableDeclaration,
     base?: bigint
 ): Array<[string, View<Memory>]> {
+    if (callee instanceof sol.FunctionDefinition && callee.kind === sol.FunctionKind.Fallback) {
+        if (callee.vParameters.vParameters.length === 0) {
+            return [];
+        }
+
+        return [[callee.vParameters.vParameters[0].name, new RawBytesView()]];
+    }
+
     const res: Array<[string, View]> = [];
     const ctx = callee.requiredContext;
 

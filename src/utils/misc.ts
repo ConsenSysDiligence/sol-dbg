@@ -1,7 +1,7 @@
 import { Common } from "@ethereumjs/common";
 import { createTx, TypedTransaction, TypedTxData } from "@ethereumjs/tx";
 import { Address, setLengthLeft, createAddressFromString } from "@ethereumjs/util";
-import { bytesToHex, hexToBytes } from "ethereum-cryptography/utils";
+import { bytesToHex, concatBytes, hexToBytes } from "ethereum-cryptography/utils";
 import { FunctionDefinition, assert, signatureHash } from "solc-typed-ast";
 import { HexString, Stack, Storage, UnprefixedHexString } from "../debug/types";
 import { AddressType, BoolType, FixedBytesType, IntType } from "../debug/runtime_types";
@@ -13,6 +13,7 @@ export const ZERO_BYTES32 = new Uint8Array(32);
 
 export const uint256 = new IntType(256, false);
 export const uint8 = new IntType(8, false);
+export const uint64 = new IntType(64, false);
 export const bytes4 = new FixedBytesType(4);
 export const byte = new FixedBytesType(1);
 export const bool = new BoolType();
@@ -118,6 +119,33 @@ export function ppEvmStack(stack: Stack): string {
 /**
  * Try to read memory from offset start to start+len. If the access is OoB return undefined
  */
+export function readCalldata(
+    start: Uint8Array | bigint | number,
+    length: Uint8Array | bigint | number,
+    calldata: Uint8Array
+): Uint8Array | undefined {
+    if (start instanceof Uint8Array) {
+        start = bigEndianBufToNumber(start);
+    } else if (typeof start === "bigint") {
+        start = bigIntToNum(start);
+    }
+
+    if (length instanceof Uint8Array) {
+        length = bigEndianBufToNumber(length);
+    } else if (typeof length === "bigint") {
+        length = bigIntToNum(length);
+    }
+
+    if (start < 0 || start + length > calldata.length) {
+        return undefined;
+    }
+
+    return calldata.slice(start, start + length);
+}
+
+/**
+ * Try to read memory from offset start to start+len. If the access is OoB return zeroes.
+ */
 export function readMem(
     start: Uint8Array | bigint | number,
     length: Uint8Array | bigint | number,
@@ -140,11 +168,17 @@ export function readMem(
         return new Uint8Array();
     }
 
-    if (start < 0 || start + length > mem.length) {
+    if (start < 0) {
         return undefined;
     }
 
-    return mem.slice(start, start + length);
+    const nonZeroSlice = mem.slice(start, min(start + length, mem.length));
+
+    if (start + length <= mem.length) {
+        return nonZeroSlice;
+    }
+
+    return concatBytes(nonZeroSlice, new Uint8Array(start + length - mem.length));
 }
 
 /**

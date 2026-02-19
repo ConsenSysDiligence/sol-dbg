@@ -1,4 +1,4 @@
-import { Address, createAddressFromString } from "@ethereumjs/util";
+import { Address, bigIntToHex, createAddressFromString } from "@ethereumjs/util";
 import { bytesToHex } from "ethereum-cryptography/utils";
 import expect from "expect";
 import fse from "fs-extra";
@@ -199,13 +199,15 @@ function valueToJSON(s: Value): any {
         return null;
     }
 
-    if (
-        s instanceof ExternalFunRef ||
-        s instanceof InternalFunRef ||
-        s instanceof Slice ||
-        s instanceof View ||
-        s instanceof Poison
-    ) {
+    if (s instanceof ExternalFunRef) {
+        return { address: s.address.toString(), selector: bytesToHex(s.selector) };
+    }
+
+    if (s instanceof InternalFunRef) {
+        return { opaque: bigIntToHex(s.opaque) };
+    }
+
+    if (s instanceof Slice || s instanceof View || s instanceof Poison) {
         nyi(`valueToJSON(${s})`);
     }
 

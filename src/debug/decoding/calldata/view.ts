@@ -1,6 +1,6 @@
 import { assert } from "solc-typed-ast";
 import { Memory } from "../../types";
-import { DecodingFailure, Struct, Value } from "../value";
+import { DecodingFailure, ExternalFunRef, Struct, Value } from "../value";
 import { ArrayLikeView, PointerView, shouldTreatStringsAsBytes, StructView, View } from "../view";
 import {
     bigEndianBufToBigint,
@@ -9,7 +9,7 @@ import {
     fits,
     MAX_ARR_DECODE_LIMIT,
     nyi,
-    readMem,
+    readCalldata,
     uint256,
     zip
 } from "../../../utils";
@@ -22,6 +22,7 @@ import {
     BoolType,
     BytesType,
     FixedBytesType,
+    FunctionType,
     IntType,
     MissingTypeDef,
     PointerType,
@@ -171,7 +172,7 @@ export abstract class BaseCalldataView<
         len: bigint | number
     ): Uint8Array | DecodingFailure {
         const actualOffset = this.base + BigInt(off);
-        const res = readMem(actualOffset, len, calldata);
+        const res = readCalldata(actualOffset, len, calldata);
 
         if (!res) {
             // OoB access
@@ -690,6 +691,36 @@ export class MissingCalldataView extends BaseCalldataView<DecodingFailure, BaseR
     }
 }
 
+/**
+ * View to the entire msg.data/return data. This view is used for the arguments/returns of a fallback() function.
+ */
+export class RawBytesView extends BaseCalldataView<Uint8Array, BytesType> {
+    constructor() {
+        super(new BytesType(), 0n, 0n);
+    }
+
+    decode(state: Memory): DecodingFailure | Uint8Array<ArrayBufferLike> {
+        return state;
+    }
+}
+
+export class ExternalFunctionCalldataView extends BaseCalldataView<ExternalFunRef, FunctionType> {
+    decode(state: Memory): ExternalFunRef | DecodingFailure {
+        const addrMem = this.readMemAt(this.loc, state, 20);
+        const selector = this.readMemAt(this.loc + 20n, state, 4);
+
+        if (isFailure(addrMem)) {
+            return addrMem;
+        }
+
+        if (isFailure(selector)) {
+            return selector;
+        }
+
+        return new ExternalFunRef(new Address(addrMem), selector);
+    }
+}
+
 export function makeCalldataView(
     type: BaseRuntimeType,
     loc: bigint,
@@ -743,6 +774,11 @@ export function makeCalldataView(
 
     if (type instanceof MissingTypeDef) {
         return new MissingCalldataView(type, loc, base);
+    }
+
+    if (type instanceof FunctionType) {
+        assert(type.solType.kind === "external", `Unexpected function type in calldata {0}`, type);
+        return new ExternalFunctionCalldataView(type, loc, base);
     }
 
     nyi(`makeCalldataView(${type.pp()})`);

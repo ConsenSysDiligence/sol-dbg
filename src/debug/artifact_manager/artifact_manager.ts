@@ -547,6 +547,10 @@ export class ArtifactManager implements IArtifactManager {
             }
 
             for (const fun of base.vFunctions) {
+                if (fun.visibility !== "public" && fun.visibility !== "external") {
+                    continue;
+                }
+
                 const funSel = getFunctionSelector(fun);
                 if (funSel == strSelector) {
                     return fun;

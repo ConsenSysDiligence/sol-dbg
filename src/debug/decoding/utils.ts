@@ -23,14 +23,25 @@ import * as rtt from "../runtime_types/ast";
 import { BytecodeInfo, LinkMap } from "../artifact_manager";
 import { Address } from "@ethereumjs/util";
 
-export function isCalldataArrayType(typ: BaseRuntimeType): boolean {
-    return (
+/**
+ * Returns true of the given type takes 2 slot words on the stack
+ * @param typ
+ * @returns
+ */
+export function is2SlotStackType(typ: BaseRuntimeType): boolean {
+    // Array slice
+    if (
         typ instanceof PointerType &&
         ((typ.toType instanceof ArrayType && typ.toType.size === undefined) ||
             typ.toType instanceof BytesType ||
             typ.toType instanceof StringType) &&
         typ.location === SolDataLocation.CallData
-    );
+    ) {
+        return true;
+    }
+
+    // External function type
+    return typ instanceof rtt.FunctionType && typ.solType.kind === "external";
 }
 
 /**
