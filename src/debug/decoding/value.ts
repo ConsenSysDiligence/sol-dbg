@@ -11,7 +11,7 @@ export class ExternalFunRef {
 }
 
 export class InternalFunRef {
-    constructor(public readonly opaque: bigint) {}
+    constructor(public readonly opaque: any) {}
 }
 
 export type FunctionValue = ExternalFunRef | InternalFunRef;
