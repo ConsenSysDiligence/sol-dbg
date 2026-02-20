@@ -5,6 +5,7 @@ import { VM } from "@ethereumjs/vm";
 import { assert, FunctionDefinition, VariableDeclaration } from "solc-typed-ast";
 import { getCodeHash, getCreationCodeHash } from "../../../artifacts";
 import {
+    bigEndianBufToBigint,
     bigEndianBufToNumber,
     mustReadMem,
     stackTop,
@@ -121,7 +122,7 @@ function makeCreationFrame(
  * 3. The msg.data
  * @param step
  */
-function decodeCall(step: BasicStepInfo): [Address, Address, Uint8Array] {
+export function decodeCall(step: BasicStepInfo): [Address, Address, Uint8Array, bigint, bigint] {
     const op = step.op;
     assert(
         op.opcode === OPCODES.CALL ||
@@ -140,11 +141,18 @@ function decodeCall(step: BasicStepInfo): [Address, Address, Uint8Array] {
 
     const receiver = op.opcode === OPCODES.DELEGATECALL ? step.address : receiverArg;
     const codeAddr = receiverArg;
+    const gas = bigEndianBufToBigint(step.evmStack[stackTop]);
+    let value = 0n;
+
+    if (op.opcode === OPCODES.CALL || op.opcode === OPCODES.CALLCODE) {
+        value = bigEndianBufToBigint(step.evmStack[stackTop - 2]);
+    }
+
     const start = bigEndianBufToNumber(step.evmStack[stackTop - argStackOff]);
     const size = bigEndianBufToNumber(step.evmStack[stackTop - argSizeStackOff]);
     const msgData = size === 0 ? new Uint8Array() : mustReadMem(start, size, step.memory);
 
-    return [receiver, codeAddr, msgData];
+    return [receiver, codeAddr, msgData, gas, value];
 }
 
 /**
