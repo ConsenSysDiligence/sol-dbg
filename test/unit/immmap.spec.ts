@@ -5,6 +5,8 @@ type TestStep = ["a" | "am" | "d" | "g" | "col" | "clp", any];
 
 function testStep(step: TestStep, immMaps: Array<ImmMap<any, any>>): void {
     const immMap = immMaps[immMaps.length - 1];
+    let cs: Map<any, any>;
+    let v: any;
     switch (step[0]) {
         case "a":
             immMaps.push(immMap.set(step[1][0], step[1][1]));
@@ -12,25 +14,23 @@ function testStep(step: TestStep, immMaps: Array<ImmMap<any, any>>): void {
         case "am":
             immMaps.push(immMap.setMany(step[1]));
             break;
-        case "am":
-            immMaps.push(immMap.set(step[1][0], step[1][1]));
-            break;
         case "d":
             immMaps.push(immMap.delete(step[1]));
             break;
         case "g":
-            const v = immMap.get(step[1][0]);
+            v = immMap.get(step[1][0]);
             expect(v).toEqual(step[1][1]);
             immMaps.push(immMap);
             break;
         case "col":
-            const cs = immMap.collectMap();
+            cs = immMap.collectMap();
             expect(cs).toEqual(step[1]);
             immMaps.push(immMap);
             break;
         case "clp":
-            const parent = immMaps[(step[1] + immMaps.length) % immMaps.length]; // support negative indexing from end
-            immMaps.push(immMap.collapseUntil(parent));
+            immMaps.push(
+                immMap.collapseUntil(immMaps[(step[1] + immMaps.length) % immMaps.length])
+            );
             break;
     }
 }
