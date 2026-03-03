@@ -1,5 +1,8 @@
+import { assert } from "solc-typed-ast";
+
 export class ImmMap<KeyT, ValT> {
     private innerM: Map<KeyT, ValT>;
+    private deletedKeys: Set<KeyT>;
     private _next: this | undefined;
 
     static fromEntries<K, V>(arg: Iterable<[K, V]>): ImmMap<K, V> {
@@ -12,16 +15,17 @@ export class ImmMap<KeyT, ValT> {
         return res;
     }
 
-    static fromImmMap<K, V>(arg: ImmMap<K, V>): ImmMap<K, V> {
-        return new ImmMap<K, V>(arg);
-    }
-
     private constructor(next: any = undefined) {
         this.innerM = new Map();
         this._next = next;
+        this.deletedKeys = new Set();
     }
 
     get(key: KeyT): ValT | undefined {
+        if (this.deletedKeys.has(key)) {
+            return undefined;
+        }
+
         if (this.innerM.has(key)) {
             return this.innerM.get(key);
         }
@@ -48,15 +52,8 @@ export class ImmMap<KeyT, ValT> {
     }
 
     delete(key: KeyT): this {
-        if (this.get(key) === undefined) {
-            return this;
-        }
-
-        const newInnerM = this.collectMap();
-        newInnerM.delete(key);
-        const res = new ImmMap<KeyT, ValT>(undefined);
-        res.innerM = newInnerM;
-
+        const res = new ImmMap<KeyT, ValT>(this);
+        res.deletedKeys.add(key);
         return res as this;
     }
 
@@ -70,33 +67,32 @@ export class ImmMap<KeyT, ValT> {
         return newMap as this;
     }
 
-    private collectMap(): Map<KeyT, ValT> {
-        const res = this._next ? this._next.collectMap() : new Map();
+    public collectMap(untilParent: ImmMap<KeyT, ValT> | undefined = undefined): Map<KeyT, ValT> {
+        let res: Map<KeyT, ValT>;
+
+        if (this._next === untilParent) {
+            res = new Map();
+        } else {
+            assert(this._next !== undefined, `Error in collectMap chain tracking. Did you mix up your chains?`)
+            res = this._next.collectMap(untilParent);
+        }
 
         for (const [key, val] of this.innerM) {
             res.set(key, val);
+        }
+
+        for (const delKey of this.deletedKeys) {
+            res.delete(delKey);
         }
 
         return res;
     }
 
     collapseUntil(parent: ImmMap<KeyT, ValT>): this {
-        const newMap = new ImmMap<KeyT, ValT>(parent);
-        let m: ImmMap<KeyT, ValT> | undefined = this;
-
-        while (m !== parent && m !== undefined) {
-            for (const [k, v] of m.innerM) {
-                if (newMap.innerM.has(k)) {
-                    continue;
-                }
-
-                newMap.innerM.set(k, v);
-            }
-
-            m = m._next;
-        }
-
-        return newMap as this;
+        const rawMap = this.collectMap(parent);
+        const res = new ImmMap<KeyT, ValT>(parent);
+        res.innerM = rawMap;
+        return res as this;
     }
 
     entries(): Iterable<[KeyT, ValT]> {
