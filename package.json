@@ -1,6 +1,6 @@
 {
     "name": "sol-dbg",
-    "version": "0.9.17",
+    "version": "0.9.18",
     "description": "Small (experimental) Solidity-level debugger built around EthereumJS",
     "keywords": [],
     "files": [
