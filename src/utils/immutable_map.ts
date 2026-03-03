@@ -70,6 +70,10 @@ export class ImmMap<KeyT, ValT> {
     public collectMap(untilParent: ImmMap<KeyT, ValT> | undefined = undefined): Map<KeyT, ValT> {
         let res: Map<KeyT, ValT>;
 
+        if (untilParent === this) {
+            return new Map();
+        }
+
         if (this._next === untilParent) {
             res = new Map();
         } else {
@@ -92,6 +96,10 @@ export class ImmMap<KeyT, ValT> {
     }
 
     collapseUntil(parent: ImmMap<KeyT, ValT>): this {
+        if (parent === this) {
+            return this;
+        }
+
         const rawMap = this.collectMap(parent);
         const res = new ImmMap<KeyT, ValT>(parent);
         res.innerM = rawMap;
