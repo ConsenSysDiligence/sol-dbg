@@ -78,7 +78,7 @@ export async function addReturnInfo<T extends object & BasicStepInfo & ExternalF
             retInfo: {
                 callStartStep,
                 rawReturnData,
-                decodedReturnData: [],
+                decodedReturnData: []
             }
         };
     }

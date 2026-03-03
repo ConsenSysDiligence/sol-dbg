@@ -73,7 +73,10 @@ export class ImmMap<KeyT, ValT> {
         if (this._next === untilParent) {
             res = new Map();
         } else {
-            assert(this._next !== undefined, `Error in collectMap chain tracking. Did you mix up your chains?`)
+            assert(
+                this._next !== undefined,
+                `Error in collectMap chain tracking. Did you mix up your chains?`
+            );
             res = this._next.collectMap(untilParent);
         }
 
