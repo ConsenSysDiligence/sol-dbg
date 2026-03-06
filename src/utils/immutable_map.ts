@@ -1,5 +1,3 @@
-import { assert } from "solc-typed-ast";
-
 export class ImmMap<KeyT, ValT> {
     private innerM: Map<KeyT, ValT>;
     private deletedKeys: Set<KeyT>;
@@ -22,25 +20,23 @@ export class ImmMap<KeyT, ValT> {
     }
 
     get(key: KeyT): ValT | undefined {
-        if (this.deletedKeys.has(key)) {
-            return undefined;
+        let _this: this | undefined = this;
+
+        // Note: we convert the recursion to a loop here to avoid
+        // JS stack overflow
+        while (_this !== undefined) {
+            if (_this.deletedKeys.has(key)) {
+                return undefined;
+            }
+
+            if (_this.innerM.has(key)) {
+                return _this.innerM.get(key);
+            }
+
+            _this = _this._next;
         }
 
-        if (this.innerM.has(key)) {
-            return this.innerM.get(key);
-        }
-
-        if (this._next === undefined) {
-            return undefined;
-        }
-
-        const resInNext = this._next.get(key);
-
-        if (resInNext !== undefined) {
-            this.innerM.set(key, resInNext);
-        }
-
-        return resInNext;
+        return undefined;
     }
 
     set(key: KeyT, val: ValT): this {
@@ -68,28 +64,28 @@ export class ImmMap<KeyT, ValT> {
     }
 
     public collectMap(untilParent: ImmMap<KeyT, ValT> | undefined = undefined): Map<KeyT, ValT> {
-        let res: Map<KeyT, ValT>;
+        const stack: this[] = [];
+        const res: Map<KeyT, ValT> = new Map();
 
         if (untilParent === this) {
-            return new Map();
+            return res;
         }
 
-        if (this._next === untilParent) {
-            res = new Map();
-        } else {
-            assert(
-                this._next !== undefined,
-                `Error in collectMap chain tracking. Did you mix up your chains?`
-            );
-            res = this._next.collectMap(untilParent);
+        let _this: this | undefined = this;
+
+        while (_this !== untilParent && _this !== undefined) {
+            stack.unshift(_this);
+            _this = _this._next;
         }
 
-        for (const [key, val] of this.innerM) {
-            res.set(key, val);
-        }
+        for (const _this of stack) {
+            for (const [key, val] of _this.innerM) {
+                res.set(key, val);
+            }
 
-        for (const delKey of this.deletedKeys) {
-            res.delete(delKey);
+            for (const delKey of _this.deletedKeys) {
+                res.delete(delKey);
+            }
         }
 
         return res;
