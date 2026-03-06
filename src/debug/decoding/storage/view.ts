@@ -860,7 +860,7 @@ export abstract class PackedArrayStorageView<
 
     encodeBytesAt(bytes: Uint8Array, slot: bigint, state: Storage): Storage {
         if (bytes.length < 32) {
-            const w = this.fetchWordCopy(slot, state);
+            const w = new Uint8Array(32);
             w[31] = 2 * bytes.length;
             w.set(bytes, 0);
             return this.setWord(slot, w, state);
@@ -877,7 +877,7 @@ export abstract class PackedArrayStorageView<
             if (end - srcOff === 32) {
                 w = bytes.slice(srcOff, end);
             } else {
-                w = this.fetchWordCopy(addr, s);
+                w = new Uint8Array(32);
                 w.set(bytes.slice(srcOff, end));
             }
 
