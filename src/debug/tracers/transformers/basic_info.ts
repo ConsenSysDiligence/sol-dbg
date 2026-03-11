@@ -38,6 +38,7 @@ export interface BasicStepInfo {
     gas: bigint;
     depth: number;
     address: Address;
+    codeAddress: Address;
 }
 
 /**
@@ -79,6 +80,7 @@ export async function addBasicInfo<T extends object & OpInfo>(
         dynamicGasCost,
         gas: step.gasLeft,
         depth: step.depth + 1,
-        address: step.address
+        address: step.address,
+        codeAddress: step.codeAddress
     };
 }

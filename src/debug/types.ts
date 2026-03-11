@@ -141,6 +141,7 @@ export interface StepVMState {
     gas: bigint;
     depth: number;
     address: Address;
+    codeAddress: Address;
 }
 
 /**
