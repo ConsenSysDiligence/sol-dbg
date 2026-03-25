@@ -240,7 +240,10 @@ describe("Local tests", () => {
                     const traces: StepState[][] = [];
 
                     beforeAll(async () => {
-                        const hardfork = testJSON.hardfork === undefined ? Hardfork.Cancun : testJSON.hardfork as Hardfork;
+                        const hardfork =
+                            testJSON.hardfork === undefined
+                                ? Hardfork.Cancun
+                                : (testJSON.hardfork as Hardfork);
 
                         solDbg = new SolTxDebugger(artifactManager, {
                             foundryCheatcodes: true,

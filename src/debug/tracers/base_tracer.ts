@@ -167,7 +167,7 @@ export abstract class BaseSolTxTracer<TraceT, CtxT> {
         const common = this.forceHardfork
             ? getCommon(this.forceHardfork)
             : getCommonForBlock(block);
-            
+
         const vm = await BaseSolTxTracer.createVm(
             stateBefore.shallowCopy(true),
             this.foundryCheatcodes,

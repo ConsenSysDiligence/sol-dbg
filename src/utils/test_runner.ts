@@ -126,9 +126,11 @@ export class TxRunner {
     }
 
     async runScenario(scenario: Scenario): Promise<void> {
-        const hardfork =
-            this.forceHardfork ? this.forceHardfork :
-                scenario.hardfork === undefined ? Hardfork.Cancun : (scenario.hardfork as Hardfork);
+        const hardfork = this.forceHardfork
+            ? this.forceHardfork
+            : scenario.hardfork === undefined
+              ? Hardfork.Cancun
+              : (scenario.hardfork as Hardfork);
         /**
          * Dummy VM used just to get a StateManager and a Common instance. The actual VM used for execution is created inside
          * SupportTracer. (@todo this is kinda ugly... oh well)
