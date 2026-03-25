@@ -38,6 +38,7 @@ import {
     Value
 } from "../../src/debug/decoding/value";
 import { View } from "../../src/debug/decoding/view";
+import { Hardfork } from "@ethereumjs/common";
 
 function checkResult(result: FoundryTxResult, step: TestStep): boolean {
     switch (step.result.kind) {
@@ -239,12 +240,15 @@ describe("Local tests", () => {
                     const traces: StepState[][] = [];
 
                     beforeAll(async () => {
+                        const hardfork = testJSON.hardfork === undefined ? Hardfork.Cancun : testJSON.hardfork as Hardfork;
+
                         solDbg = new SolTxDebugger(artifactManager, {
                             foundryCheatcodes: true,
-                            strict: false
+                            strict: false,
+                            forceHardfork: hardfork
                         });
 
-                        runner = new TxRunner(artifactManager, true);
+                        runner = new TxRunner(artifactManager, true, hardfork);
 
                         await runner.runScenario(testJSON);
                         for (let i = 0; i < testJSON.steps.length; i++) {

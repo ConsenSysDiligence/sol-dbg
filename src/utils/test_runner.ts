@@ -1,5 +1,5 @@
 import { Block, createBlock } from "@ethereumjs/block";
-import { Common, StateManagerInterface } from "@ethereumjs/common";
+import { Common, Hardfork, StateManagerInterface } from "@ethereumjs/common";
 import { MerkleStateManager } from "@ethereumjs/statemanager";
 import { TypedTransaction, TypedTxData } from "@ethereumjs/tx";
 import {
@@ -25,6 +25,7 @@ import { map_add } from "./map";
 import { hexStrToBuf32, makeFakeTransaction, ZERO_ADDRESS_STRING } from "./misc";
 import { set_add, set_subtract } from "./set";
 import { HexString } from "../debug";
+import { getCommon } from "../debug/tracers/common";
 
 export interface TxDesc {
     address: HexString;
@@ -57,6 +58,7 @@ export interface InitialState {
 }
 
 export interface Scenario {
+    hardfork?: string;
     initialState: InitialState;
     steps: TxDesc[];
 }
@@ -105,7 +107,6 @@ export function blockFromTxDesc(step: TxDesc, common: Common): Block {
  * 6. The set of keccak256 (result, preimage) pairs computed by the TX (useful for computing Solidity-level maps)
  */
 export class TxRunner {
-    private tracer: SupportTracer;
     private _txs: TypedTransaction[];
     private _txToBlock: Map<string, Block>;
     private _results: FoundryTxResult[];
@@ -116,24 +117,27 @@ export class TxRunner {
 
     constructor(
         public readonly artifactManager: IArtifactManager,
-        private _foundryCheatcodes: boolean = true
+        private _foundryCheatcodes: boolean = true,
+        private forceHardfork: Hardfork | undefined = undefined
     ) {
-        this.tracer = new SupportTracer(artifactManager, {
-            strict: true,
-            foundryCheatcodes: this._foundryCheatcodes
-        });
-
         this._txs = [];
         this._results = [];
         this._txToBlock = new Map();
     }
 
     async runScenario(scenario: Scenario): Promise<void> {
+        const hardfork =
+            this.forceHardfork ? this.forceHardfork :
+                scenario.hardfork === undefined ? Hardfork.Cancun : (scenario.hardfork as Hardfork);
         /**
          * Dummy VM used just to get a StateManager and a Common instance. The actual VM used for execution is created inside
          * SupportTracer. (@todo this is kinda ugly... oh well)
          */
-        const dummyVM = await BaseSolTxTracer.createVm(undefined, this._foundryCheatcodes);
+        const dummyVM = await BaseSolTxTracer.createVm(
+            undefined,
+            this._foundryCheatcodes,
+            getCommon(hardfork)
+        );
 
         let stateManager = dummyVM.stateManager.shallowCopy();
         const common = dummyVM.common.copy();
@@ -146,6 +150,12 @@ export class TxRunner {
         );
 
         const keccakPreimages: KeccakPreimageMap = new Map();
+
+        const tracer = new SupportTracer(this.artifactManager, {
+            strict: true,
+            foundryCheatcodes: this._foundryCheatcodes,
+            forceHardfork: hardfork
+        });
 
         for (let i = 0; i < scenario.steps.length; i++) {
             const tx = txDescToTx(scenario.steps[i], common);
@@ -161,7 +171,7 @@ export class TxRunner {
             this._contractsBeforeTx.set(txHash, new Set(contractsBefore));
             this._keccakPreimagesBeforeTx.set(txHash, new Map(keccakPreimages));
 
-            const [trace, res, stateAfter] = await this.tracer.debugTx(tx, block, stateManager);
+            const [trace, res, stateAfter] = await tracer.debugTx(tx, block, stateManager);
 
             await (stateManager as MerkleStateManager).flush();
 
@@ -296,7 +306,8 @@ export class TxRunner {
     ): Promise<ContractStates | undefined> {
         const tracer = new StorageDecodeTracer(this.artifactManager, {
             strict: true,
-            foundryCheatcodes: this._foundryCheatcodes
+            foundryCheatcodes: this._foundryCheatcodes,
+            forceHardfork: this.forceHardfork
         });
 
         const liveContracts = new Set(this.getContractsBefore(tx));

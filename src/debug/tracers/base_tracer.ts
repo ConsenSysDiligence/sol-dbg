@@ -1,6 +1,6 @@
 import { Block } from "@ethereumjs/block";
 import { createBlockchain } from "@ethereumjs/blockchain";
-import { Mainnet, Common, StateManagerInterface, Hardfork } from "@ethereumjs/common";
+import { Common, Hardfork, StateManagerInterface } from "@ethereumjs/common";
 import { createEVM, EVM, getOpcodesForHF, InterpreterStep } from "@ethereumjs/evm";
 import { MerkleStateManager } from "@ethereumjs/statemanager";
 import { TypedTransaction } from "@ethereumjs/tx";
@@ -15,10 +15,12 @@ import {
 } from "../foundry_cheatcodes";
 import { foundryInterposedOps } from "../opcode_interposing";
 import { EVMOpts } from "../types";
+import { getCommon, getCommonForBlock } from "./common";
 
 export interface TracerOpts {
     strict?: boolean;
     foundryCheatcodes?: boolean;
+    forceHardfork?: Hardfork;
 }
 
 export interface FoundryTxResult extends RunTxResult {
@@ -44,6 +46,7 @@ export abstract class BaseSolTxTracer<TraceT, CtxT> {
     artifactManager!: IArtifactManager;
     protected readonly strict: boolean;
     protected readonly foundryCheatcodes: boolean;
+    protected readonly forceHardfork: Hardfork | undefined;
 
     constructor(artifactManager: IArtifactManager, opts?: TracerOpts) {
         this.artifactManager = artifactManager;
@@ -58,6 +61,8 @@ export abstract class BaseSolTxTracer<TraceT, CtxT> {
                 opts.foundryCheatcodes !== undefined
                     ? opts.foundryCheatcodes
                     : this.foundryCheatcodes;
+
+            this.forceHardfork = opts.forceHardfork;
         }
     }
 
@@ -110,9 +115,9 @@ export abstract class BaseSolTxTracer<TraceT, CtxT> {
 
     static async createVm(
         stateManager: StateManagerInterface | undefined,
-        foundryCheatcodes: boolean
+        foundryCheatcodes: boolean,
+        common: Common
     ): Promise<VM> {
-        const common = new Common({ chain: Mainnet, hardfork: Hardfork.Cancun });
         const blockchain = await createBlockchain({ common });
 
         if (!stateManager) {
@@ -155,13 +160,18 @@ export abstract class BaseSolTxTracer<TraceT, CtxT> {
      */
     async debugTx(
         tx: TypedTransaction,
-        block: Block | undefined, // TODO: Make block required and add to processRawTraceStep
+        block: Block,
         stateBefore: StateManagerInterface,
         ctx: CtxT
     ): Promise<[TraceT[], FoundryTxResult, StateManagerInterface, CtxT]> {
+        const common = this.forceHardfork
+            ? getCommon(this.forceHardfork)
+            : getCommonForBlock(block);
+            
         const vm = await BaseSolTxTracer.createVm(
             stateBefore.shallowCopy(true),
-            this.foundryCheatcodes
+            this.foundryCheatcodes,
+            common
         );
 
         const trace: TraceT[] = [];
@@ -206,7 +216,7 @@ export abstract class BaseSolTxTracer<TraceT, CtxT> {
 export abstract class MapOnlyTracer<TraceT> extends BaseSolTxTracer<TraceT, null> {
     async debugTx(
         tx: TypedTransaction,
-        block: Block | undefined,
+        block: Block,
         stateBefore: StateManagerInterface
     ): Promise<[TraceT[], FoundryTxResult, StateManagerInterface, null]> {
         return super.debugTx(tx, block, stateBefore, null);

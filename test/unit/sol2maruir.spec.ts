@@ -2,6 +2,7 @@ import expect from "expect";
 import fse from "fs-extra";
 import { Scenario, SolTxDebugger, TxRunner } from "../../src";
 import { loadSamples } from "../utils/misc";
+import { Hardfork } from "@ethereumjs/common";
 
 describe("Sol2Maruir Tests", () => {
     for (const sample of fse
@@ -15,7 +16,13 @@ describe("Sol2Maruir Tests", () => {
             );
 
             const runner = new TxRunner(artifactManager);
-            const dbg = new SolTxDebugger(artifactManager, { strict: false });
+            const dbg = new SolTxDebugger(artifactManager, {
+                strict: false,
+                forceHardfork:
+                    scenario.hardfork === undefined
+                        ? Hardfork.Cancun
+                        : (scenario.hardfork as Hardfork)
+            });
 
             await runner.runScenario(scenario);
             for (const tx of runner.txs) {
