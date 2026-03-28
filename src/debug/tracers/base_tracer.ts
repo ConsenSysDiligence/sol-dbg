@@ -48,6 +48,17 @@ export abstract class BaseSolTxTracer<TraceT, CtxT> {
     protected readonly foundryCheatcodes: boolean;
     protected readonly forceHardfork: Hardfork | undefined;
 
+    private failedStep: number = -1;
+    private failure: any;
+
+    get failed(): boolean {
+        return this.failedStep > 0;
+    }
+
+    get failInfo(): [number, any] | undefined {
+        return this.failed ? [this.failedStep, this.failure] : undefined;
+    }
+
     constructor(artifactManager: IArtifactManager, opts?: TracerOpts) {
         this.artifactManager = artifactManager;
 
@@ -178,11 +189,21 @@ export abstract class BaseSolTxTracer<TraceT, CtxT> {
 
         assert(vm.evm.events !== undefined, "Unable to access EVM events at this point");
 
-        vm.evm.events.on("step", async (step: InterpreterStep, next: any) => {
-            const [curStep, newCtx] = await this.processRawTraceStep(vm, step, trace, tx, ctx);
-            ctx = newCtx;
+        this.failedStep = -1;
 
-            trace.push(curStep);
+        vm.evm.events.on("step", async (step: InterpreterStep, next: any) => {
+            try {
+                const [curStep, newCtx] = await this.processRawTraceStep(vm, step, trace, tx, ctx);
+                ctx = newCtx;
+
+                trace.push(curStep);
+            } catch (e) {
+                // Save the first failed step in the trace
+                if (!this.failed) {
+                    this.failedStep = trace.length;
+                    this.failure = e;
+                }
+            }
 
             next();
         });
