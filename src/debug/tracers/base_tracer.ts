@@ -1,11 +1,17 @@
 import { Block } from "@ethereumjs/block";
 import { createBlockchain } from "@ethereumjs/blockchain";
 import { Common, Hardfork, StateManagerInterface } from "@ethereumjs/common";
-import { createEVM, EVM, EVMMockBlockchainInterface, getOpcodesForHF, InterpreterStep } from "@ethereumjs/evm";
+import {
+    createEVM,
+    EVM,
+    EVMMockBlockchainInterface,
+    getOpcodesForHF,
+    InterpreterStep
+} from "@ethereumjs/evm";
 import { MerkleStateManager } from "@ethereumjs/statemanager";
 import { TypedTransaction } from "@ethereumjs/tx";
 import { createVM, runTx, RunTxResult, VM } from "@ethereumjs/vm";
-import { assert, } from "solc-typed-ast";
+import { assert } from "solc-typed-ast";
 import { IArtifactManager } from "../artifact_manager";
 import {
     FoundryCheatcodesAddress,
@@ -16,8 +22,6 @@ import {
 import { foundryInterposedOps } from "../opcode_interposing";
 import { EVMOpts } from "../types";
 import { getCommon, getCommonForBlock } from "./common";
-import { EVMMockBlock } from "@ethereumjs/evm/dist/cjs/types";
-import { bytesToHex } from "ethereum-cryptography/utils";
 
 export interface TracerOpts {
     strict?: boolean;
@@ -36,26 +40,25 @@ export interface FoundryTxResult extends RunTxResult {
 const vmToEVMMap = new Map<VM, EVM>();
 
 export interface TxReplayInfo {
-    tx: TypedTransaction,
-    block: Block,
-    stateBefore: StateManagerInterface,
-    getBlock(num: bigint | number): Promise<Block | undefined>
+    tx: TypedTransaction;
+    block: Block;
+    stateBefore: StateManagerInterface;
+    getBlock(num: bigint | number): Promise<Block | undefined>;
 }
 
 class ReplayMockBlockchain implements EVMMockBlockchainInterface {
-    constructor(private readonly txReplayEnv: TxReplayInfo) {
-    }
-    putBlock(block: EVMMockBlock): Promise<void> {
+    constructor(private readonly txReplayEnv: TxReplayInfo) {}
+    putBlock(): Promise<void> {
         throw new Error("Method not implemented.");
     }
     shallowCopy(): EVMMockBlockchainInterface {
         throw new Error("Method not implemented.");
     }
 
-    async getBlock(blockNum: number): Promise<{ hash(): Uint8Array<ArrayBuffer>; }> {
-        const res = await this.txReplayEnv.getBlock(blockNum)
+    async getBlock(blockNum: number): Promise<{ hash(): Uint8Array<ArrayBuffer> }> {
+        const res = await this.txReplayEnv.getBlock(blockNum);
         const hash = res === undefined ? new Uint8Array() : new Uint8Array(res.hash());
-        return { hash: () => hash }
+        return { hash: () => hash };
     }
 }
 
@@ -204,7 +207,7 @@ export abstract class BaseSolTxTracer<TraceT, CtxT> {
         const common = this.forceHardfork
             ? getCommon(this.forceHardfork)
             : getCommonForBlock(block);
-        const blockchain = new ReplayMockBlockchain(info)
+        const blockchain = new ReplayMockBlockchain(info);
 
         const vm = await BaseSolTxTracer.createVm(
             stateBefore.shallowCopy(true),

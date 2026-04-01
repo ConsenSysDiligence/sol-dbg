@@ -258,7 +258,12 @@ describe("Local tests", () => {
                             const tx = runner.txs[i];
                             const block = runner.getBlock(tx);
                             const stateBefore = runner.getStateBeforeTx(tx);
-                            const [trace] = await solDbg.debugTx({tx, block, stateBefore, getBlock: () => nyi(`getBlock`)});
+                            const [trace] = await solDbg.debugTx({
+                                tx,
+                                block,
+                                stateBefore,
+                                getBlock: () => nyi(`getBlock`)
+                            });
                             traces.push(trace);
                         }
                     });

@@ -129,10 +129,6 @@ export class TxRunner {
         this._numToBlock = new Map();
     }
 
-    private knownBlocks(): Block[] {
-        return [...this._preBlocks, ...this._txToBlock.values()]
-    }
-
     async runScenario(scenario: Scenario): Promise<void> {
         const hardfork = this.forceHardfork
             ? this.forceHardfork
@@ -153,10 +149,10 @@ export class TxRunner {
         const common = dummyVM.common.copy();
 
         if (scenario.blocks) {
-            for(const blockData of scenario.blocks) {
-                const block = createBlock(blockData, { common })
-                this._preBlocks.push(block)
-                this._numToBlock.set(block.header.number, block)
+            for (const blockData of scenario.blocks) {
+                const block = createBlock(blockData, { common });
+                this._preBlocks.push(block);
+                this._numToBlock.set(block.header.number, block);
             }
         }
 
@@ -188,9 +184,14 @@ export class TxRunner {
             this._txToBlock.set(txHash, block);
             this._contractsBeforeTx.set(txHash, new Set(contractsBefore));
             this._keccakPreimagesBeforeTx.set(txHash, new Map(keccakPreimages));
-            this._numToBlock.set(block.header.number, block)
+            this._numToBlock.set(block.header.number, block);
 
-            const [trace, res, stateAfter] = await tracer.debugTx({tx, block, stateBefore: stateManager, getBlock: async(num: number | bigint) => this._numToBlock.get(BigInt(num))});
+            const [trace, res, stateAfter] = await tracer.debugTx({
+                tx,
+                block,
+                stateBefore: stateManager,
+                getBlock: async (num: number | bigint) => this._numToBlock.get(BigInt(num))
+            });
 
             await (stateManager as MerkleStateManager).flush();
 
@@ -354,25 +355,28 @@ export class TxRunner {
         const block = this.getBlock(tx);
         const stateBefore = this.getStateBeforeTx(tx);
 
-        return await tracer.debugTx({tx, block, stateBefore, getBlock: async() => nyi(`getBlock`)}, ctx);
+        return await tracer.debugTx(
+            { tx, block, stateBefore, getBlock: async () => nyi(`getBlock`) },
+            ctx
+        );
     }
 
-    getBlockMap(): Map<bigint, Block> {
-        return new Map<bigint, Block>(this.knownBlocks().map((b) => [b.header.number, b]))
+    getBlockByNum(num: bigint | number): Block | undefined {
+        return this._numToBlock.get(BigInt(num))
     }
 
     getTxReplayInfo(txIdx: number): TxReplayInfo {
         const tx = this.txs[txIdx];
         const block = this.getBlock(tx);
         const stateBefore = this.getStateBeforeTx(tx);
-        const blockMap = new Map<bigint, Block>(this.knownBlocks().map((b) => [b.header.number, b]))
+        const blockMap = this._numToBlock;
         return {
             tx,
             block,
             stateBefore,
             getBlock: async function (num: bigint | number): Promise<Block | undefined> {
-                return blockMap.get(BigInt(num))
+                return blockMap.get(BigInt(num));
             }
-        }
+        };
     }
 }
