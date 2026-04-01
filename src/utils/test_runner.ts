@@ -362,7 +362,7 @@ export class TxRunner {
     }
 
     getBlockByNum(num: bigint | number): Block | undefined {
-        return this._numToBlock.get(BigInt(num))
+        return this._numToBlock.get(BigInt(num));
     }
 
     getTxReplayInfo(txIdx: number): TxReplayInfo {
