@@ -1,11 +1,11 @@
 import { Block } from "@ethereumjs/block";
 import { createBlockchain } from "@ethereumjs/blockchain";
 import { Common, Hardfork, StateManagerInterface } from "@ethereumjs/common";
-import { createEVM, EVM, getOpcodesForHF, InterpreterStep } from "@ethereumjs/evm";
+import { createEVM, EVM, EVMMockBlockchainInterface, getOpcodesForHF, InterpreterStep } from "@ethereumjs/evm";
 import { MerkleStateManager } from "@ethereumjs/statemanager";
 import { TypedTransaction } from "@ethereumjs/tx";
 import { createVM, runTx, RunTxResult, VM } from "@ethereumjs/vm";
-import { assert } from "solc-typed-ast";
+import { assert, } from "solc-typed-ast";
 import { IArtifactManager } from "../artifact_manager";
 import {
     FoundryCheatcodesAddress,
@@ -16,6 +16,8 @@ import {
 import { foundryInterposedOps } from "../opcode_interposing";
 import { EVMOpts } from "../types";
 import { getCommon, getCommonForBlock } from "./common";
+import { EVMMockBlock } from "@ethereumjs/evm/dist/cjs/types";
+import { bytesToHex } from "ethereum-cryptography/utils";
 
 export interface TracerOpts {
     strict?: boolean;
@@ -32,6 +34,30 @@ export interface FoundryTxResult extends RunTxResult {
  * global listener map for foundry cheatcodes.
  */
 const vmToEVMMap = new Map<VM, EVM>();
+
+export interface TxReplayInfo {
+    tx: TypedTransaction,
+    block: Block,
+    stateBefore: StateManagerInterface,
+    getBlock(num: bigint | number): Promise<Block | undefined>
+}
+
+class ReplayMockBlockchain implements EVMMockBlockchainInterface {
+    constructor(private readonly txReplayEnv: TxReplayInfo) {
+    }
+    putBlock(block: EVMMockBlock): Promise<void> {
+        throw new Error("Method not implemented.");
+    }
+    shallowCopy(): EVMMockBlockchainInterface {
+        throw new Error("Method not implemented.");
+    }
+
+    async getBlock(blockNum: number): Promise<{ hash(): Uint8Array<ArrayBuffer>; }> {
+        const res = await this.txReplayEnv.getBlock(blockNum)
+        const hash = res === undefined ? new Uint8Array() : new Uint8Array(res.hash());
+        return { hash: () => hash }
+    }
+}
 
 /**
  * Base class for all trace processors. You can think of trace processing as a combination
@@ -127,9 +153,10 @@ export abstract class BaseSolTxTracer<TraceT, CtxT> {
     static async createVm(
         stateManager: StateManagerInterface | undefined,
         foundryCheatcodes: boolean,
-        common: Common
+        common: Common,
+        blockchain?: EVMMockBlockchainInterface
     ): Promise<VM> {
-        const blockchain = await createBlockchain({ common });
+        blockchain = blockchain === undefined ? await createBlockchain({ common }) : blockchain;
 
         if (!stateManager) {
             stateManager = new MerkleStateManager();
@@ -170,19 +197,20 @@ export abstract class BaseSolTxTracer<TraceT, CtxT> {
      * 4. The final (reduced) context `CtxT`
      */
     async debugTx(
-        tx: TypedTransaction,
-        block: Block,
-        stateBefore: StateManagerInterface,
+        info: TxReplayInfo,
         ctx: CtxT
     ): Promise<[TraceT[], FoundryTxResult, StateManagerInterface, CtxT]> {
+        const { tx, block, stateBefore } = info;
         const common = this.forceHardfork
             ? getCommon(this.forceHardfork)
             : getCommonForBlock(block);
+        const blockchain = new ReplayMockBlockchain(info)
 
         const vm = await BaseSolTxTracer.createVm(
             stateBefore.shallowCopy(true),
             this.foundryCheatcodes,
-            common
+            common,
+            blockchain
         );
 
         const trace: TraceT[] = [];
@@ -236,10 +264,8 @@ export abstract class BaseSolTxTracer<TraceT, CtxT> {
 
 export abstract class MapOnlyTracer<TraceT> extends BaseSolTxTracer<TraceT, null> {
     async debugTx(
-        tx: TypedTransaction,
-        block: Block,
-        stateBefore: StateManagerInterface
+        info: TxReplayInfo
     ): Promise<[TraceT[], FoundryTxResult, StateManagerInterface, null]> {
-        return super.debugTx(tx, block, stateBefore, null);
+        return super.debugTx(info, null);
     }
 }

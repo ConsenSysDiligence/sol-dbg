@@ -1,4 +1,4 @@
-import { Block, createBlock } from "@ethereumjs/block";
+import { Block, BlockData, createBlock } from "@ethereumjs/block";
 import { Common, Hardfork, StateManagerInterface } from "@ethereumjs/common";
 import { MerkleStateManager } from "@ethereumjs/statemanager";
 import { TypedTransaction, TypedTxData } from "@ethereumjs/tx";
@@ -13,7 +13,7 @@ import { bytesToHex, hexToBytes } from "ethereum-cryptography/utils";
 import { assert } from "solc-typed-ast";
 import { IArtifactManager } from "../debug/artifact_manager/artifact_manager";
 import { ContractStates, decodeContractStates } from "../debug/layout";
-import { BaseSolTxTracer, FoundryTxResult } from "../debug/tracers/base_tracer";
+import { BaseSolTxTracer, FoundryTxResult, TxReplayInfo } from "../debug/tracers/base_tracer";
 import { StorageDecodeTracer } from "../debug/tracers/storage_decode_tracer";
 import { SupportTracer } from "../debug/tracers/support_tracer";
 import { getContractGenKillSet } from "../debug/tracers/transformers/contract_lifetime";
@@ -22,7 +22,7 @@ import {
     KeccakPreimageMap
 } from "../debug/tracers/transformers/keccak256_invert";
 import { map_add } from "./map";
-import { hexStrToBuf32, makeFakeTransaction, ZERO_ADDRESS_STRING } from "./misc";
+import { hexStrToBuf32, makeFakeTransaction, nyi, ZERO_ADDRESS_STRING } from "./misc";
 import { set_add, set_subtract } from "./set";
 import { HexString } from "../debug";
 import { getCommon } from "../debug/tracers/common";
@@ -59,6 +59,7 @@ export interface InitialState {
 
 export interface Scenario {
     hardfork?: string;
+    blocks?: BlockData[];
     initialState: InitialState;
     steps: TxDesc[];
 }
@@ -109,11 +110,13 @@ export function blockFromTxDesc(step: TxDesc, common: Common): Block {
 export class TxRunner {
     private _txs: TypedTransaction[];
     private _txToBlock: Map<string, Block>;
+    private _numToBlock: Map<bigint, Block>;
     private _results: FoundryTxResult[];
     private _stateRootBeforeTx = new Map<string, StateManagerInterface>();
     private _stateRootAfterTx = new Map<string, StateManagerInterface>();
     private _contractsBeforeTx = new Map<string, Set<PrefixedHexString>>();
     private _keccakPreimagesBeforeTx = new Map<string, Map<bigint, Uint8Array>>();
+    private _preBlocks: Block[] = [];
 
     constructor(
         public readonly artifactManager: IArtifactManager,
@@ -123,6 +126,11 @@ export class TxRunner {
         this._txs = [];
         this._results = [];
         this._txToBlock = new Map();
+        this._numToBlock = new Map();
+    }
+
+    private knownBlocks(): Block[] {
+        return [...this._preBlocks, ...this._txToBlock.values()]
     }
 
     async runScenario(scenario: Scenario): Promise<void> {
@@ -143,6 +151,14 @@ export class TxRunner {
 
         let stateManager = dummyVM.stateManager.shallowCopy();
         const common = dummyVM.common.copy();
+
+        if (scenario.blocks) {
+            for(const blockData of scenario.blocks) {
+                const block = createBlock(blockData, { common })
+                this._preBlocks.push(block)
+                this._numToBlock.set(block.header.number, block)
+            }
+        }
 
         BaseSolTxTracer.releaseVM(dummyVM);
 
@@ -172,8 +188,9 @@ export class TxRunner {
             this._txToBlock.set(txHash, block);
             this._contractsBeforeTx.set(txHash, new Set(contractsBefore));
             this._keccakPreimagesBeforeTx.set(txHash, new Map(keccakPreimages));
+            this._numToBlock.set(block.header.number, block)
 
-            const [trace, res, stateAfter] = await tracer.debugTx(tx, block, stateManager);
+            const [trace, res, stateAfter] = await tracer.debugTx({tx, block, stateBefore: stateManager, getBlock: async(num: number | bigint) => this._numToBlock.get(BigInt(num))});
 
             await (stateManager as MerkleStateManager).flush();
 
@@ -337,6 +354,25 @@ export class TxRunner {
         const block = this.getBlock(tx);
         const stateBefore = this.getStateBeforeTx(tx);
 
-        return await tracer.debugTx(tx, block, stateBefore, ctx);
+        return await tracer.debugTx({tx, block, stateBefore, getBlock: async() => nyi(`getBlock`)}, ctx);
+    }
+
+    getBlockMap(): Map<bigint, Block> {
+        return new Map<bigint, Block>(this.knownBlocks().map((b) => [b.header.number, b]))
+    }
+
+    getTxReplayInfo(txIdx: number): TxReplayInfo {
+        const tx = this.txs[txIdx];
+        const block = this.getBlock(tx);
+        const stateBefore = this.getStateBeforeTx(tx);
+        const blockMap = new Map<bigint, Block>(this.knownBlocks().map((b) => [b.header.number, b]))
+        return {
+            tx,
+            block,
+            stateBefore,
+            getBlock: async function (num: bigint | number): Promise<Block | undefined> {
+                return blockMap.get(BigInt(num))
+            }
+        }
     }
 }

@@ -25,10 +25,11 @@ describe("Sol2Maruir Tests", () => {
             });
 
             await runner.runScenario(scenario);
+            const m = runner.getBlockMap();
             for (const tx of runner.txs) {
                 const block = runner.getBlock(tx);
                 const stateBefore = runner.getStateAfterTx(tx);
-                const [trace] = await dbg.debugTx(tx, block, stateBefore);
+                const [trace] = await dbg.debugTx({tx, block, stateBefore, getBlock: async(num: number | bigint) => m.get(BigInt(num))});
                 expect(trace.length).toBeGreaterThan(0);
             }
         });
