@@ -258,7 +258,8 @@ export class ArtifactManager implements IArtifactManager {
                 abiEncoderVersion,
                 fileMap,
                 srcMap,
-                codegen: "old"
+                codegen: "old",
+                contracts: []
             });
         }
 
@@ -318,6 +319,7 @@ export class ArtifactManager implements IArtifactManager {
                     }
 
                     this._contracts.push(contractInfo);
+                    artifactInfo.contracts.push(contractInfo);
 
                     if (contractInfo.mdHash !== undefined) {
                         this._mdHashToContractInfo.set(contractInfo.mdHash, contractInfo);

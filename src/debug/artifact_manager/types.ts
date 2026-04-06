@@ -134,6 +134,10 @@ export interface ArtifactInfo {
      * Codegen type
      */
     codegen: "ir" | "old";
+    /**
+     * List of `ContractInfo` objects for all contracts in this artifact
+     */
+    contracts: ContractInfo[];
 }
 
 /**
