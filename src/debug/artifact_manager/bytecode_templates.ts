@@ -1,18 +1,17 @@
 import { equalsBytes } from "@ethereumjs/util";
 import { RangeList } from "../../artifacts";
-import { BytecodeInfo, ContractInfo } from ".";
+import { BytecodeInfo } from ".";
 
 export interface BytecodeTemplate {
     object: Uint8Array;
     skipRanges: Array<[number, number]>;
-    contractInfo: ContractInfo;
 }
 
 function makeSkipRanges(rawList: RangeList): Array<[number, number]> {
     return rawList.map((raw) => [raw.start, raw.start + raw.length]);
 }
 
-export function makeTemplate(artifact: BytecodeInfo, contract: ContractInfo): BytecodeTemplate {
+export function makeTemplate(artifact: BytecodeInfo): BytecodeTemplate {
     const skipRanges: Array<[number, number]> = [];
 
     for (const [, ranges] of artifact.linkReferences) {
@@ -28,7 +27,6 @@ export function makeTemplate(artifact: BytecodeInfo, contract: ContractInfo): By
     return {
         object: artifact.bytecode,
         skipRanges,
-        contractInfo: contract
     };
 }
 

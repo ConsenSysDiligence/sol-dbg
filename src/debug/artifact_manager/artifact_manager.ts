@@ -173,8 +173,8 @@ export class ArtifactManager implements IArtifactManager {
     private _artifacts: ArtifactInfo[];
     private _contracts: ContractInfo[];
     private _mdHashToContractInfo: Map<string, ContractInfo>;
-    private _creationBytecodeTemplates: BytecodeTemplate[];
-    private _deployedBytecodeTemplates: BytecodeTemplate[];
+    private _creationBytecodeTemplates: [BytecodeTemplate, ContractInfo][];
+    private _deployedBytecodeTemplates: [BytecodeTemplate, ContractInfo][];
     private _topicToEventInfo: Map<bigint, EventDefInfo>;
 
     private _unitToArtifact: Map<SourceUnit, ArtifactInfo>;
@@ -327,13 +327,13 @@ export class ArtifactManager implements IArtifactManager {
 
                     if (contractInfo.bytecode !== undefined) {
                         this._creationBytecodeTemplates.push(
-                            makeTemplate(contractInfo.bytecode, contractInfo)
+                            [makeTemplate(contractInfo.bytecode), contractInfo]
                         );
                     }
 
                     if (contractInfo.deployedBytecode !== undefined) {
                         this._deployedBytecodeTemplates.push(
-                            makeTemplate(contractInfo.deployedBytecode, contractInfo)
+                            [makeTemplate(contractInfo.deployedBytecode), contractInfo]
                         );
                     }
                 }
@@ -409,10 +409,10 @@ export class ArtifactManager implements IArtifactManager {
         }
 
         for (let i = 0; i < this._deployedBytecodeTemplates.length; i++) {
-            const templ = this._deployedBytecodeTemplates[i];
+            const [templ, info] = this._deployedBytecodeTemplates[i];
 
             if (matchesTemplate(bytecode, templ, false)) {
-                return templ.contractInfo;
+                return info;
             }
         }
 
@@ -427,10 +427,10 @@ export class ArtifactManager implements IArtifactManager {
         }
 
         for (let i = 0; i < this._creationBytecodeTemplates.length; i++) {
-            const templ = this._creationBytecodeTemplates[i];
+            const [templ, info] = this._creationBytecodeTemplates[i];
 
             if (matchesTemplate(creationBytecode, templ, true)) {
-                return templ.contractInfo;
+                return info;
             }
         }
 

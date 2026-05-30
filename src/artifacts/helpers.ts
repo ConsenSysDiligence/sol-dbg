@@ -108,7 +108,7 @@ function getBytecodeHashHacky(bytecode: Uint8Array): ContractMdStruct | undefine
     return { bzzr1: `0x${bytesToHex([...bzzr1Candidates][0])}` };
 }
 
-function getDeployedBytecodeMdInfo(
+export function getDeployedBytecodeMdInfo(
     deployedBytecode: UnprefixedHexString | Uint8Array
 ): ContractMdStruct | undefined {
     const len = deployedBytecode.length;
