@@ -8,8 +8,12 @@
         "@ethereumjs/evm/dist/cjs/interpreter": "<rootDir>/node_modules/@ethereumjs/evm/dist/cjs/interpreter",
         "@ethereumjs/evm/dist/cjs/opcodes": "<rootDir>/node_modules/@ethereumjs/evm/dist/cjs/opcodes"
     },
+    "transformIgnorePatterns": [
+      "/node_modules/(?!@noble)/"
+    ],
     "transform": {
-        "^.+\\.ts$": "ts-jest"
+        "^.+\\.ts$": "ts-jest",
+        "^.*@noble/.*\\.js$": "babel-jest"
     },
 
     "testTimeout": 2000,
