@@ -113,7 +113,7 @@ export function getDeployedBytecodeMdInfo(
 ): ContractMdStruct | undefined {
     const len = deployedBytecode.length;
 
-    let rawMd: any = {};
+    let rawMd: any;
 
     try {
         if (typeof deployedBytecode === "string") {
@@ -251,7 +251,7 @@ export function detectArtifactCompilerVersion(artifact: PartialSolcOutput): stri
                         return m[1];
                     }
                 }
-            } catch (e) {
+            } catch {
                 // Nothing to do;
             }
         }

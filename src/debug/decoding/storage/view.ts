@@ -48,6 +48,7 @@ import {
     StructType
 } from "../../runtime_types";
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface ArrayLikeStorageView<
     ValViewT extends BaseStorageView<Value, BaseRuntimeType>
 > extends ArrayLikeView<Storage, ValViewT> {}

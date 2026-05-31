@@ -60,7 +60,7 @@ function makeCallFrame(
         if (callee !== undefined) {
             try {
                 args = buildMsgViews(callee);
-            } catch (e) {
+            } catch {
                 args = undefined;
             }
         }
@@ -93,7 +93,6 @@ function makeCreationFrame(
     artifactManager: IArtifactManager
 ): CreationFrame {
     const contractInfo = artifactManager.getContractFromCreationBytecode(data);
-    let args: Array<[string, View]> | undefined;
     const callee = contractInfo && contractInfo.ast ? contractInfo.ast.vConstructor : undefined;
 
     if (contractInfo && callee instanceof FunctionDefinition) {
@@ -109,7 +108,7 @@ function makeCreationFrame(
         callee,
         address: ZERO_ADDRESS,
         startStep: step,
-        arguments: args,
+        arguments: undefined,
         codeMdHash: getCreationCodeHash(data),
         internalFramesSus: false
     };

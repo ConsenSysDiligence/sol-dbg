@@ -26,7 +26,7 @@ export function makeTemplate(artifact: BytecodeInfo): BytecodeTemplate {
 
     return {
         object: artifact.bytecode,
-        skipRanges,
+        skipRanges
     };
 }
 

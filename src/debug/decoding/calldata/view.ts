@@ -31,6 +31,7 @@ import {
     TupleType
 } from "../../runtime_types";
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface ArrayLikeCalldataView<
     ValViewT extends BaseCalldataView<Value, BaseRuntimeType>
 > extends ArrayLikeView<Memory, ValViewT> {}

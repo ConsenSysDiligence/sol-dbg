@@ -10,7 +10,7 @@ import { ethers } from "hardhat";
     try {
         const t = await FailingConstructor.deploy();
         await t.wait();
-    } catch (e) {
+    } catch {
         console.error(`Failed as expected`);
     }
 

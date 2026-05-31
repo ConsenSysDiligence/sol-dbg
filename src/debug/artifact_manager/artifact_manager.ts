@@ -173,8 +173,8 @@ export class ArtifactManager implements IArtifactManager {
     private _artifacts: ArtifactInfo[];
     private _contracts: ContractInfo[];
     private _mdHashToContractInfo: Map<string, ContractInfo>;
-    private _creationBytecodeTemplates: [BytecodeTemplate, ContractInfo][];
-    private _deployedBytecodeTemplates: [BytecodeTemplate, ContractInfo][];
+    private _creationBytecodeTemplates: Array<[BytecodeTemplate, ContractInfo]>;
+    private _deployedBytecodeTemplates: Array<[BytecodeTemplate, ContractInfo]>;
     private _topicToEventInfo: Map<bigint, EventDefInfo>;
 
     private _unitToArtifact: Map<SourceUnit, ArtifactInfo>;
@@ -326,15 +326,17 @@ export class ArtifactManager implements IArtifactManager {
                     }
 
                     if (contractInfo.bytecode !== undefined) {
-                        this._creationBytecodeTemplates.push(
-                            [makeTemplate(contractInfo.bytecode), contractInfo]
-                        );
+                        this._creationBytecodeTemplates.push([
+                            makeTemplate(contractInfo.bytecode),
+                            contractInfo
+                        ]);
                     }
 
                     if (contractInfo.deployedBytecode !== undefined) {
-                        this._deployedBytecodeTemplates.push(
-                            [makeTemplate(contractInfo.deployedBytecode), contractInfo]
-                        );
+                        this._deployedBytecodeTemplates.push([
+                            makeTemplate(contractInfo.deployedBytecode),
+                            contractInfo
+                        ]);
                     }
                 }
             }

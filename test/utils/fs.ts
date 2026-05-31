@@ -1,6 +1,6 @@
 import { join } from "path";
 
-const fse = require("fs-extra");
+import * as fse from "fs-extra";
 
 export function ls(dir: string, ext: string): string[] {
     return fse

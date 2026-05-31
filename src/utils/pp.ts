@@ -29,8 +29,9 @@ import {
     StructType
 } from "../debug/runtime_types";
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const srcLocation = require("src-location");
-const fse = require("fs-extra");
+import * as fse from "fs-extra";
 
 export function ppValue(typ: BaseRuntimeType, v: any): string {
     if (v === undefined) {

@@ -52,8 +52,8 @@ export function getFoundryCtx(evm: EVMInterface): FoundryContext | undefined {
     return wrappedRes;
 };
 
-const { secp256k1 } = require("ethereum-cryptography/secp256k1");
-const ethABI = require("web3-eth-abi");
+import { secp256k1 } from "ethereum-cryptography/secp256k1";
+import * as ethABI from "web3-eth-abi";
 
 export const FoundryCheatcodesAddress = createAddressFromString(
     "0x7109709ECfa91a80626fF3989D68f67F5b1DD12D"
@@ -152,7 +152,10 @@ export function returnStateMatchesRevert(
     // This looks like an Error(string) encoded message. Extract the inner string/bytes
     if (excDataSize >= 4n && equalsBytes(excData.slice(0, 4), ERROR_PREFIX)) {
         try {
-            const errMsg = ethABI.decodeParameters(["string"], bytesToHex(excData.slice(4)))[0];
+            const errMsg = ethABI.decodeParameters(
+                ["string"],
+                bytesToHex(excData.slice(4))
+            )[0] as any;
             actualBytes = utf8ToBytes(errMsg);
         } catch {
             actualBytes = excData;
@@ -330,7 +333,7 @@ export function makeFoundryCheatcodePrecompile(): [PrecompileFunc, FoundryContex
 
         if (equalsBytes(selector, WARP_SELECTOR)) {
             const newTime = BigInt(
-                ethABI.decodeParameters(["uint256"], bytesToHex(input.data.slice(4)))[0]
+                ethABI.decodeParameters(["uint256"], bytesToHex(input.data.slice(4)))[0] as any
             );
 
             ctx.timeWarp = newTime;
@@ -343,7 +346,7 @@ export function makeFoundryCheatcodePrecompile(): [PrecompileFunc, FoundryContex
 
         if (equalsBytes(selector, ROLL_SELECTOR)) {
             const newBlockNum = BigInt(
-                ethABI.decodeParameters(["uint256"], bytesToHex(input.data.slice(4)))[0]
+                ethABI.decodeParameters(["uint256"], bytesToHex(input.data.slice(4)))[0] as any
             );
 
             ctx.rollBockNum = newBlockNum;

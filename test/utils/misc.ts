@@ -2,7 +2,8 @@ import * as sol from "solc-typed-ast";
 import { BaseRuntimeType } from "../../src/debug/runtime_types";
 import { ArtifactManager, PartialSolcOutput } from "../../src";
 import { bytesToUtf8 } from "@ethereumjs/util";
-const fse = require("fs-extra");
+
+import * as fse from "fs-extra";
 
 export type TypeGenerator = (unit: sol.SourceUnit) => BaseRuntimeType;
 

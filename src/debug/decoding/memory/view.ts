@@ -42,6 +42,7 @@ import {
     StructType
 } from "../../runtime_types";
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface ArrayLikeMemView<
     ValViewT extends BaseMemoryView<Value, BaseRuntimeType>
 > extends ArrayLikeView<Memory, ValViewT> {}
