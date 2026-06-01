@@ -5,7 +5,7 @@
         "declaration": true,
         "declarationMap": true,
         "sourceMap": true,
-        "rootDir": "./",
+        "rootDir": "./src",
         "outDir": "dist",
         "removeComments": false,
         "lib": [
