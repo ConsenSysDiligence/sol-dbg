@@ -239,19 +239,25 @@ export abstract class BaseSolTxTracer<TraceT, CtxT> {
             next();
         });
 
-        const txRes = await runTx(vm, {
-            tx,
-            block,
-            skipBalance: true,
-            skipNonce: true,
-            skipBlockGasLimitValidation: true
-        });
+        let txRes: RunTxResult;
+        let foundryFailCalled: boolean;
+        let stateAfter: StateManagerInterface;
 
-        const foundryCtx = getFoundryCtx(vm.evm);
-        const foundryFailCalled = foundryCtx !== undefined ? foundryCtx.failCalled : false;
-        const stateAfter = vm.stateManager;
+        try {
+            txRes = await runTx(vm, {
+                tx,
+                block,
+                skipBalance: true,
+                skipNonce: true,
+                skipBlockGasLimitValidation: true
+            });
 
-        BaseSolTxTracer.releaseVM(vm);
+            const foundryCtx = getFoundryCtx(vm.evm);
+            foundryFailCalled = foundryCtx !== undefined ? foundryCtx.failCalled : false;
+            stateAfter = vm.stateManager;
+        } finally {
+            BaseSolTxTracer.releaseVM(vm);
+        }
 
         return [
             trace,
