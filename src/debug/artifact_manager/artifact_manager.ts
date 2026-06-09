@@ -1,4 +1,4 @@
-import { bytesToBigInt } from "@ethereumjs/util";
+import { Address, bytesToBigInt } from "@ethereumjs/util";
 import { bytesToHex, hexToBytes } from "ethereum-cryptography/utils";
 import {
     ASTNode,
@@ -41,6 +41,7 @@ import {
     SourceFileInfo,
     SourceFileType
 } from "./types";
+import { decodeLinkMap } from "../decoding/utils";
 
 export interface IArtifactManager {
     getContractFromDeployedBytecode(code: Uint8Array): ContractInfo | undefined;
@@ -595,5 +596,49 @@ export class ArtifactManager implements IArtifactManager {
         }
 
         return this._topicToEventInfo.get(topic);
+    }
+
+    /**
+     * Find the linked address for a library `lib` in a contract `inContract` given its actual bytecode `actualBytecode`. The `isCreation` determines if `actualBytecode`
+     * referes to the creation or deployed bytecode.
+     *
+     * @todo: We pass in `actualBytecode` instead of just using the bytecode in the artifact, as in the mainnet replay case they used to differ. This is a bit of a hack,
+     * and a better hack I'm moving towards is to just modify the compilation artifacts to take the mainnet bytecode verbatim as long as it loosly matches the locally compiled version.
+     * The main difference seems to be md hashes.
+     *
+     * @returns
+     */
+    getLibraryAddress(
+        lib: ContractDefinition,
+        inContract: ContractInfo,
+        isCreation: boolean,
+        actualBytecode: Uint8Array
+    ): Address | undefined {
+        // First try looking up in the relevant bytecode linkReferences
+        const bytecodeInfo = isCreation ? inContract.bytecode : inContract.deployedBytecode;
+        if (bytecodeInfo !== undefined) {
+            const linkMap = decodeLinkMap(bytecodeInfo, actualBytecode);
+            const addr = linkMap.get(`${lib.vScope.sourceEntryKey}:${lib.name}`);
+            if (addr) {
+                return addr;
+            }
+        }
+
+        // Otherwise try looking in the linkedLibraries of the artifact. They are indexed
+        // by file name where the library is used, but this can be tricky to look up. The file could be inlcuded in the current context.
+        // To avoid a complex lookup, just search by name, hoping for a unique match.
+        // @todo: This is hacky. Come up with something better. https://github.com/ConsenSysDiligence/sol-dbg/issues/75
+        const artifactInfo = inContract.artifact;
+        const res: Address[] = [];
+        for (const [, libM] of artifactInfo.linkedLibraries) {
+            const addr = libM.get(lib.name);
+
+            if (addr) {
+                res.push(addr);
+            }
+        }
+
+        // In duplicate scenarios we just throw our hands
+        return res.length === 1 ? res[0] : undefined;
     }
 }

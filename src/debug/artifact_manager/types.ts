@@ -140,13 +140,15 @@ export interface ArtifactInfo {
     contracts: ContractInfo[];
 
     /**
-     * Map from library identifiers ('FileName.sol:ContractName') to the address
-     * where the specific library is linked.
+     * Map from file names where a library is used, to a map from library names to their deployed address.
      *
-     * This maps can hold libraries that were passed in to compilation in the
+     * This maps holds libraries that were passed in to compilation in the
      * `libraries` field in the input JSON.
+     *
+     * Note: In some cases I've observed the root keys to be of the form `FileName.sol:ContractName` instead of
+     * just `FileName.sol`
      */
-    linkedLibraries: Map<string, Address>;
+    linkedLibraries: Map<string, Map<string, Address>>;
 }
 
 /**
