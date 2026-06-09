@@ -138,6 +138,15 @@ export interface ArtifactInfo {
      * List of `ContractInfo` objects for all contracts in this artifact
      */
     contracts: ContractInfo[];
+
+    /**
+     * Map from library identifiers ('FileName.sol:ContractName') to the address
+     * where the specific library is linked.
+     *
+     * This maps can hold libraries that were passed in to compilation in the
+     * `libraries` field in the input JSON.
+     */
+    linkedLibraries: Map<string, Address>;
 }
 
 /**

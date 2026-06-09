@@ -259,7 +259,8 @@ export class ArtifactManager implements IArtifactManager {
                 fileMap,
                 srcMap,
                 codegen: "old",
-                contracts: []
+                contracts: [],
+                linkedLibraries: new Map()
             });
         }
 
