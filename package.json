@@ -1,6 +1,6 @@
 {
     "name": "sol-dbg",
-    "version": "0.10.9",
+    "version": "0.10.10",
     "description": "Small (experimental) Solidity-level debugger built around EthereumJS",
     "keywords": [],
     "files": [
@@ -33,7 +33,7 @@
         "@ethereumjs/vm": "10.1.2",
         "cbor": "^10.0.3",
         "ethereum-cryptography": "2.2.1",
-        "solc-typed-ast": "20.0.5",
+        "solc-typed-ast": "20.0.6",
         "src-location": "1.1.0",
         "web3-eth-abi": "4.4.1"
     },
