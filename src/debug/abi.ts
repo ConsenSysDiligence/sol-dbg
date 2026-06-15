@@ -63,8 +63,8 @@ export function buildMsgViews(
     const views = makeCalldataViews(
         formals.map((x) => {
             const rtt = typeIdToRuntimeType(x[1], ctx, sol.DataLocation.CallData);
-            return ((rtt instanceof PointerType && rtt.location === sol.DataLocation.Storage) ||
-                rtt instanceof MappingType)
+            return (rtt instanceof PointerType && rtt.location === sol.DataLocation.Storage) ||
+                rtt instanceof MappingType
                 ? uint256
                 : rtt;
         }),
