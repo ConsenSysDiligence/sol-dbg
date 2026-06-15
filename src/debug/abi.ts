@@ -10,7 +10,7 @@ import {
 } from "./decoding/calldata/view";
 import { DecodingFailure, Value } from "./decoding/value";
 import { IArtifactManager } from "./artifact_manager";
-import { BaseRuntimeType, PointerType, typeIdToRuntimeType } from "./runtime_types";
+import { BaseRuntimeType, MappingType, PointerType, typeIdToRuntimeType } from "./runtime_types";
 
 /**
  * Return true if the given callee requires a selector
@@ -59,11 +59,12 @@ export function buildMsgViews(
 
     const formals = getArgs(callee);
 
-    // Note that we do not o=convert types to ABI types here. The calldata views transparently decode high-levle types (e.g. structs, fixed arrays)
+    // Note that we do not convert types to ABI types here. The calldata views transparently decode high-level types (e.g. structs, fixed arrays)
     const views = makeCalldataViews(
         formals.map((x) => {
             const rtt = typeIdToRuntimeType(x[1], ctx, sol.DataLocation.CallData);
-            return rtt instanceof PointerType && rtt.location === sol.DataLocation.Storage
+            return ((rtt instanceof PointerType && rtt.location === sol.DataLocation.Storage) ||
+                rtt instanceof MappingType)
                 ? uint256
                 : rtt;
         }),
