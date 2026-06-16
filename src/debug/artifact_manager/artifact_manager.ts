@@ -625,20 +625,23 @@ export class ArtifactManager implements IArtifactManager {
         }
 
         // Otherwise try looking in the linkedLibraries of the artifact. They are indexed
-        // by file name where the library is used, but this can be tricky to look up. The file could be inlcuded in the current context.
-        // To avoid a complex lookup, just search by name, hoping for a unique match.
+        // by file name where the library is used, but this can be tricky to look up.
+        // Sometimes etherscan give the keys as "filename.sol:contract" and other times as just "filename.sol:"
+        // Also a file may be included in our current file, in which case its not clear if we have to walk all included files.
+        // To avoid a complex lookup, just search by name, hoping for a unique address match.
         // @todo: This is hacky. Come up with something better. https://github.com/ConsenSysDiligence/sol-dbg/issues/75
         const artifactInfo = inContract.artifact;
-        const res: Address[] = [];
+        const res = new Map<string, Address>();
+
         for (const [, libM] of artifactInfo.linkedLibraries) {
             const addr = libM.get(lib.name);
 
             if (addr) {
-                res.push(addr);
+                res.set(addr.toString(), addr);
             }
         }
 
         // In duplicate scenarios we just throw our hands
-        return res.length === 1 ? res[0] : undefined;
+        return res.size === 1 ? [...res.values()][0] : undefined;
     }
 }
