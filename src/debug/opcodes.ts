@@ -2929,7 +2929,9 @@ export function changesMemory(op: EVMOpInfo): boolean {
         op.opcode === OPCODES.CALLCODE ||
         op.opcode === OPCODES.DELEGATECALL ||
         op.opcode === OPCODES.STATICCALL ||
-        op.opcode === OPCODES.MCOPY
+        op.opcode === OPCODES.MCOPY ||
+        op.opcode === OPCODES.RETURN ||
+        op.opcode === OPCODES.STOP
     );
 }
 
